@@ -32,13 +32,28 @@ One command. No config. Works with your local `~/.claude/` sessions out of the b
 pip install vibelens && vibelens serve
 ```
 
-![Analytics Dashboard](figures/02-dashboard.png)
-
-![Dashboard Charts — Peak Hours, Model & Tool Distribution](figures/03-dashboard-charts.png)
-
-![Session Browser with Step Timeline](figures/01-session-browser.png)
-
-![Conversation Flow with Phase Detection](figures/04-flow-diagram.png)
+<table>
+  <tr>
+    <td width="50%">
+      <kbd><img src="figures/02-dashboard.png" alt="Analytics Dashboard" width="100%" /></kbd>
+      <p align="center"><b>Analytics Dashboard</b><br>Aggregate stats, cost estimation, and usage trends over time.</p>
+    </td>
+    <td width="50%">
+      <kbd><img src="figures/03-dashboard-charts.png" alt="Dashboard Charts" width="100%" /></kbd>
+      <p align="center"><b>Activity Heatmap & Charts</b><br>Peak hours, project breakdown, model and tool distribution.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <kbd><img src="figures/01-session-browser.png" alt="Session Browser" width="100%" /></kbd>
+      <p align="center"><b>Session Browser</b><br>Browse by project, view step-by-step timelines with tool calls.</p>
+    </td>
+    <td width="50%">
+      <kbd><img src="figures/04-flow-diagram.png" alt="Conversation Flow" width="100%" /></kbd>
+      <p align="center"><b>Conversation Flow</b><br>Phase detection across exploration, implementation, and verification.</p>
+    </td>
+  </tr>
+</table>
 
 ## Why VibeLens?
 
