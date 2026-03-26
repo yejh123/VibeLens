@@ -4,7 +4,7 @@ Builds skeleton trajectories from parser indexes with polymorphic dispatch,
 plus deduplication/validation and continuation chain enrichment.
 """
 
-import json
+import re
 from pathlib import Path
 
 from vibelens.ingest.parsers.base import BaseParser
@@ -16,8 +16,7 @@ logger = get_logger(__name__)
 
 
 def build_session_index(
-    file_index: dict[str, tuple[Path, BaseParser]],
-    data_dirs: dict[BaseParser, Path],
+    file_index: dict[str, tuple[Path, BaseParser]], data_dirs: dict[BaseParser, Path]
 ) -> list[Trajectory]:
     """Build validated, deduplicated skeleton trajectories from all agents.
 
@@ -79,9 +78,7 @@ def _collect_all_skeletons(
 
 
 def _build_orphaned_skeletons(
-    parser: BaseParser,
-    file_index: dict[str, tuple[Path, BaseParser]],
-    indexed_ids: set[str],
+    parser: BaseParser, file_index: dict[str, tuple[Path, BaseParser]], indexed_ids: set[str]
 ) -> list[Trajectory]:
     """Parse session files not covered by the parser's fast index.
 
@@ -289,13 +286,16 @@ def _enrich_continuation_refs(
         logger.info("Enriched %d continuation chain links", linked)
 
 
+_SESSION_ID_PATTERN = re.compile(r'"sessionId"\s*:\s*"([^"]+)"')
+
+
 def _scan_continuation_session_id(filepath: Path, expected_id: str) -> str | None:
     """Check if a JSONL file contains entries from multiple sessions.
 
     Claude Code continuation sessions embed the tail of the previous
     conversation at the start of the file. These entries carry the
-    previous session's sessionId. This function does a fast line-level
-    scan to detect the secondary (previous) sessionId.
+    previous session's sessionId. This function uses a fast regex scan
+    instead of json.loads() to extract sessionId values.
 
     Args:
         filepath: Path to the Claude Code JSONL session file.
@@ -308,19 +308,10 @@ def _scan_continuation_session_id(filepath: Path, expected_id: str) -> str | Non
     try:
         with open(filepath, encoding="utf-8") as fh:
             for line in fh:
-                line = line.strip()
-                if not line:
+                match = _SESSION_ID_PATTERN.search(line)
+                if not match:
                     continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                sid = entry.get("sessionId")
-                if not sid:
-                    continue
-                seen_ids.add(sid)
+                seen_ids.add(match.group(1))
                 if len(seen_ids) >= 2:
                     break
     except OSError:

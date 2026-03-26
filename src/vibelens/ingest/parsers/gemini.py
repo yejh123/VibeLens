@@ -76,7 +76,7 @@ class GeminiParser(BaseParser):
         try:
             data = json.loads(content)
         except json.JSONDecodeError:
-            logger.warning("Invalid JSON in Gemini session content")
+            logger.debug("Invalid JSON in Gemini session content")
             return []
 
         session_id = data.get("sessionId", "")

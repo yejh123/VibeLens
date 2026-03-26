@@ -47,7 +47,6 @@ def _make_step(
 def _make_llm_event(session_id: str, start: str, end: str | None = None) -> FrictionLLMEvent:
     """Build a minimal FrictionLLMEvent for testing."""
     return FrictionLLMEvent(
-        friction_id="friction-001",
         friction_type="test-type",
         span_ref=StepRef(session_id=session_id, start_step_id=start, end_step_id=end),
         severity=3,
@@ -55,7 +54,6 @@ def _make_llm_event(session_id: str, start: str, end: str | None = None) -> Fric
         friction_detail="test detail",
         claude_helpfulness=3,
         mitigations=[],
-        related_friction_ids=[],
     )
 
 

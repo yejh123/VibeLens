@@ -3,7 +3,11 @@
 import time
 from datetime import datetime, timedelta
 
-from vibelens.analysis.dashboard_stats import compute_dashboard_stats, filter_metadata
+from vibelens.analysis.dashboard_stats import (
+    compute_dashboard_stats,
+    compute_dashboard_stats_from_metadata,
+    filter_metadata,
+)
 from vibelens.analysis.session_analytics import compute_session_analytics
 from vibelens.analysis.tool_usage import compute_tool_usage
 from vibelens.deps import get_store
@@ -76,6 +80,9 @@ def get_dashboard_stats(
 ) -> DashboardStats:
     """Compute dashboard stats with caching and session count reconciliation.
 
+    Uses enriched metadata when available to avoid loading full trajectories.
+    Falls back to full trajectory loading if metadata lacks enriched metrics.
+
     Args:
         project_path: Optional project path filter.
         date_from: Optional start date (YYYY-MM-DD).
@@ -92,11 +99,20 @@ def get_dashboard_stats(
         if (time.monotonic() - cached_time) < CACHE_TTL_SECONDS:
             return cached_result
 
-    trajectories, filtered_metadata = load_filtered_trajectories(
-        project_path, date_from, date_to, session_token
-    )
-    result = compute_dashboard_stats(trajectories)
-    _reconcile_session_counts(result, trajectories, filtered_metadata)
+    store = get_store()
+    metadata = store.list_metadata()
+    metadata = filter_visible(metadata, session_token)
+    filtered = filter_metadata(metadata, project_path, date_from, date_to)
+
+    if _has_enriched_metrics(filtered):
+        result = compute_dashboard_stats_from_metadata(filtered)
+    else:
+        trajectories, filtered = load_filtered_trajectories(
+            project_path, date_from, date_to, session_token
+        )
+        result = compute_dashboard_stats(trajectories)
+        _reconcile_session_counts(result, trajectories, filtered)
+
     _dashboard_cache[cache_key] = (time.monotonic(), result)
     return result
 
@@ -150,11 +166,50 @@ def get_session_analytics(session_id: str, session_token: str | None) -> Session
 
 
 def warm_cache() -> None:
-    """Pre-compute global dashboard stats and tool usage into cache."""
+    """Pre-compute global dashboard stats and tool usage into cache.
+
+    Dashboard stats use enriched metadata (fast-scanned token counts)
+    to avoid loading full trajectories. Tool usage still requires full
+    trajectories since it needs per-tool function names.
+    """
     logger.info("Warming dashboard cache...")
-    get_dashboard_stats(None, None, None, None)
-    get_tool_usage(None, None, None, None)
+    cache_key_dash = "dash:all:None:None:None"
+    cache_key_tools = "tools:all:None:None:None"
+
+    store = get_store()
+    metadata = store.list_metadata()
+    metadata = filter_visible(metadata, session_token=None)
+    filtered = filter_metadata(metadata, None, None, None)
+
+    # Dashboard stats from enriched metadata (no full trajectory loading)
+    if _has_enriched_metrics(filtered):
+        stats = compute_dashboard_stats_from_metadata(filtered)
+        logger.info("Dashboard stats computed from metadata (no file I/O)")
+    else:
+        trajectories, _meta = load_filtered_trajectories(None, None, None, None)
+        stats = compute_dashboard_stats(trajectories)
+        _reconcile_session_counts(stats, trajectories, filtered)
+    _dashboard_cache[cache_key_dash] = (time.monotonic(), stats)
+
+    # Tool usage requires full trajectories for function names
+    trajectories, _meta = load_filtered_trajectories(None, None, None, None)
+    usage = compute_tool_usage(trajectories)
+    _tool_usage_cache[cache_key_tools] = (time.monotonic(), usage)
+
     logger.info("Dashboard cache warmed")
+
+
+def _has_enriched_metrics(metadata: list[dict]) -> bool:
+    """Check if metadata has enriched final_metrics from fast scanning.
+
+    Returns True if at least one entry has non-zero token counts,
+    indicating the metadata was enriched by fast_metrics scanning.
+    """
+    for meta in metadata[:10]:
+        fm = meta.get("final_metrics") or {}
+        if fm.get("total_prompt_tokens") or fm.get("total_completion_tokens"):
+            return True
+    return False
 
 
 def invalidate_cache() -> None:

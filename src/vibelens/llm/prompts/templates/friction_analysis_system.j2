@@ -97,9 +97,11 @@ Each mitigation must be structured with:
 
 ## Output Rules
 
-- Text fields (`user_intention`, `friction_detail`, `summary`) must NOT reference step IDs
-- `user_intention`: Describe what the user fundamentally wanted in plain language
-- `friction_detail`: Why the agent failed to satisfy the user (1 sentence, or empty if self-evident)
-- If a session has zero friction, report zero events. Do not invent friction.
+**CRITICAL: Your entire response must be a single JSON object. No markdown, no prose, no explanation — only raw JSON.**
 
-Return valid JSON matching the provided schema.
+- Text fields (`user_intention`, `friction_detail`, `summary`) must NOT reference step IDs
+- `user_intention`: What the user wanted (max 15 words)
+- `friction_detail`: Why the agent failed (max 20 words, or empty if self-evident)
+- `summary`: Narrative overview of friction (max 50 words). Be terse.
+- `mitigation.content`: Exact text to add/change (max 30 words)
+- If a session has zero friction, return `{"events": [], "summary": "No friction detected.", "top_mitigation": null}`

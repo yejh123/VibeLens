@@ -114,7 +114,6 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
 
     return [
         FrictionEvent(
-            friction_id="friction-001",
             friction_type="misunderstood-intent",
             span_ref=StepRef(
                 session_id=sid_1,
@@ -138,13 +137,13 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-            related_friction_ids=["friction-003"],
+
             estimated_cost=FrictionCost(
                 affected_steps=3, affected_tokens=12000, affected_time_seconds=90
             ),
         ),
         FrictionEvent(
-            friction_id="friction-002",
+
             friction_type="quality-rejection",
             span_ref=StepRef(
                 session_id=sid_2,
@@ -168,13 +167,13 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-            related_friction_ids=[],
+
             estimated_cost=FrictionCost(
                 affected_steps=2, affected_tokens=6500, affected_time_seconds=45
             ),
         ),
         FrictionEvent(
-            friction_id="friction-003",
+
             friction_type="scope-violation",
             span_ref=StepRef(
                 session_id=sid_3,
@@ -202,13 +201,13 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     content="Add visual regression test for login button alignment.",
                 ),
             ],
-            related_friction_ids=["friction-001"],
+
             estimated_cost=FrictionCost(
                 affected_steps=4, affected_tokens=18000, affected_time_seconds=120
             ),
         ),
         FrictionEvent(
-            friction_id="friction-004",
+
             friction_type="abandoned-task",
             span_ref=StepRef(
                 session_id=sid_4,
@@ -219,13 +218,13 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
             friction_detail="",
             claude_helpfulness=4,
             mitigations=[],
-            related_friction_ids=[],
+
             estimated_cost=FrictionCost(
                 affected_steps=1, affected_tokens=2000, affected_time_seconds=15
             ),
         ),
         FrictionEvent(
-            friction_id="friction-005",
+
             friction_type="repeated-failure",
             span_ref=StepRef(
                 session_id=sid_5,
@@ -249,7 +248,7 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-            related_friction_ids=[],
+
             estimated_cost=FrictionCost(
                 affected_steps=3, affected_tokens=9500, affected_time_seconds=60
             ),

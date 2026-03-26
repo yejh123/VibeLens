@@ -1,4 +1,4 @@
-import { Clock, History, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, Coins, History, Layers, Loader2, Trash2, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "../../app";
 import type { FrictionAnalysisResult, FrictionMeta } from "../../types";
@@ -73,9 +73,6 @@ export function FrictionHistory({ onSelect, refreshTrigger }: FrictionHistoryPro
 
   return (
     <div className="space-y-1.5">
-      <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-        History
-      </p>
       {items.map((item) => (
         <HistoryCard
           key={item.analysis_id}
@@ -103,7 +100,12 @@ function HistoryCard({
   const date = new Date(item.created_at);
   const dateStr = isNaN(date.getTime())
     ? item.created_at
-    : date.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const timeStr = isNaN(date.getTime())
+    ? ""
+    : date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  const hasFriction = item.event_count > 0;
 
   return (
     <div
@@ -111,20 +113,49 @@ function HistoryCard({
       className="group relative px-3 py-2.5 rounded-lg bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-700/40 hover:border-zinc-600/50 cursor-pointer transition"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-zinc-200 line-clamp-2 leading-relaxed">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <p className="text-xs text-zinc-100 line-clamp-2 leading-relaxed font-medium">
             {item.summary_preview}
           </p>
-          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-zinc-500">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {hasFriction ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-700/30 text-[10px] font-medium text-amber-300">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {item.event_count}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-900/30 border border-emerald-700/30 text-[10px] font-medium text-emerald-300">
+                <Zap className="w-2.5 h-2.5" />
+                Clean
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 text-[10px] text-zinc-300">
+              <Layers className="w-2.5 h-2.5 text-violet-400" />
+              {item.session_ids.length}
+            </span>
+            {item.cost_usd != null && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-300">
+                <Coins className="w-2.5 h-2.5 text-amber-400" />
+                {formatCost(item.cost_usd)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-zinc-400">
+            <span className="inline-flex items-center gap-1">
+              <Calendar className="w-2.5 h-2.5" />
               {dateStr}
             </span>
-            <span>{item.event_count} event{item.event_count !== 1 ? "s" : ""}</span>
-            <span>{item.session_ids.length} session{item.session_ids.length !== 1 ? "s" : ""}</span>
-            {item.cost_usd != null && <span>{formatCost(item.cost_usd)}</span>}
+            {timeStr && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                {timeStr}
+              </span>
+            )}
           </div>
-          <p className="text-[10px] text-zinc-600 mt-0.5 truncate">{item.model}</p>
+
+          <p className="text-[10px] text-zinc-500 truncate">{item.model}</p>
         </div>
         <button
           onClick={(e) => {

@@ -89,8 +89,6 @@ export function PromptNavPanel({
   const hasFlowSections = viewMode === "flow" && flowSections && flowSections.length > 0;
   if (hasFlowPhases || hasFlowSections) {
     const sections = flowSections ?? [];
-    // Build a stepId→turnNumber lookup from prompt entries
-    const turnByStepId = new Map(entries.map((e) => [e.stepId, e]));
     let phaseIdx = 0;
 
     return (
@@ -104,36 +102,45 @@ export function PromptNavPanel({
             {sections.map((section, i) => {
               if (section.type === "anchor") {
                 const anchor = section.data;
-                const entry = turnByStepId.get(anchor.id);
-                const turnNum = entry?.turnNumber ?? "?";
-                const preview = entry?.preview ?? truncate(anchor.label, PREVIEW_LONG);
+                const isAuto = anchor.isAutoPrompt;
                 const isActive = anchor.id === activeStepId;
+                const activeClass = isAuto
+                  ? "bg-amber-500/15 border border-amber-500/30"
+                  : "bg-emerald-500/15 border border-emerald-500/30";
+                const idleClass = isAuto
+                  ? "bg-amber-950/20 hover:bg-amber-900/20 border border-amber-500/10 hover:border-amber-500/20"
+                  : "bg-emerald-950/20 hover:bg-emerald-900/20 border border-emerald-500/10 hover:border-emerald-500/20";
+                const iconColor = isAuto
+                  ? (isActive ? "text-amber-400" : "text-amber-400/60")
+                  : (isActive ? "text-emerald-400" : "text-emerald-400/60");
+                const labelColor = isAuto
+                  ? (isActive ? "text-amber-300" : "text-amber-400/70 group-hover:text-amber-300")
+                  : (isActive ? "text-emerald-300" : "text-emerald-400/70 group-hover:text-emerald-300");
+                const previewColor = isAuto
+                  ? (isActive ? "text-amber-200/70" : "text-zinc-500 group-hover:text-zinc-400")
+                  : (isActive ? "text-emerald-200/80" : "text-zinc-400 group-hover:text-zinc-300");
+
                 return (
                   <button
                     key={`anchor-${anchor.id}`}
                     onClick={() => onNavigate(anchor.id)}
                     className={`w-full text-left px-2.5 py-2 rounded-md transition-colors text-sm group ${
-                      isActive
-                        ? "bg-indigo-500/20 border border-indigo-500/40"
-                        : "bg-indigo-950/30 hover:bg-indigo-900/30 border border-indigo-500/10 hover:border-indigo-500/25"
+                      isActive ? activeClass : idleClass
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <User className={`w-3.5 h-3.5 ${isActive ? "text-indigo-400" : "text-indigo-400/60"}`} />
-                      <span
-                        className={`font-mono font-semibold text-xs ${
-                          isActive ? "text-indigo-300" : "text-indigo-400/70 group-hover:text-indigo-300"
-                        }`}
-                      >
-                        Prompt #{turnNum}
+                      <User className={`w-3.5 h-3.5 ${iconColor}`} />
+                      <span className={`font-mono font-semibold text-xs ${labelColor}`}>
+                        Prompt #{anchor.promptIndex}
                       </span>
+                      {isAuto && (
+                        <span className="text-[9px] uppercase tracking-wider text-amber-500/50 font-semibold">
+                          auto
+                        </span>
+                      )}
                     </div>
-                    <p
-                      className={`line-clamp-2 leading-snug pl-5 ${
-                        isActive ? "text-indigo-200/80" : "text-zinc-400 group-hover:text-zinc-300"
-                      }`}
-                    >
-                      {preview}
+                    <p className={`line-clamp-2 leading-snug pl-5 ${previewColor}`}>
+                      {truncate(anchor.label, PREVIEW_LONG)}
                     </p>
                   </button>
                 );

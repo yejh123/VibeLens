@@ -442,7 +442,7 @@ function SessionRow({
               {baseProjectName(session.project_path || "")}
             </span>
             <div className="flex items-center gap-1">
-              {(session.last_trajectory_ref || session.continued_trajectory_ref) && (
+              {(session.last_trajectory_ref || session.continued_trajectory_ref || session.parent_trajectory_ref) && (
                 <span title="Part of continuation chain"><Link2 className="w-3 h-3 text-violet-400" /></span>
               )}
               <span className="text-xs text-zinc-400">
@@ -456,7 +456,7 @@ function SessionRow({
             {truncate(session.first_message || "", 120) || "Empty session"}
           </p>
           <div className="flex items-center gap-1 shrink-0">
-            {!showProject && (session.last_trajectory_ref || session.continued_trajectory_ref) && (
+            {!showProject && (session.last_trajectory_ref || session.continued_trajectory_ref || session.parent_trajectory_ref) && (
               <span title="Part of continuation chain"><Link2 className="w-3 h-3 text-violet-400" /></span>
             )}
             {!showProject && (

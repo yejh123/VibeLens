@@ -92,7 +92,7 @@ export function FlowDiagram({ steps, flowData }: FlowDiagramProps) {
       {result.sections.map((section, sectionIdx) => {
         if (section.type === "anchor") {
           return (
-            <div key={`anchor-${section.data.id}`}>
+            <div key={`anchor-${section.data.id}`} id={`step-${section.data.id}`} style={{ scrollMarginTop: "1rem" }}>
               {sectionIdx > 0 && <SectionDivider />}
               <UserAnchor
                 data={section.data}
@@ -161,22 +161,53 @@ function UserAnchor({
   onMove: (e: React.MouseEvent) => void;
   onLeave: () => void;
 }) {
+  // Auto-prompts (plan mode, continuation) use a muted amber style;
+  // real user prompts use the standard emerald style.
+  const isAuto = data.isAutoPrompt;
+  const borderClass = isAuto
+    ? "border-amber-500/20 bg-amber-950/20 hover:border-amber-400/35 hover:bg-amber-950/30"
+    : "border-emerald-500/25 bg-emerald-950/20 hover:border-emerald-400/40 hover:bg-emerald-950/30";
+  const iconBg = isAuto
+    ? "bg-amber-500/20 border-amber-400/15"
+    : "bg-emerald-500/20 border-emerald-400/15";
+  const iconText = isAuto ? "text-amber-300" : "text-emerald-300";
+  const labelText = isAuto ? "text-amber-200/70" : "text-emerald-100";
+  const indexText = isAuto ? "text-amber-400/60" : "text-emerald-400/80";
+
   return (
     <div
-      className="group relative rounded-lg border border-indigo-500/30 bg-indigo-950/30 hover:border-indigo-400/50 hover:bg-indigo-950/40 transition-all"
+      className={`group relative rounded-lg border ${borderClass} transition-all`}
       onMouseEnter={(e) => onHover(e, data.detail)}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
     >
       <div className="px-4 py-3 flex items-start gap-3">
-        <span className="shrink-0 mt-0.5 w-6 h-6 rounded-md bg-indigo-500/25 border border-indigo-400/20 flex items-center justify-center">
-          <svg className="w-3 h-3 text-indigo-300" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-          </svg>
+        <span className={`shrink-0 mt-0.5 w-6 h-6 rounded-md ${iconBg} border flex items-center justify-center`}>
+          {isAuto ? (
+            <svg className={`w-3 h-3 ${iconText}`} viewBox="0 0 16 16" fill="currentColor">
+              <path d="M5.5 0a.5.5 0 0 1 .5.5v4A1.5 1.5 0 0 1 4.5 6H1a.5.5 0 0 1 0-1h3.5a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5H15a.5.5 0 0 1 0 1h-3.5A1.5 1.5 0 0 1 10 4.5v-4a.5.5 0 0 1 .5-.5zM5.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5H1a.5.5 0 0 1 0-1h3.5a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5H15a.5.5 0 0 1 0-1h-3.5a.5.5 0 0 0-.5-.5v-4a.5.5 0 0 1 .5-.5z"/>
+            </svg>
+          ) : (
+            <svg className={`w-3 h-3 ${iconText}`} viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+            </svg>
+          )}
         </span>
-        <p className="text-[13px] leading-relaxed text-indigo-100 min-w-0 break-words">
-          {data.label}
-        </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <span className={`font-mono text-[11px] font-semibold ${indexText}`}>
+              #{data.promptIndex}
+            </span>
+            {isAuto && (
+              <span className="text-[9px] uppercase tracking-wider text-amber-500/60 font-semibold">
+                auto
+              </span>
+            )}
+          </div>
+          <p className={`text-[13px] leading-relaxed ${labelText} break-words`}>
+            {data.label}
+          </p>
+        </div>
       </div>
     </div>
   );

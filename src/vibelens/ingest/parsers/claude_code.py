@@ -1,8 +1,8 @@
 """Claude Code JSONL format parser.
 
-Parses ~/.claude/history.jsonl for session indices and individual
-session .jsonl files for full conversation data, including subagent
-conversations stored in {session-id}/subagents/ directories.
+Parses ~/.claude/history.jsonl for session indices and individual session
+.jsonl files for full conversation data, including subagent conversations
+stored in {session-id}/subagents/ directories.
 
 Claude Code stores each conversation event as a separate JSONL line with
 a top-level ``type`` field (``"user"`` or ``"assistant"``).  Tool use
@@ -265,7 +265,7 @@ class ClaudeCodeParser(BaseParser):
         """
         history_file = claude_dir / "history.jsonl"
         if not history_file.exists():
-            logger.warning("history.jsonl not found at %s", history_file)
+            logger.debug("history.jsonl not found at %s", history_file)
             return []
 
         since_ms = int(since.timestamp() * 1000) if since else 0
@@ -317,7 +317,7 @@ class ClaudeCodeParser(BaseParser):
         try:
             content = file_path.read_text(encoding="utf-8")
         except OSError:
-            logger.warning("Cannot read file: %s", file_path)
+            logger.debug("Cannot read file: %s", file_path)
             return []
         return self._parse_content(content)
 

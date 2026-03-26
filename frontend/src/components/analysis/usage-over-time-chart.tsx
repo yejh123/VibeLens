@@ -307,7 +307,15 @@ export function UsageOverTimeChart({
         />
 
         {grouped.map((d, i) => {
-          if (i % labelInterval !== 0 && i !== grouped.length - 1) return null;
+          const isLast = i === grouped.length - 1;
+          const isOnInterval = i % labelInterval === 0;
+          if (!isOnInterval && !isLast) return null;
+          // Skip the last label if it would overlap with the previous interval label
+          if (isLast && !isOnInterval) {
+            const prevIntervalIdx = Math.floor((grouped.length - 1) / labelInterval) * labelInterval;
+            const gap = points[i].x - points[prevIntervalIdx].x;
+            if (gap < 40) return null;
+          }
           return (
             <text
               key={d.date}

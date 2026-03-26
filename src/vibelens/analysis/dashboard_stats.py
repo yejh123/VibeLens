@@ -324,6 +324,82 @@ class _StatsAccumulator:
         )
 
 
+def compute_dashboard_stats_from_metadata(metadata_list: list[dict]) -> DashboardStats:
+    """Compute dashboard stats from enriched metadata without loading trajectories.
+
+    Uses pre-computed final_metrics stored in the metadata cache (populated
+    by fast_metrics scanning during index build). This avoids the ~16s cost
+    of parsing all session files for dashboard statistics.
+
+    Args:
+        metadata_list: Metadata dicts with enriched final_metrics and agent fields.
+
+    Returns:
+        DashboardStats with all chart data populated.
+    """
+    start = time.monotonic()
+    local_tz = datetime.now().astimezone().tzinfo
+    acc = _StatsAccumulator(local_tz)
+
+    for meta in metadata_list:
+        session = _aggregate_metadata(meta)
+        acc.add_session(session)
+
+    stats = acc.build(len(metadata_list))
+    elapsed_ms = (time.monotonic() - start) * 1000
+    logger.info(
+        "Dashboard stats from metadata: %d sessions in %.1fms", len(metadata_list), elapsed_ms
+    )
+    return stats
+
+
+def _aggregate_metadata(meta: dict) -> _SessionAggregate:
+    """Extract aggregate metrics from a single metadata dict.
+
+    Reads from the enriched final_metrics and agent fields stored in
+    the metadata cache, avoiding full trajectory loading.
+    """
+    agg = _SessionAggregate()
+    agg.project = meta.get("project_path") or NO_PROJECT
+    agg.agent_name = (meta.get("agent") or {}).get("name") or "unknown"
+
+    # Parse timestamp
+    ts = parse_metadata_timestamp(meta)
+    agg.timestamp = ts
+
+    # Model from agent metadata
+    agent = meta.get("agent") or {}
+    model = agent.get("model_name")
+    if _is_real_model(model):
+        agg.model = model
+
+    # Extract metrics from enriched final_metrics
+    fm = meta.get("final_metrics") or {}
+    agg.input_tokens = fm.get("total_prompt_tokens") or 0
+    agg.output_tokens = fm.get("total_completion_tokens") or 0
+    agg.cache_read_tokens = fm.get("total_cache_read") or 0
+    agg.cache_creation_tokens = fm.get("total_cache_write") or 0
+    agg.tool_calls = fm.get("tool_call_count") or 0
+    agg.messages = fm.get("total_steps") or 0
+    agg.duration = fm.get("duration") or 0
+
+    # Cost estimation from pricing table using token totals + model
+    if agg.model and agg.model != UNKNOWN_MODEL:
+        from vibelens.analysis.pricing import compute_cost_from_tokens
+
+        cost = compute_cost_from_tokens(
+            agg.model,
+            agg.input_tokens,
+            agg.output_tokens,
+            agg.cache_read_tokens,
+            agg.cache_creation_tokens,
+        )
+        if cost is not None:
+            agg.cost_usd = cost
+
+    return agg
+
+
 def _is_real_model(name: str | None) -> bool:
     """Check if a model name is a real model (not a placeholder).
 

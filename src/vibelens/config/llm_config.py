@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 LLM_CONFIG_ENV_VAR = "VIBELENS_LLM_CONFIG"
 LLM_ENV_PREFIX = "VIBELENS_LLM_"
-DEFAULT_LLM_CONFIG_PATH = Path("config/llm.yaml")
+DEFAULT_LLM_CONFIG_PATH = Path.home() / ".vibelens" / "llm.yaml"
 
 PROVIDER_BASE_URLS: dict[str, str] = {
     "anthropic": "https://api.anthropic.com",
@@ -64,7 +64,7 @@ class LLMConfig(BaseModel):
         description="Custom base URL. Auto-resolved from PROVIDER_BASE_URLS if None.",
     )
     model: str = Field(
-        default="anthropic/claude-sonnet-4-5",
+        default="anthropic/claude-haiku-4-5",
         description="Model in litellm format.",
     )
     timeout: int = Field(
@@ -77,12 +77,16 @@ class LLMConfig(BaseModel):
     )
 
 
+LEGACY_LLM_CONFIG_PATH = Path("config/llm.yaml")
+
+
 def discover_llm_config_path() -> Path | None:
     """Find the LLM config file path.
 
     Checks (in order):
         1. ``VIBELENS_LLM_CONFIG`` environment variable
-        2. ``config/llm.yaml`` in the current directory
+        2. ``~/.vibelens/llm.yaml`` (default)
+        3. ``config/llm.yaml`` (legacy fallback)
 
     Returns:
         Path if found, else None.
@@ -97,6 +101,11 @@ def discover_llm_config_path() -> Path | None:
 
     if DEFAULT_LLM_CONFIG_PATH.exists():
         return DEFAULT_LLM_CONFIG_PATH
+
+    # Legacy fallback: config/llm.yaml in the working directory
+    if LEGACY_LLM_CONFIG_PATH.exists():
+        return LEGACY_LLM_CONFIG_PATH
+
     return None
 
 

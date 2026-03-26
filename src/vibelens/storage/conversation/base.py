@@ -15,6 +15,7 @@ from pathlib import Path
 
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.models.trajectories import Trajectory
+from vibelens.models.trajectories.trajectory_ref import TrajectoryRef
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -78,7 +79,33 @@ class TrajectoryStore(ABC):
         if not trajectories:
             return None
 
+        self._enrich_refs_from_index(session_id, trajectories)
         return self._sort_trajectories(trajectories)
+
+    def _enrich_refs_from_index(
+        self, session_id: str, trajectories: list[Trajectory]
+    ) -> None:
+        """Carry over continuation refs from the index to loaded trajectories.
+
+        The index builder enriches skeletons with last_trajectory_ref and
+        continued_trajectory_ref via JSONL analysis.  When sessions are
+        re-parsed from disk these refs are lost, so we copy them back
+        from the cached metadata onto the main trajectory.
+        """
+        meta = self._metadata_cache.get(session_id)
+        if not meta:
+            return
+        main = next((t for t in trajectories if t.session_id == session_id), None)
+        if not main:
+            return
+
+        ref_fields = ("last_trajectory_ref", "continued_trajectory_ref")
+        for field in ref_fields:
+            if getattr(main, field) is not None:
+                continue
+            ref_data = meta.get(field)
+            if ref_data and isinstance(ref_data, dict):
+                setattr(main, field, TrajectoryRef(**ref_data))
 
     @abstractmethod
     def save(self, trajectories: list[Trajectory]) -> None:

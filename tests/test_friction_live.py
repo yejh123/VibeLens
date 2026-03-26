@@ -171,7 +171,7 @@ def _run_friction_analysis(label: str, groups: dict[str, list[Trajectory]]) -> N
             if batch_output.events:
                 for event in batch_output.events:
                     print(
-                        f"    {event.friction_id}: [{event.severity}] {event.friction_type}"
+                        f"    [{event.severity}] {event.friction_type}"
                         f" — {event.user_intention[:80]}..."
                     )
         else:

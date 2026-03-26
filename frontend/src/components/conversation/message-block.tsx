@@ -79,13 +79,13 @@ function SystemStep({ step }: { step: Step }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors bg-zinc-800/50 hover:bg-zinc-800/80 text-zinc-500 border-zinc-700"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors bg-zinc-800/50 hover:bg-zinc-800/80 text-zinc-400 border-zinc-600"
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <Monitor className="w-3.5 h-3.5" />
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <Monitor className="w-4 h-4" />
         <span className="font-medium">System</span>
         {!open && (
-          <span className="text-zinc-600 truncate max-w-[250px] ml-0.5">{previewSnippet}</span>
+          <span className="text-zinc-500 truncate max-w-[250px] ml-0.5">{previewSnippet}</span>
         )}
       </button>
       {open && (
@@ -114,12 +114,12 @@ function SkillStep({ step }: { step: Step }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors bg-amber-500/10 hover:bg-amber-500/15 text-amber-300 border-amber-500/20"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors bg-amber-500/10 hover:bg-amber-500/15 text-amber-300 border-amber-500/25"
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <Zap className="w-3.5 h-3.5" />
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <Zap className="w-4 h-4" />
         <span className="font-medium">Skill</span>
-        {skillName && <span className="text-amber-400/70 ml-0.5">/{skillName}</span>}
+        {skillName && <span className="text-amber-400 ml-0.5">/{skillName}</span>}
       </button>
       {open && (
         <div className="mt-1 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
@@ -142,13 +142,13 @@ function AutoPromptStep({ step }: { step: Step }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors bg-violet-500/10 hover:bg-violet-500/15 text-violet-300 border-violet-500/20"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors bg-violet-500/10 hover:bg-violet-500/15 text-violet-300 border-violet-500/25"
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <ScrollText className="w-3.5 h-3.5" />
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <ScrollText className="w-4 h-4" />
         <span className="font-medium">Auto</span>
         {!open && (
-          <span className="text-violet-400/60 truncate max-w-[250px] ml-0.5">{firstLine}</span>
+          <span className="text-violet-400/80 truncate max-w-[250px] ml-0.5">{firstLine}</span>
         )}
       </button>
       {open && (
@@ -227,10 +227,10 @@ function ConcurrentToolsBlock({
     <div className="max-w-[85%] rounded-lg border bg-cyan-500/5 border-cyan-500/20 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-xs text-cyan-300 hover:bg-white/5 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-cyan-300 hover:bg-white/5 transition-colors"
       >
-        {open ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <Layers className="w-3.5 h-3.5" />
+        {open ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+        <Layers className="w-4 h-4" />
         <span className="font-medium">{toolCalls.length} parallel calls</span>
         {!open && (
           <span className="text-zinc-500 truncate ml-1">{preview}</span>
@@ -279,10 +279,10 @@ function ThinkingBlock({ text }: { text: string }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/15 text-[11px] text-amber-400/90 border border-amber-500/20 transition-colors"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/15 text-sm text-amber-400 border border-amber-500/25 transition-colors"
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <Lightbulb className="w-3.5 h-3.5" />
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <Lightbulb className="w-4 h-4" />
         <span className="font-medium">Thinking</span>
       </button>
       {open && (
@@ -306,13 +306,13 @@ function ToolUseBlock({ toolCall }: { toolCall: ToolCall }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${color}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors ${color}`}
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         {icon}
         <span className="font-medium">{name}</span>
         {!open && preview && (
-          <span className="text-zinc-500 truncate max-w-[200px] ml-0.5">{preview}</span>
+          <span className="text-zinc-400 truncate max-w-[200px] ml-0.5">{preview}</span>
         )}
       </button>
       {open && (
@@ -361,17 +361,17 @@ function ToolResultBlock({ result }: { result: ObservationResult }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors ${
           isError
-            ? "bg-rose-500/10 hover:bg-rose-500/15 text-rose-300 border-rose-500/20"
-            : "bg-teal-500/10 hover:bg-teal-500/15 text-teal-300 border-teal-500/20"
+            ? "bg-rose-500/10 hover:bg-rose-500/15 text-rose-300 border-rose-500/25"
+            : "bg-teal-500/10 hover:bg-teal-500/15 text-teal-300 border-teal-500/25"
         }`}
       >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        {isError ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {isError ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
         <span className="font-medium">{isError ? "Error" : "Result"}</span>
         {!open && (
-          <span className="text-zinc-500 truncate max-w-[250px] ml-0.5">{previewSnippet}</span>
+          <span className="text-zinc-400 truncate max-w-[250px] ml-0.5">{previewSnippet}</span>
         )}
       </button>
       {open && (
@@ -659,48 +659,48 @@ function getToolIconAndColor(name: string): { icon: React.ReactNode; color: stri
   const n = name.toLowerCase();
   if (n === "bash") {
     return {
-      icon: <Terminal className="w-3.5 h-3.5 text-green-400" />,
+      icon: <Terminal className="w-4 h-4 text-green-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "edit") {
     return {
-      icon: <Pencil className="w-3.5 h-3.5 text-blue-400" />,
+      icon: <Pencil className="w-4 h-4 text-blue-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "read") {
     return {
-      icon: <FileCode className="w-3.5 h-3.5 text-sky-400" />,
+      icon: <FileCode className="w-4 h-4 text-sky-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "write") {
     return {
-      icon: <FilePlus2 className="w-3.5 h-3.5 text-emerald-400" />,
+      icon: <FilePlus2 className="w-4 h-4 text-emerald-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "grep") {
     return {
-      icon: <Search className="w-3.5 h-3.5 text-amber-400" />,
+      icon: <Search className="w-4 h-4 text-amber-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "glob") {
     return {
-      icon: <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />,
+      icon: <FolderOpen className="w-4 h-4 text-cyan-400" />,
       color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
     };
   }
   if (n === "agent" || n.includes("task") || n.includes("agent")) {
     return {
-      icon: <Bot className="w-3.5 h-3.5 text-violet-400" />,
+      icon: <Bot className="w-4 h-4 text-violet-400" />,
       color: "bg-violet-500/10 hover:bg-violet-500/15 text-violet-300 border-violet-500/20",
     };
   }
   return {
-    icon: <Wrench className="w-3.5 h-3.5 text-zinc-400" />,
+    icon: <Wrench className="w-4 h-4 text-zinc-400" />,
     color: "bg-slate-500/10 hover:bg-slate-500/15 text-slate-300 border-slate-500/20",
   };
 }

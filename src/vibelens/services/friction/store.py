@@ -1,4 +1,8 @@
-"""Friction store — persistence for friction analysis results."""
+"""Friction store — persistence for friction analysis results.
+
+Uses a single ``meta.jsonl`` file for lightweight listing and individual
+``{analysis_id}.json`` files for full results.
+"""
 
 import json
 import secrets
@@ -12,28 +16,29 @@ logger = get_logger(__name__)
 
 TOKEN_BYTES = 12
 SUMMARY_PREVIEW_LENGTH = 120
+META_FILENAME = "meta.jsonl"
 
 
 class FrictionStore:
     """Manages persisted friction analysis results on disk.
 
-    Each analysis produces two files under ``friction_dir``:
-    - ``{analysis_id}.json``      — full FrictionAnalysisResult
-    - ``{analysis_id}.meta.json`` — lightweight FrictionMeta for listing
+    Each analysis produces one line in ``meta.jsonl`` (append-only) and
+    one ``{analysis_id}.json`` file containing the full result.
     """
 
     def __init__(self, friction_dir: Path):
         self._dir = friction_dir
         self._dir.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def _meta_path(self) -> Path:
+        return self._dir / META_FILENAME
+
     def _data_path(self, analysis_id: str) -> Path:
         return self._dir / f"{analysis_id}.json"
 
-    def _meta_path(self, analysis_id: str) -> Path:
-        return self._dir / f"{analysis_id}.meta.json"
-
     def save(self, result: FrictionAnalysisResult) -> FrictionMeta:
-        """Persist a friction analysis result and return its metadata.
+        """Persist a friction analysis result and append metadata.
 
         Args:
             result: Complete friction analysis result to persist.
@@ -44,10 +49,13 @@ class FrictionStore:
         analysis_id = secrets.token_urlsafe(TOKEN_BYTES)
         result.analysis_id = analysis_id
 
-        self._data_path(analysis_id).write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        self._data_path(analysis_id).write_text(
+            result.model_dump_json(indent=2), encoding="utf-8"
+        )
 
         meta = _build_meta(analysis_id, result)
-        self._meta_path(analysis_id).write_text(meta.model_dump_json(indent=2), encoding="utf-8")
+        with self._meta_path.open("a", encoding="utf-8") as fh:
+            fh.write(meta.model_dump_json() + "\n")
 
         logger.info("Saved friction analysis %s (%d events)", analysis_id, len(result.events))
         return meta
@@ -66,33 +74,25 @@ class FrictionStore:
             return None
         return FrictionAnalysisResult.model_validate_json(path.read_text(encoding="utf-8"))
 
-    def load_meta(self, analysis_id: str) -> FrictionMeta | None:
-        """Load friction metadata by ID.
-
-        Args:
-            analysis_id: Unique analysis identifier.
-
-        Returns:
-            FrictionMeta, or None if not found.
-        """
-        path = self._meta_path(analysis_id)
-        if not path.exists():
-            return None
-        return FrictionMeta.model_validate_json(path.read_text(encoding="utf-8"))
-
     def list_analyses(self) -> list[FrictionMeta]:
         """List all persisted analyses sorted by created_at descending.
 
         Returns:
             List of FrictionMeta objects.
         """
+        if not self._meta_path.exists():
+            return []
+
         analyses: list[FrictionMeta] = []
-        for meta_path in self._dir.glob("*.meta.json"):
+        for line in self._meta_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
             try:
-                meta = FrictionMeta.model_validate_json(meta_path.read_text(encoding="utf-8"))
-                analyses.append(meta)
+                analyses.append(FrictionMeta.model_validate_json(stripped))
             except (json.JSONDecodeError, ValueError):
-                logger.warning("Skipping corrupt friction metadata: %s", meta_path)
+                logger.warning("Skipping corrupt meta line: %s", stripped[:80])
+
         analyses.sort(key=lambda m: m.created_at, reverse=True)
         return analyses
 
@@ -106,13 +106,35 @@ class FrictionStore:
             True if files were deleted, False if not found.
         """
         data_path = self._data_path(analysis_id)
-        meta_path = self._meta_path(analysis_id)
-        if not data_path.exists() and not meta_path.exists():
+        if not data_path.exists():
             return False
         data_path.unlink(missing_ok=True)
-        meta_path.unlink(missing_ok=True)
+        self._rewrite_meta_without(analysis_id)
         logger.info("Deleted friction analysis %s", analysis_id)
         return True
+
+    def _rewrite_meta_without(self, analysis_id: str) -> None:
+        """Remove a single entry from the meta JSONL by rewriting.
+
+        Args:
+            analysis_id: ID to remove from meta.jsonl.
+        """
+        if not self._meta_path.exists():
+            return
+        lines = self._meta_path.read_text(encoding="utf-8").splitlines()
+        kept = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                data = json.loads(stripped)
+                if data.get("analysis_id") == analysis_id:
+                    continue
+            except json.JSONDecodeError:
+                pass
+            kept.append(stripped)
+        self._meta_path.write_text("\n".join(kept) + "\n" if kept else "", encoding="utf-8")
 
 
 def _build_meta(analysis_id: str, result: FrictionAnalysisResult) -> FrictionMeta:

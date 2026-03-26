@@ -192,7 +192,7 @@ class BaseParser(ABC):
         try:
             content = file_path.read_text(encoding="utf-8")
         except OSError:
-            logger.warning("Cannot read file: %s", file_path)
+            logger.debug("Cannot read file: %s", file_path)
             return []
         return self.parse(content, source_path=str(file_path))
 
@@ -343,7 +343,7 @@ class BaseParser(ABC):
                             diagnostics.record_skip("invalid JSON")
                         continue
         except OSError:
-            logger.warning("Cannot read file: %s", file_path)
+            logger.debug("Cannot read file: %s", file_path)
 
 
 def _compute_final_metrics(steps: list[Step]) -> FinalMetrics:

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from vibelens import __version__
+from vibelens.api import build_router
 from vibelens.config import load_settings
 from vibelens.deps import (
     get_central_skill_store,
@@ -31,9 +32,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Initialize store and load demo data on startup."""
+    """Initialize store and start background tasks on startup.
+
+    Only essential setup (store init, demo loading) runs synchronously.
+    All other work (skill import, mock seeding, cache warming) is
+    deferred to a background thread so the server accepts requests
+    immediately — the session list is available on first API call.
+    """
     settings = load_settings()
 
+    # Initialize the trajectory store (local or disk)
     store = get_store()
     store.initialize()
 
@@ -43,19 +51,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if loaded:
             logger.info("Loaded %d trajectory groups for demo mode", loaded)
 
-    # Import skills from all detected agent interfaces into central store.
-    # Uses import_all_from with overwrite=False so existing central skills are preserved.
-    _load_agent_skills_into_central_store()
-
-    # Seed skill analysis history with mock records in test/demo mode
-    # so the UI History sidebar is pre-populated for demonstration
-    if settings.app_mode in (AppMode.TEST, AppMode.DEMO):
-        _seed_mock_skill_history()
-
-    # Pre-compute dashboard in background thread (doesn't block server startup)
-    asyncio.get_event_loop().run_in_executor(None, warm_cache)
+    # Run remaining startup work in background so the server is ready immediately
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _background_startup, settings)
 
     yield
+
+
+def _background_startup(settings) -> None:
+    """Run non-critical startup tasks in a background thread.
+
+    Skill import, mock seeding, and cache warming don't need to
+    complete before the server starts serving requests.
+    """
+    _load_agent_skills_into_central_store()
+    if settings.app_mode in (AppMode.TEST, AppMode.DEMO):
+        _seed_mock_skill_history()
+    warm_cache()
 
 
 def _load_agent_skills_into_central_store() -> None:
@@ -66,10 +78,7 @@ def _load_agent_skills_into_central_store() -> None:
     Existing central skills are never overwritten to preserve user edits.
     """
     central = get_central_skill_store()
-    agent_stores = [
-        ("claude_code", get_skill_store()),
-        ("codex", get_codex_skill_store()),
-    ]
+    agent_stores = [("claude_code", get_skill_store()), ("codex", get_codex_skill_store())]
     total_imported = 0
     for label, store in agent_stores:
         try:
@@ -118,10 +127,7 @@ def _seed_mock_skill_history() -> None:
 
 def create_app() -> FastAPI:
     """Build and return the FastAPI application."""
-    from vibelens.api import build_router
-
     app = FastAPI(title="VibeLens", version=__version__, lifespan=lifespan)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -129,10 +135,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
     app.include_router(build_router(), prefix="/api")
 
     if STATIC_DIR.exists() and any(STATIC_DIR.iterdir()):
         app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
-
     return app

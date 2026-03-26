@@ -47,10 +47,7 @@ class CodexSkillStore(ClaudeCodeSkillStore):
         if not VALID_SKILL_NAME.match(name):
             return None
 
-        candidates = [
-            self._skills_dir / name,
-            self._skills_dir / self.SYSTEM_DIRNAME / name,
-        ]
+        candidates = [self._skills_dir / name, self._skills_dir / self.SYSTEM_DIRNAME / name]
         for skill_dir in candidates:
             skill_file = skill_dir / SKILL_FILENAME
             if skill_file.is_file():

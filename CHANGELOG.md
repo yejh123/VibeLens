@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.9.4] - 2026-03-26
+
+### Added
+- **Fast metrics scanner**: New `ingest/fast_metrics.py` extracts aggregate token counts, tool call counts, model name, and duration from raw JSONL without full Pydantic parsing. Deduplicates assistant entries by message ID.
+- **Persistent index cache**: New `ingest/index_cache.py` serializes session metadata and file mtimes to `~/.vibelens/index_cache.json` for near-instant startup. Incremental updates re-parse only changed files (< 30% threshold; full rebuild otherwise).
+- **Metadata-based dashboard stats**: `compute_dashboard_stats_from_metadata()` computes all dashboard charts from enriched metadata cache, eliminating full trajectory loading for the dashboard.
+- **Friction analysis logging**: Each LLM call saves `system_prompt.txt`, `user_prompt_{N}.txt`, and `raw_output_{N}.txt` to `logs/friction/{YYYYMMDD_HHMMSS}/`. Persists even on inference errors.
+- **Friction analysis summary log**: Append-only `logs/analysis-friction.log` records session IDs, batch composition, token counts, and model for each run.
+- **Session continuation refs**: `TrajectoryStore.load()` enriches loaded trajectories with `last_trajectory_ref`/`continued_trajectory_ref` from the metadata cache, fixing missing continuation tags in the UI.
+
+### Fixed
+- **Flow mode scroll navigation**: Clicking user prompts in the right sidebar now scrolls to the correct position in the flow diagram. Added matching `id` and `scrollMarginTop` to flow anchor divs.
+- **Missing "Spawned by" tag**: Sessions with `parent_trajectory_ref` now show both the link icon in the sidebar and the "Spawned by" navigation tag in the session header.
+- **Overlapping x-axis dates**: Usage Over Time chart skips the last-point label when it overlaps the previous interval label (< 40px gap).
+- **LLM returning markdown instead of JSON**: Strengthened prompt enforcement with "Your entire response must be a single JSON object" directive and explicit zero-friction JSON template.
+- **Duplicate "History" label**: Removed inner "HISTORY" text from `FrictionHistory` component; only the panel header label remains.
+- **History sidebar toggle**: Sidebar now stays visible when clicking a history item instead of collapsing.
+- **Parser log spam**: Downgraded "Cannot read file" and "Invalid JSON" warnings to DEBUG level for edge case test files.
+
+### Changed
+- **Friction store → single JSONL**: Replaced per-analysis `.meta.json` files with a single append-only `meta.jsonl` file. Delete rewrites the file minus the removed entry.
+- **Friction type sort**: Type summary section now sorts by average severity (descending) instead of event count.
+- **Friction ID → server-side UUID**: Removed `friction_id` from LLM output schema. `FrictionEvent` generates a UUID via `default_factory`. Removed `related_friction_ids` field entirely — each event is self-contained.
+- **Default LLM model → Haiku**: Changed default from `anthropic/claude-sonnet-4-5` to `anthropic/claude-haiku-4-5` for faster, cheaper analysis. Frontend model presets reordered accordingly.
+- **LLM config path**: Default config moved from `config/llm.yaml` to `~/.vibelens/llm.yaml` with legacy fallback.
+- **Friction prompt word limits**: Added explicit max word counts — `user_intention` (15), `friction_detail` (20), `summary` (50), `mitigation.content` (30).
+- **Loading animation**: Friction panel now uses the shared `LoadingSpinner` (triple-ring animation) instead of a simple spinner.
+- **History sidebar UI**: Cards show amber/green event badges, violet session count, amber cost icon, split date/time with calendar+clock icons, and whiter text for readability.
+- **Background startup**: Skill import, mock seeding, and cache warming run in a background thread so the server accepts requests immediately.
+
 ## [0.9.3] - 2026-03-26
 
 ### Added

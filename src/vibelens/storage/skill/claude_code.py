@@ -16,7 +16,12 @@ from pathlib import Path
 
 import yaml
 
-from vibelens.models.skill import VALID_SKILL_NAME, SkillInfo, SkillSource, SkillSourceType
+from vibelens.models.skill import (
+    VALID_SKILL_NAME,
+    SkillInfo,
+    SkillSource,
+    SkillSourceType,
+)
 from vibelens.storage.skill.base import SkillStore
 from vibelens.utils.log import get_logger
 
@@ -146,12 +151,7 @@ class ClaudeCodeSkillStore(SkillStore):
         return SkillInfo(
             name=name,
             description=description,
-            sources=[
-                SkillSource(
-                    source_type=self.source_type,
-                    source_path=str(skill_dir),
-                )
-            ],
+            sources=[SkillSource(source_type=self.source_type, source_path=str(skill_dir))],
             central_path=None,
             content_hash=SkillInfo.hash_content(text),
             metadata={

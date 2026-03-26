@@ -7,8 +7,7 @@ Agent trajectory analysis and visualization platform. Parses, normalizes, and vi
 ```
 src/vibelens/
 ├── api/               # FastAPI route handlers. Thin HTTP layer delegating to services/.
-├── analysis/          # Pure computation on trajectories → analytics results.
-│                      # No Pydantic model definitions here — output models live in models/analysis/.
+├── analysis/          # Pure computation on trajectories → analytics results. No Pydantic model definitions here.
 ├── config/            # Pydantic Settings model, YAML config loading, auto-discovery.
 ├── ingest/            # Raw data → ATIF trajectories. Parsers, discovery, fingerprinting.
 │   └── parsers/       # One parser per agent CLI format (Claude Code, Codex, Gemini, Dataclaw).
@@ -37,7 +36,6 @@ tests/                 # Unit and integration tests mirroring src/ structure.
 - **Trajectory**: Root container for a single agent session — includes steps, agent metadata, final metrics, and cross-references.
 - **Step**: One turn in a conversation (user prompt, agent response, or system message) with optional tool calls and observations.
 - **TrajectoryRef**: Cross-reference linking trajectories — `last_trajectory_ref` for session continuation, `parent_trajectory_ref` for sub-agent lineage, `subagent_trajectory_ref` on observation results for spawn linkage.
-- **TrajectoryStore**: Read-only ABC in `storage/`. `LocalStore` reads from `~/.claude/`, `DiskStore` reads/writes JSON files.
 
 ## Agent Data Directories (macOS)
 

@@ -11,6 +11,7 @@ import json
 import time
 from collections import defaultdict
 from datetime import UTC, datetime
+from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
@@ -45,6 +46,8 @@ logger = get_logger(__name__)
 CACHE_TTL_SECONDS = 3600
 FRICTION_OUTPUT_TOKENS = 8192
 FRICTION_TIMEOUT_SECONDS = 300
+FRICTION_LOG_DIR = Path("logs/friction")
+ANALYSIS_FRICTION_LOG = Path("logs/analysis-friction.log")
 
 _cache: dict[str, tuple[float, BaseModel]] = {}
 
@@ -79,13 +82,18 @@ async def analyze_friction(
     batches = build_batches(contexts)
     logger.info("Friction analysis: %d sessions → %d batch(es)", len(loaded_ids), len(batches))
 
+    # Create timestamped log directory for this run
+    run_timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    log_dir = FRICTION_LOG_DIR / run_timestamp
+    _log_analysis_summary(loaded_ids, skipped_ids, batches, backend)
+
     # Collect all trajectories for cost computation and validation
     all_trajectories = []
     for ctx in contexts:
         all_trajectories.extend(ctx.trajectory_group)
 
     # Pipeline: concurrent LLM inference → merge batch outputs → validate refs → aggregate
-    batch_results = await _run_all_batches(backend, batches)
+    batch_results = await _run_all_batches(backend, batches, log_dir)
     events, summary, top_mitigation, total_cost = _merge_batch_results(
         batch_results, all_trajectories
     )
@@ -145,13 +153,15 @@ def _extract_all_contexts(
 
 
 async def _infer_batch(
-    backend: InferenceBackend, batch: SessionBatch
+    backend: InferenceBackend, batch: SessionBatch, log_dir: Path, batch_index: int
 ) -> tuple[FrictionLLMBatchOutput, float]:
     """Run LLM inference for one batch.
 
     Args:
         backend: Configured inference backend.
         batch: Session batch with pre-extracted contexts.
+        log_dir: Timestamped directory for saving prompts and outputs.
+        batch_index: Zero-based batch index for file naming.
 
     Returns:
         Tuple of (parsed batch output, cost in USD).
@@ -162,9 +172,7 @@ async def _infer_batch(
 
     system_prompt = FRICTION_ANALYSIS_PROMPT.render_system()
     user_prompt = FRICTION_ANALYSIS_PROMPT.render_user(
-        session_count=session_count,
-        batch_digest=digest,
-        output_schema=output_schema,
+        session_count=session_count, batch_digest=digest, output_schema=output_schema
     )
 
     request = InferenceRequest(
@@ -174,9 +182,19 @@ async def _infer_batch(
         timeout=FRICTION_TIMEOUT_SECONDS,
     )
 
-    _log_friction_prompt(system_prompt, user_prompt, batch.batch_id)
-    result = await backend.generate(request)
-    _log_friction_response(result.text, batch.batch_id)
+    # Save system prompt only once (shared across batches)
+    if batch_index == 0:
+        _save_friction_log(log_dir, "system_prompt.txt", system_prompt)
+    _save_friction_log(log_dir, f"user_prompt_{batch_index}.txt", user_prompt)
+
+    try:
+        result = await backend.generate(request)
+    except Exception:
+        error_file = f"error_{batch_index}.txt"
+        _save_friction_log(log_dir, error_file, "LLM inference failed.")
+        raise
+
+    _save_friction_log(log_dir, f"raw_output_{batch_index}.txt", result.text)
 
     batch_output = _parse_llm_output(result.text)
     cost = result.cost_usd or 0.0
@@ -184,24 +202,27 @@ async def _infer_batch(
 
 
 async def _run_all_batches(
-    backend: InferenceBackend, batches: list[SessionBatch]
+    backend: InferenceBackend, batches: list[SessionBatch], log_dir: Path
 ) -> list[tuple[FrictionLLMBatchOutput, float]]:
     """Run all batches concurrently.
 
     Args:
         backend: Configured inference backend.
         batches: List of session batches.
+        log_dir: Timestamped directory for saving prompts and outputs.
 
     Returns:
         List of (batch_output, cost_usd) tuples.
     """
-    tasks = [_infer_batch(backend, batch) for batch in batches]
+    tasks = [
+        _infer_batch(backend, batch, log_dir, idx)
+        for idx, batch in enumerate(batches)
+    ]
     return await asyncio.gather(*tasks)
 
 
 def _merge_batch_results(
-    batch_results: list[tuple[FrictionLLMBatchOutput, float]],
-    trajectories: list[Trajectory],
+    batch_results: list[tuple[FrictionLLMBatchOutput, float]], trajectories: list[Trajectory]
 ) -> tuple[list[FrictionEvent], str, Mitigation | None, float]:
     """Merge results from all batches into a unified result.
 
@@ -224,10 +245,7 @@ def _merge_batch_results(
         # Enrich LLM events with computed costs
         for llm_event in batch_output.events:
             event_cost = _compute_event_cost(llm_event, trajectories)
-            event = FrictionEvent(
-                **llm_event.model_dump(),
-                estimated_cost=event_cost,
-            )
+            event = FrictionEvent(**llm_event.model_dump(), estimated_cost=event_cost)
             all_events.append(event)
 
         if batch_output.summary:
@@ -246,7 +264,7 @@ def _merge_batch_results(
     # Sort by severity descending
     all_events.sort(key=lambda e: e.severity, reverse=True)
 
-    summary = " ".join(summaries) if summaries else "No friction detected."
+    summary = "\n".join(summaries) if summaries else "No friction detected."
     return all_events, summary, top_mitigation, total_cost
 
 
@@ -348,8 +366,8 @@ def _validate_and_clean(
         # Validate session_id
         if ref.session_id not in valid_session_ids:
             logger.warning(
-                "Dropping friction event %s: invalid session_id %s",
-                event.friction_id,
+                "Dropping friction event [%s]: invalid session_id %s",
+                event.friction_type,
                 ref.session_id,
             )
             continue
@@ -357,8 +375,8 @@ def _validate_and_clean(
         # Validate start_step_id
         if ref.start_step_id not in valid_step_ids:
             logger.warning(
-                "Dropping friction event %s: invalid start_step_id %s",
-                event.friction_id,
+                "Dropping friction event [%s]: invalid start_step_id %s",
+                event.friction_type,
                 ref.start_step_id,
             )
             continue
@@ -366,23 +384,13 @@ def _validate_and_clean(
         # Validate end_step_id if present
         if ref.end_step_id and ref.end_step_id not in valid_step_ids:
             logger.warning(
-                "Clearing invalid end_step_id %s on event %s",
+                "Clearing invalid end_step_id %s on event [%s]",
                 ref.end_step_id,
-                event.friction_id,
+                event.friction_type,
             )
-            event.span_ref = StepRef(
-                session_id=ref.session_id,
-                start_step_id=ref.start_step_id,
-            )
+            event.span_ref = StepRef(session_id=ref.session_id, start_step_id=ref.start_step_id)
 
         validated.append(event)
-
-    # Clean cross-references
-    valid_friction_ids = {e.friction_id for e in validated}
-    for event in validated:
-        event.related_friction_ids = [
-            fid for fid in event.related_friction_ids if fid in valid_friction_ids
-        ]
 
     return validated
 
@@ -421,7 +429,7 @@ def _compute_type_summary(events: list[FrictionEvent]) -> list[TypeSummary]:
             )
         )
 
-    summaries.sort(key=lambda s: s.count, reverse=True)
+    summaries.sort(key=lambda s: s.avg_severity, reverse=True)
     return summaries
 
 
@@ -572,24 +580,61 @@ def _repair_truncated_json(text: str) -> str:
     return trimmed + suffix
 
 
-def _log_friction_prompt(system_prompt: str, user_prompt: str, batch_id: str) -> None:
-    """Log the full friction prompt via the module logger."""
-    logger.info(
-        "Friction prompt — batch=%s | system_chars=%d | user_chars=%d\n"
-        "SYSTEM PROMPT:\n%s\n\nUSER PROMPT:\n%s",
-        batch_id,
-        len(system_prompt),
-        len(user_prompt),
-        system_prompt,
-        user_prompt,
-    )
+def _save_friction_log(log_dir: Path, filename: str, content: str) -> None:
+    """Save friction analysis log to a timestamped directory.
+
+    Args:
+        log_dir: Target directory (e.g. logs/friction/20260326153000).
+        filename: File name within the directory.
+        content: Text content to write.
+    """
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        (log_dir / filename).write_text(content, encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Failed to save friction log %s/%s: %s", log_dir, filename, exc)
 
 
-def _log_friction_response(raw_output: str, batch_id: str) -> None:
-    """Log the raw LLM response via the module logger."""
-    logger.info(
-        "Friction response — batch=%s | response_chars=%d\nRAW OUTPUT:\n%s",
-        batch_id,
-        len(raw_output),
-        raw_output,
-    )
+def _log_analysis_summary(
+    loaded_ids: list[str],
+    skipped_ids: list[str],
+    batches: list[SessionBatch],
+    backend: InferenceBackend,
+) -> None:
+    """Append a structured summary line to the analysis friction log.
+
+    Records session IDs, batch composition, and token counts without
+    including the full prompt text.
+
+    Args:
+        loaded_ids: Successfully loaded session IDs.
+        skipped_ids: Session IDs that were skipped.
+        batches: Built session batches.
+        backend: Inference backend in use.
+    """
+    batch_details = []
+    for batch in batches:
+        sids = [ctx.session_id for ctx in batch.session_contexts]
+        batch_details.append({
+            "batch_id": batch.batch_id,
+            "session_ids": sids,
+            "session_count": len(sids),
+            "total_tokens": batch.total_tokens,
+        })
+
+    entry = {
+        "timestamp": datetime.now(UTC).isoformat(),
+        "session_ids": loaded_ids,
+        "sessions_skipped": skipped_ids,
+        "batch_count": len(batches),
+        "model": _get_backend_model(backend),
+        "backend_id": backend.backend_id,
+        "batches": batch_details,
+    }
+
+    try:
+        ANALYSIS_FRICTION_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with ANALYSIS_FRICTION_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except OSError as exc:
+        logger.warning("Failed to write analysis friction log: %s", exc)

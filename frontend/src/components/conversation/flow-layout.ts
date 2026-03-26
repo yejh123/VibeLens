@@ -32,6 +32,8 @@ export interface FlowUserCardData {
   label: string;
   detail: string;
   stepIndex: number;
+  promptIndex: number;
+  isAutoPrompt: boolean;
 }
 
 export type FlowCard =
@@ -133,6 +135,7 @@ function buildCards(steps: Step[]): CardSplit {
   const userCards: FlowUserCardData[] = [];
   const agentCards: FlowCard[] = [];
   let globalStepIdx = 0;
+  let promptNumber = 0;
 
   for (const step of steps) {
     const stepIdx = globalStepIdx++;
@@ -140,13 +143,17 @@ function buildCards(steps: Step[]): CardSplit {
     if (step.source === "user") {
       const text = extractMessageText(step.message);
       if (!text) continue;
-      // Skip skill outputs and auto-generated prompts
-      if (step.extra?.is_skill_output || step.extra?.is_auto_prompt) continue;
+      // Skip skill outputs entirely but keep auto-prompts (plan mode, etc.)
+      if (step.extra?.is_skill_output) continue;
+      const isAuto = !!step.extra?.is_auto_prompt;
+      promptNumber++;
       userCards.push({
         id: `user-${step.step_id}`,
         label: truncateLabel(text, LABEL_MAX_LENGTH),
         detail: text,
         stepIndex: stepIdx,
+        promptIndex: promptNumber,
+        isAutoPrompt: isAuto,
       });
     }
 

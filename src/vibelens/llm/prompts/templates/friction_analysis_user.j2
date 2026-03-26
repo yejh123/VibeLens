@@ -11,14 +11,14 @@ Analyze {{ session_count }} coding agent session{{ "s" if session_count != 1 els
 You MUST stay within the output token limit. Be concise.
 
 - Report **at most 7** friction events, prioritized by severity (highest first). Merge minor events into related higher-severity ones.
-- `friction_id`: Sequential identifier (friction-001, friction-002, ...).
 - `friction_type`: Kebab-case label from the taxonomy.
 - `span_ref`: session_id + start_step_id + end_step_id referencing where friction occurs.
 - `severity`: 1-5 using the user-impact severity scale.
-- `user_intention`: What the user wanted (1 sentence, plain language, NO step IDs).
-- `friction_detail`: Why the agent failed (1 sentence or empty).
+- `user_intention`: Max 15 words. What the user wanted (plain language, NO step IDs).
+- `friction_detail`: Max 20 words. Why the agent failed (or empty string).
 - `claude_helpfulness`: 1-5 helpfulness rating for the task context.
-- `mitigations`: Structured actions with action_type, target, and exact content.
-- `related_friction_ids`: Link causally connected events.
-- `summary`: Under 100 words covering total friction impact.
+- `mitigations`: Structured actions with action_type, target, and content (max 30 words each).
+- `summary`: Max 50 words covering total friction impact.
 - `top_mitigation`: Single highest-impact structured mitigation, or null if no friction.
+
+**Respond with raw JSON only. No markdown fences, no prose.**

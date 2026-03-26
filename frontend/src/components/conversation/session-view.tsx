@@ -23,6 +23,7 @@ import {
   Database,
   HardDrive,
   DollarSign,
+  Link2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "../../app";
@@ -540,8 +541,21 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
           </div>
 
           {/* Row 2.5: Continuation Chain Nav */}
-          {(main.last_trajectory_ref || main.continued_trajectory_ref) && (
+          {(main.last_trajectory_ref || main.continued_trajectory_ref || main.parent_trajectory_ref) && (
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              {main.parent_trajectory_ref && onNavigateSession && (
+                <button
+                  onClick={() => onNavigateSession(main.parent_trajectory_ref!.session_id)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-900/30 border border-violet-700/40 text-xs text-violet-300 hover:bg-violet-800/40 hover:border-violet-600/50 transition-colors"
+                  title={`Navigate to parent session: ${main.parent_trajectory_ref.session_id}`}
+                >
+                  <Link2 className="w-3 h-3" />
+                  <span>Spawned by</span>
+                  <span className="text-violet-400 font-medium truncate max-w-[200px]">
+                    {_lookupFirstMessage(main.parent_trajectory_ref.session_id, allSessions)}
+                  </span>
+                </button>
+              )}
               {main.last_trajectory_ref && onNavigateSession && (
                 <button
                   onClick={() => onNavigateSession(main.last_trajectory_ref!.session_id)}

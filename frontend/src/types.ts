@@ -245,7 +245,6 @@ export interface FrictionEvent {
   friction_detail: string;
   claude_helpfulness: number;
   mitigations: Mitigation[];
-  related_friction_ids: string[];
   estimated_cost: FrictionCost;
 }
 

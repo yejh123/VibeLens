@@ -36,6 +36,7 @@ import type {
 import { formatCost, formatDuration, formatTokens } from "../../utils";
 import { SEVERITY_COLORS, SESSION_ID_SHORT } from "../../styles";
 import { CopyButton } from "../copy-button";
+import { LoadingSpinner } from "../loading-spinner";
 import { FrictionHistory } from "./friction-history";
 
 const SEVERITY_LABELS: Record<number, string> = {
@@ -89,7 +90,6 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [llmStatus, setLlmStatus] = useState<LLMStatus | null>(null);
-  const [showHistory, setShowHistory] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const refreshLlmStatus = useCallback(async () => {
@@ -131,7 +131,6 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
 
   const handleHistorySelect = useCallback((loaded: FrictionAnalysisResult) => {
     setResult(loaded);
-    setShowHistory(false);
   }, []);
 
   const handleNewAnalysis = useCallback(() => {
@@ -141,17 +140,10 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-zinc-200">
-              Analyzing {checkedIds.size} session{checkedIds.size !== 1 ? "s" : ""} for friction
-            </p>
-            <p className="text-xs text-zinc-500 mt-1">This may take a moment</p>
-          </div>
-        </div>
-      </div>
+      <LoadingSpinner
+        label={`Analyzing ${checkedIds.size} session${checkedIds.size !== 1 ? "s" : ""} for friction`}
+        sublabel="This may take a moment"
+      />
     );
   }
 
@@ -188,40 +180,22 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
           <AnalysisMeta result={result} />
         </div>
       </div>
-      {showHistory ? (
-        <div className="w-56 shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col">
-          <div className="shrink-0 flex items-center justify-between px-3 pt-3 pb-1">
-            <span className="text-xs font-medium text-zinc-400">History</span>
-            <button
-              onClick={() => setShowHistory(false)}
-              className="p-1 text-zinc-500 hover:text-zinc-300 rounded transition"
-              title="Collapse history"
-            >
-              <History className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 pt-1">
-            <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
-          </div>
+      <div className="w-56 shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 pb-1">
+          <History className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="text-xs font-medium text-zinc-400">History</span>
         </div>
-      ) : (
-        <div className="shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col items-center pt-3 px-1">
-          <button
-            onClick={() => setShowHistory(true)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-300 rounded transition"
-            title="Show history"
-          >
-            <History className="w-4 h-4" />
-          </button>
+        <div className="flex-1 overflow-y-auto p-3 pt-1">
+          <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 const MODEL_PRESETS = [
-  "anthropic/claude-sonnet-4-5",
   "anthropic/claude-haiku-4-5",
+  "anthropic/claude-sonnet-4-5",
   "openai/gpt-4.1",
   "openai/gpt-4.1-mini",
   "google/gemini-2.5-flash",
@@ -253,7 +227,7 @@ function ModelCombobox({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="anthropic/claude-sonnet-4-5"
+          placeholder="anthropic/claude-haiku-4-5"
           className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-600 pr-8"
         />
         <button
@@ -302,7 +276,7 @@ function LLMConfigForm({
 }) {
   const [backend, setBackend] = useState(llmStatus?.backend_id === "mock" ? "litellm" : llmStatus?.backend_id ?? "litellm");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(llmStatus?.model ?? "anthropic/claude-sonnet-4-5");
+  const [model, setModel] = useState(llmStatus?.model ?? "anthropic/claude-haiku-4-5");
   const [baseUrl, setBaseUrl] = useState(llmStatus?.base_url ?? "");
   const [timeout, setTimeout_] = useState(llmStatus?.timeout ?? 120);
   const [maxTokens, setMaxTokens] = useState(llmStatus?.max_tokens ?? 4096);

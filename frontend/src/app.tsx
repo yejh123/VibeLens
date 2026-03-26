@@ -134,7 +134,7 @@ export function App() {
   }, [fetchWithToken, refreshKey]);
 
   useEffect(() => {
-    fetchWithToken(`/api/sessions?refresh=true`)
+    fetchWithToken(`/api/sessions`)
       .then((r) => r.json())
       .then((data: Trajectory[]) => {
         setSessions(data);

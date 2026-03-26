@@ -15,11 +15,47 @@ __all__ = [
     "ModelPricing",
     "PRICING_TABLE",
     "TOKENS_PER_MTOK",
+    "compute_cost_from_tokens",
     "compute_step_cost",
     "compute_trajectory_cost",
     "lookup_pricing",
     "normalize_model_name",
 ]
+
+
+def compute_cost_from_tokens(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_creation_tokens: int = 0,
+) -> float | None:
+    """Compute estimated USD cost from aggregate token counts.
+
+    Used by metadata-based dashboard stats to estimate cost without
+    loading full trajectories.
+
+    Args:
+        model: Model name for pricing lookup.
+        input_tokens: Total prompt tokens (includes cached).
+        output_tokens: Total completion tokens.
+        cache_read_tokens: Total tokens read from cache.
+        cache_creation_tokens: Total tokens written to cache.
+
+    Returns:
+        Cost in USD or None if model is unrecognized.
+    """
+    pricing = lookup_pricing(model)
+    if not pricing:
+        return None
+    non_cached_input = input_tokens - cache_read_tokens
+    cost = (
+        non_cached_input * pricing.input_per_mtok
+        + cache_read_tokens * pricing.cached_input_per_mtok
+        + cache_creation_tokens * pricing.cache_write_per_mtok
+        + output_tokens * pricing.output_per_mtok
+    ) / TOKENS_PER_MTOK
+    return cost
 
 
 def compute_step_cost(step: Step, session_model: str | None = None) -> float | None:
