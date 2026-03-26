@@ -7,6 +7,7 @@ from vibelens.api.friction import router as friction_router
 from vibelens.api.insights import router as insights_router
 from vibelens.api.sessions import router as sessions_router
 from vibelens.api.shares import router as shares_router
+from vibelens.api.skill_analysis import router as skill_analysis_router
 from vibelens.api.skills import router as skills_router
 from vibelens.api.system import router as system_router
 from vibelens.api.upload import router as upload_router
@@ -23,4 +24,5 @@ def build_router() -> APIRouter:
     router.include_router(insights_router)
     router.include_router(friction_router)
     router.include_router(skills_router)
+    router.include_router(skill_analysis_router)
     return router

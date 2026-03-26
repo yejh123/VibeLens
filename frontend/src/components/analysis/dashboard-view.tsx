@@ -459,7 +459,7 @@ export function DashboardView({ cache }: DashboardViewProps) {
                     >
                       Project Activity
                     </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                    <p className="text-xs text-zinc-400 mt-0.5">
                       Click a project to view its dedicated dashboard analysis
                     </p>
                   </div>
@@ -657,16 +657,16 @@ function ProjectRow({
         />
       </div>
       {detail && (
-        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+        <div className="flex items-center gap-3 text-xs text-zinc-400">
           <span className="inline-flex items-center gap-1">
-            <Hash className="w-3 h-3" />
+            <Hash className="w-3 h-3 text-cyan-500" />
             {detail.messages.toLocaleString()} msgs
           </span>
           <span className="inline-flex items-center gap-1">
-            <BarChart3 className="w-3 h-3" />
+            <BarChart3 className="w-3 h-3 text-amber-500" />
             {formatTokens(detail.tokens)}
           </span>
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 text-emerald-400">
             {formatCost(detail.cost_usd)}
           </span>
         </div>

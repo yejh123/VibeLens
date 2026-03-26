@@ -2,18 +2,23 @@
 
 from pathlib import Path
 
-from vibelens.config import Settings, load_settings
+from vibelens.config import LLMConfig, Settings, load_llm_config, load_settings, save_llm_config
+from vibelens.config.llm_config import DEFAULT_LLM_CONFIG_PATH, discover_llm_config_path
 from vibelens.llm.backend import InferenceBackend
 from vibelens.models.enums import AppMode
-from vibelens.storage.base import TrajectoryStore
-from vibelens.storage.disk import DiskStore
-from vibelens.storage.local import LocalStore
+from vibelens.storage.conversation.base import TrajectoryStore
+from vibelens.storage.conversation.disk import DiskStore
+from vibelens.storage.conversation.local import LocalStore
 
 _settings: Settings | None = None
+_llm_config: LLMConfig | None = None
 _store: TrajectoryStore | None = None
 _share_service = None
 _friction_store = None
 _skill_store = None
+_central_skill_store = None
+_codex_skill_store = None
+_skill_analysis_store = None
 _inference_backend: InferenceBackend | None = None
 _inference_checked = False
 
@@ -50,7 +55,7 @@ def get_share_service():
 
 def get_friction_store():
     """Return cached FrictionStore singleton."""
-    from vibelens.services.friction_store import FrictionStore
+    from vibelens.services.friction.store import FrictionStore
 
     global _friction_store
     if _friction_store is None:
@@ -68,15 +73,68 @@ def get_skill_store():
     return _skill_store
 
 
+def get_codex_skill_store():
+    """Return cached CodexSkillStore singleton."""
+    from vibelens.storage.skill.codex import CodexSkillStore
+
+    global _codex_skill_store
+    if _codex_skill_store is None:
+        _codex_skill_store = CodexSkillStore(get_settings().codex_dir / "skills")
+    return _codex_skill_store
+
+
+def get_central_skill_store():
+    """Return cached central managed skill repository."""
+    from vibelens.storage.skill.central import CentralSkillStore
+
+    global _central_skill_store
+    if _central_skill_store is None:
+        _central_skill_store = CentralSkillStore(get_settings().managed_skills_dir)
+    return _central_skill_store
+
+
+def get_skill_analysis_store():
+    """Return cached SkillAnalysisStore singleton."""
+    from vibelens.services.skill.analysis_store import SkillAnalysisStore
+
+    global _skill_analysis_store
+    if _skill_analysis_store is None:
+        _skill_analysis_store = SkillAnalysisStore(get_settings().skill_analysis_dir)
+    return _skill_analysis_store
+
+
+def get_llm_config() -> LLMConfig:
+    """Return cached LLM configuration, lazy-loading from YAML/env."""
+    global _llm_config
+    if _llm_config is None:
+        _llm_config = load_llm_config()
+    return _llm_config
+
+
+def set_llm_config(config: LLMConfig) -> None:
+    """Update LLM config singleton, persist to YAML, and recreate backend."""
+    global _llm_config
+    _llm_config = config
+
+    config_path = discover_llm_config_path() or DEFAULT_LLM_CONFIG_PATH
+    save_llm_config(config, config_path)
+
+    from vibelens.llm.backends import create_backend_from_llm_config
+
+    backend = create_backend_from_llm_config(config)
+    set_inference_backend(backend)
+
+
 def get_inference_backend() -> InferenceBackend | None:
     """Return cached InferenceBackend, or None if disabled."""
     global _inference_backend, _inference_checked
     if _inference_checked:
         return _inference_backend
     _inference_checked = True
-    from vibelens.llm.backends import create_backend
 
-    _inference_backend = create_backend(get_settings())
+    from vibelens.llm.backends import create_backend_from_llm_config
+
+    _inference_backend = create_backend_from_llm_config(get_llm_config())
     return _inference_backend
 
 

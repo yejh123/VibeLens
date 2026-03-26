@@ -9,7 +9,7 @@ import pytest
 from vibelens.app import create_app
 from vibelens.config import Settings
 from vibelens.models.trajectories import Trajectory
-from vibelens.storage.local import LocalStore as LocalSource
+from vibelens.storage.conversation.local import LocalStore as LocalSource
 
 
 @pytest.fixture
@@ -726,7 +726,7 @@ class TestDiskStore:
 
     def test_save_and_load_roundtrip(self, tmp_path):
         """DiskStore save -> exists -> load round-trip."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -743,7 +743,7 @@ class TestDiskStore:
 
     def test_session_count(self, tmp_path):
         """session_count() tracks saves correctly."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -759,7 +759,7 @@ class TestDiskStore:
 
     def test_exists_unknown_session(self, tmp_path):
         """exists() returns False for non-existent session."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -769,7 +769,7 @@ class TestDiskStore:
 
     def test_save_updates_index_incrementally(self, tmp_path):
         """save() updates _metadata_cache and _index without full rebuild."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -791,7 +791,7 @@ class TestDiskStore:
 
     def test_invalidate_index_triggers_rebuild(self, tmp_path):
         """invalidate_index() clears cache; next access rebuilds from disk."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -816,7 +816,7 @@ class TestDiskStore:
 
     def test_rglob_finds_subdirectory_sessions(self, tmp_path):
         """_build_index discovers sessions in subdirectories via rglob."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -841,7 +841,7 @@ class TestDiskStore:
 
     def test_rglob_reads_upload_id_from_index(self, tmp_path):
         """_build_index reads _upload_id from JSONL index written with default_tags."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()
@@ -861,7 +861,7 @@ class TestDiskStore:
 
     def test_get_metadata(self, tmp_path):
         """get_metadata() returns summary dict for known session, None for unknown."""
-        from vibelens.storage.disk import DiskStore
+        from vibelens.storage.conversation.disk import DiskStore
 
         store = DiskStore(root=tmp_path)
         store.initialize()

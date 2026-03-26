@@ -16,7 +16,7 @@ from pathlib import Path
 
 from vibelens.ingest.parsers.parsed import ParsedTrajectoryParser
 from vibelens.models.trajectories import Trajectory
-from vibelens.storage.base import TrajectoryStore
+from vibelens.storage.conversation.base import TrajectoryStore
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)

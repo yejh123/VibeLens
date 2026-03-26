@@ -1,16 +1,11 @@
-"""Abstract base class for agent-specific skill storage backends.
+"""Base class for all skill storage backends."""
 
-Each backend knows how to discover, read, write, and search skills for one
-agent type. The service layer composes multiple SkillStore instances to present
-a unified view across all agents.
-"""
-
+import shutil
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from vibelens.models.enums import AgentType
-from vibelens.models.skill import SkillInfo
+from vibelens.models.skill import SkillInfo, SkillSourceType
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -19,10 +14,11 @@ CACHE_TTL_SECONDS = 300
 
 
 class SkillStore(ABC):
-    """Abstract base for agent-specific skill storage backends.
+    """Abstract base for all skill stores.
 
-    Provides cached listing with TTL. Subclasses implement the concrete
-    discovery, parsing, read/write, and deletion logic for their agent type.
+    Both the central VibeLens store and agent-native stores inherit from this
+    class. The common abstraction is: a directory of named skills that can be
+    listed, read, written, deleted, and copied between stores.
     """
 
     def __init__(self) -> None:
@@ -31,8 +27,8 @@ class SkillStore(ABC):
 
     @property
     @abstractmethod
-    def agent_type(self) -> AgentType:
-        """Agent type enum value for this store."""
+    def source_type(self) -> SkillSourceType:
+        """Unified source/store type for this store."""
 
     @property
     @abstractmethod
@@ -69,6 +65,40 @@ class SkillStore(ABC):
         Returns:
             True if the skill was deleted, False if it did not exist.
         """
+
+    def skill_path(self, name: str) -> Path:
+        """Return the directory path for one skill."""
+        return self.skills_dir / name
+
+    def import_skill_from(
+        self, source_store: "SkillStore", name: str, overwrite: bool = False
+    ) -> SkillInfo | None:
+        """Copy one skill directory from another store into this store."""
+        source_dir = source_store.skill_path(name)
+        if not source_dir.is_dir():
+            return None
+
+        target_dir = self.skill_path(name)
+        if target_dir.exists():
+            if not overwrite:
+                return self.get_skill(name)
+            shutil.rmtree(target_dir)
+
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, target_dir)
+        self.invalidate_cache()
+        return self.get_skill(name)
+
+    def import_all_from(
+        self, source_store: "SkillStore", overwrite: bool = False
+    ) -> list[SkillInfo]:
+        """Copy every skill from another store into this store."""
+        imported: list[SkillInfo] = []
+        for skill in source_store.get_cached():
+            copied = self.import_skill_from(source_store, skill.name, overwrite=overwrite)
+            if copied:
+                imported.append(copied)
+        return imported
 
     def search_skills(self, query: str) -> list[SkillInfo]:
         """Search skills by name or description substring (case-insensitive)."""

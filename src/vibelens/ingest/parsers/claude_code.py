@@ -403,6 +403,13 @@ class ClaudeCodeParser(BaseParser):
 
         sub_meta = _scan_session_metadata(sub_content)
 
+        # Compaction agents are system-internal context compaction sub-agents,
+        # identified by the "acompact-" filename prefix. Flag them via extra
+        # so downstream modules can detect compaction without coupling to
+        # Claude Code-specific session_id conventions.
+        is_compaction = COMPACTION_AGENT_PREFIX in agent_file.stem
+        extra = {"is_compaction_agent": True} if is_compaction else None
+
         return self.assemble_trajectory(
             session_id=agent_file.stem,
             agent=self.build_agent(version=sub_meta.version, model=sub_meta.model_name),
@@ -414,6 +421,7 @@ class ClaudeCodeParser(BaseParser):
                 tool_call_id=spawn_tool_call_id,
                 trajectory_path=str(source_path),
             ),
+            extra=extra,
         )
 
     @staticmethod
@@ -1432,7 +1440,14 @@ def _validate_subagent_linkage(
     # compaction agents (system-internal) and persisted-output edge cases.
     unreferenced = sub_ids - parent_refs
     if unreferenced:
-        compaction = {sid for sid in unreferenced if COMPACTION_AGENT_PREFIX in sid}
+        # Identify compaction agents by extra flag (preferred) or session_id prefix (fallback)
+        sub_by_id = {t.session_id: t for t in sub_trajectories}
+        compaction = {
+            sid
+            for sid in unreferenced
+            if (sub_by_id[sid].extra or {}).get("is_compaction_agent")
+            or COMPACTION_AGENT_PREFIX in sid
+        }
         regular = unreferenced - compaction
         if compaction:
             logger.debug(

@@ -32,7 +32,7 @@ import { SubAgentBlock } from "./sub-agent-block";
 import { StepTimeline } from "./step-timeline";
 import { PromptNavPanel } from "./prompt-nav-panel";
 import { FlowDiagram } from "./flow-diagram";
-import { computeFlow, type FlowPhaseGroup } from "./flow-layout";
+import { computeFlow } from "./flow-layout";
 import { formatTokens, formatDuration, formatCost, extractUserText, baseProjectName } from "../../utils";
 import { LoadingSpinner } from "../loading-spinner";
 import {
@@ -216,12 +216,13 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
       .map((s) => s.step_id);
   }, [steps]);
 
-  // Compute flow phases for the nav panel when in flow mode
-  const flowPhases: FlowPhaseGroup[] | undefined = useMemo(() => {
+  // Compute flow data for the nav panel when in flow mode
+  const flowComputed = useMemo(() => {
     if (!flowData || viewMode !== "flow") return undefined;
-    const result = computeFlow(steps, flowData.tool_graph, flowData.phase_segments);
-    return result.phases;
+    return computeFlow(steps, flowData.tool_graph, flowData.phase_segments);
   }, [flowData, viewMode, steps]);
+  const flowPhases = flowComputed?.phases;
+  const flowSections = flowComputed?.sections;
 
   const [activePhaseIdx, setActivePhaseIdx] = useState<number | null>(null);
 
@@ -668,6 +669,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
           onResize={handlePromptNavResize}
           viewMode={viewMode}
           flowPhases={flowPhases}
+          flowSections={flowSections}
           activePhaseIdx={activePhaseIdx}
           onPhaseNavigate={handlePhaseNavigate}
         />

@@ -19,7 +19,7 @@ from vibelens.services.dashboard_service import (
 )
 from vibelens.services.search_service import invalidate_search_index
 from vibelens.services.upload_visibility import register_upload
-from vibelens.storage.disk import DiskStore
+from vibelens.storage.conversation.disk import DiskStore
 from vibelens.utils import get_logger
 from vibelens.utils.zip import extract_zip, validate_zip
 

@@ -7,8 +7,11 @@ from vibelens.analysis.dashboard_stats import compute_dashboard_stats, filter_me
 from vibelens.analysis.session_analytics import compute_session_analytics
 from vibelens.analysis.tool_usage import compute_tool_usage
 from vibelens.deps import get_store
-from vibelens.models.analysis.behavior import ToolUsageStat
-from vibelens.models.analysis.dashboard import DashboardStats, SessionAnalytics
+from vibelens.models.analysis.dashboard import (
+    DashboardStats,
+    SessionAnalytics,
+    ToolUsageStat,
+)
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.upload_visibility import filter_visible, is_session_visible
 from vibelens.utils import get_logger

@@ -9,15 +9,14 @@ import {
   ChevronRight,
   Clock,
   Coins,
-  FileText,
   Footprints,
   Hash,
+  Heart,
   History,
   Loader2,
   Pencil,
   Play,
   Plus,
-  Search,
   Shield,
   Sparkles,
   Target,
@@ -28,14 +27,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAppContext } from "../../app";
 import type {
-  ClaudeMdSuggestion,
   FrictionAnalysisResult,
   FrictionEvent,
   LLMStatus,
-  ModeSummary,
+  Mitigation,
+  TypeSummary,
 } from "../../types";
 import { formatCost, formatDuration, formatTokens } from "../../utils";
-import { SEVERITY_COLORS, SESSION_ID_SHORT, SESSION_ID_MEDIUM } from "../../styles";
+import { SEVERITY_COLORS, SESSION_ID_SHORT } from "../../styles";
 import { CopyButton } from "../copy-button";
 import { FrictionHistory } from "./friction-history";
 
@@ -48,11 +47,36 @@ const SEVERITY_LABELS: Record<number, string> = {
 };
 
 const SEVERITY_DESCRIPTIONS: Record<number, string> = {
-  1: "Minor — Minimal inconvenience, negligible wasted effort",
-  2: "Low — Noticeable friction, a few wasted steps",
-  3: "Moderate — Clear wasted effort and rework",
-  4: "High — Significant blocker, many wasted steps",
-  5: "Critical — Session blocker, major rework required",
+  1: "Minor — Small user correction, agent fixes immediately",
+  2: "Low — User re-explains once, agent gets it on second try",
+  3: "Moderate — Multiple corrections or visible frustration",
+  4: "High — User takes over manually or reverts agent work",
+  5: "Critical — User abandons task or loses work",
+};
+
+const HELPFULNESS_LABELS: Record<number, string> = {
+  1: "Unhelpful",
+  2: "Slightly",
+  3: "Moderate",
+  4: "Very",
+  5: "Essential",
+};
+
+const HELPFULNESS_COLORS: Record<number, string> = {
+  1: "bg-rose-900/30 border-rose-700/30 text-rose-300",
+  2: "bg-orange-900/30 border-orange-700/30 text-orange-300",
+  3: "bg-amber-900/30 border-amber-700/30 text-amber-300",
+  4: "bg-emerald-900/30 border-emerald-700/30 text-emerald-300",
+  5: "bg-cyan-900/30 border-cyan-700/30 text-cyan-300",
+};
+
+const ACTION_TYPE_COLORS: Record<string, string> = {
+  update_claude_md: "bg-violet-900/30 border-violet-700/30 text-violet-300",
+  write_test: "bg-emerald-900/30 border-emerald-700/30 text-emerald-300",
+  create_skill: "bg-cyan-900/30 border-cyan-700/30 text-cyan-300",
+  update_skill: "bg-sky-900/30 border-sky-700/30 text-sky-300",
+  add_linter_rule: "bg-amber-900/30 border-amber-700/30 text-amber-300",
+  update_workflow: "bg-rose-900/30 border-rose-700/30 text-rose-300",
 };
 
 interface FrictionPanelProps {
@@ -157,11 +181,8 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
           <ResultHeader result={result} onRerun={handleRunAnalysis} onNew={handleNewAnalysis} />
           <SummarySection summary={result.summary} topMitigation={result.top_mitigation} />
-          {result.mode_summary.length > 0 && (
-            <ModeSummarySection modes={result.mode_summary} />
-          )}
-          {result.claude_md_suggestions.length > 0 && (
-            <SuggestionsSection suggestions={result.claude_md_suggestions} />
+          {result.type_summary.length > 0 && (
+            <TypeSummarySection types={result.type_summary} />
           )}
           <EventsSection events={result.events} sessionIds={result.session_ids} />
           <AnalysisMeta result={result} />
@@ -204,6 +225,15 @@ const MODEL_PRESETS = [
   "openai/gpt-4.1",
   "openai/gpt-4.1-mini",
   "google/gemini-2.5-flash",
+  "deepseek/deepseek-chat",
+  "openrouter/anthropic/claude-sonnet-4-5",
+];
+
+const BACKEND_OPTIONS = [
+  { value: "litellm", label: "LiteLLM (recommended)" },
+  { value: "claude-cli", label: "Claude CLI" },
+  { value: "codex-cli", label: "Codex CLI" },
+  { value: "disabled", label: "Disabled" },
 ];
 
 function ModelCombobox({
@@ -264,24 +294,42 @@ function ModelCombobox({
 function LLMConfigForm({
   fetchWithToken,
   onConfigured,
+  llmStatus,
 }: {
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   onConfigured: () => void;
+  llmStatus: LLMStatus | null;
 }) {
+  const [backend, setBackend] = useState(llmStatus?.backend_id === "mock" ? "litellm" : llmStatus?.backend_id ?? "litellm");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("anthropic/claude-sonnet-4-5");
+  const [model, setModel] = useState(llmStatus?.model ?? "anthropic/claude-sonnet-4-5");
+  const [baseUrl, setBaseUrl] = useState(llmStatus?.base_url ?? "");
+  const [timeout, setTimeout_] = useState(llmStatus?.timeout ?? 120);
+  const [maxTokens, setMaxTokens] = useState(llmStatus?.max_tokens ?? 4096);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
+  const isCliBackend = backend === "claude-cli" || backend === "codex-cli";
+  const hasExistingKey = !!llmStatus?.api_key_masked;
+
   const handleSubmit = useCallback(async () => {
-    if (!apiKey.trim()) return;
+    if (!isCliBackend && !apiKey.trim() && !hasExistingKey) return;
     setSubmitting(true);
     setConfigError(null);
     try {
+      const payload: Record<string, unknown> = {
+        backend: backend.trim(),
+        api_key: apiKey.trim(),
+        model: model.trim(),
+        timeout,
+        max_tokens: maxTokens,
+      };
+      if (baseUrl.trim()) payload.base_url = baseUrl.trim();
       const res = await fetchWithToken("/api/llm/configure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey.trim(), model: model.trim() }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
@@ -293,24 +341,100 @@ function LLMConfigForm({
     } finally {
       setSubmitting(false);
     }
-  }, [apiKey, model, fetchWithToken, onConfigured]);
+  }, [backend, apiKey, model, baseUrl, timeout, maxTokens, isCliBackend, hasExistingKey, fetchWithToken, onConfigured]);
 
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1">API Key</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-ant-..."
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-600"
-        />
+        <label className="block text-xs font-medium text-zinc-400 mb-1">Backend</label>
+        <select
+          value={backend}
+          onChange={(e) => setBackend(e.target.value)}
+          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-amber-600"
+        >
+          {BACKEND_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-zinc-400 mb-1">Model</label>
-        <ModelCombobox value={model} onChange={setModel} />
-      </div>
+
+      {!isCliBackend && backend !== "disabled" && (
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1">API Key</label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={llmStatus?.api_key_masked ? `Keep existing (${llmStatus.api_key_masked})` : "sk-ant-..."}
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-600"
+          />
+          {llmStatus?.api_key_masked && !apiKey && (
+            <p className="mt-1 text-xs text-zinc-500">
+              Key configured: {llmStatus.api_key_masked}. Leave empty to keep it.
+            </p>
+          )}
+        </div>
+      )}
+
+      {backend !== "disabled" && (
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1">Model</label>
+          <ModelCombobox value={model} onChange={setModel} />
+        </div>
+      )}
+
+      {backend !== "disabled" && (
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition"
+        >
+          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          Advanced
+        </button>
+      )}
+
+      {showAdvanced && backend !== "disabled" && (
+        <div className="space-y-3 pl-3 border-l-2 border-zinc-700/50">
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              Base URL <span className="text-zinc-600">(auto-resolved if empty)</span>
+            </label>
+            <input
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://api.anthropic.com"
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-600"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Timeout (s)</label>
+              <input
+                type="number"
+                value={timeout}
+                onChange={(e) => setTimeout_(parseInt(e.target.value) || 120)}
+                min={10}
+                max={600}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-amber-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Max Tokens</label>
+              <input
+                type="number"
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
+                min={256}
+                max={32768}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-amber-600"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {configError && (
         <div className="px-3 py-2 bg-rose-900/20 border border-rose-800/50 rounded-lg text-xs text-rose-300">
           {configError}
@@ -318,11 +442,11 @@ function LLMConfigForm({
       )}
       <button
         onClick={handleSubmit}
-        disabled={!apiKey.trim() || submitting}
+        disabled={(!isCliBackend && backend !== "disabled" && !apiKey.trim() && !hasExistingKey) || submitting}
         className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-        Connect
+        {backend === "disabled" ? "Disable" : "Connect"}
       </button>
     </div>
   );
@@ -341,7 +465,6 @@ function LLMConfigSection({
   const isConnected = llmStatus?.available === true;
   const isMock = llmStatus?.backend_id === "mock";
 
-  // Mock backend (test mode) needs no config UI
   if (isMock) return null;
 
   if (isConnected && !showForm) {
@@ -372,6 +495,7 @@ function LLMConfigSection({
       </p>
       <LLMConfigForm
         fetchWithToken={fetchWithToken}
+        llmStatus={llmStatus}
         onConfigured={() => {
           setShowForm(false);
           onConfigured();
@@ -412,7 +536,7 @@ function EmptyState({
           Friction Analysis
         </h3>
         <p className="text-sm text-zinc-400 mb-6">
-          Select sessions and run analysis to find friction events and CLAUDE.md suggestions.
+          Select sessions and run analysis to detect user dissatisfaction and generate mitigations.
         </p>
         <LLMConfigSection
           llmStatus={llmStatus}
@@ -461,6 +585,9 @@ function ResultHeader({
           </h2>
           <p className="text-sm text-zinc-400">
             {eventCount} event{eventCount !== 1 ? "s" : ""} across {sessionCount} session{sessionCount !== 1 ? "s" : ""}
+            {result.batch_count > 1 && (
+              <span className="text-zinc-500"> &middot; {result.batch_count} batches</span>
+            )}
             {result.sessions_skipped.length > 0 && (
               <span className="text-zinc-500">
                 {" "}&middot; {result.sessions_skipped.length} skipped
@@ -493,75 +620,73 @@ function SummarySection({
   topMitigation,
 }: {
   summary: string;
-  topMitigation: string;
+  topMitigation: Mitigation | null;
 }) {
   return (
     <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
       <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
-      <Tip text="The single highest-impact action to reduce friction across all analyzed sessions.">
-        <div className="flex items-start gap-3 bg-amber-900/15 border border-amber-700/30 rounded-lg px-5 py-4">
-          <Zap className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-amber-300 mb-1">Top recommendation</p>
-            <p className="text-sm text-zinc-200">{topMitigation}</p>
+      {topMitigation && (
+        <Tip text="The single highest-impact action to reduce friction across all analyzed sessions.">
+          <div className="flex items-start gap-3 bg-amber-900/15 border border-amber-700/30 rounded-lg px-5 py-4">
+            <Zap className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-300 mb-1">Top recommendation</p>
+              <MitigationCard mitigation={topMitigation} />
+            </div>
           </div>
-        </div>
-      </Tip>
+        </Tip>
+      )}
     </div>
   );
 }
 
-function ModeSummarySection({ modes }: { modes: ModeSummary[] }) {
-  const maxCost = Math.max(...modes.map((m) => m.total_estimated_cost.wasted_steps), 1);
+function TypeSummarySection({ types }: { types: TypeSummary[] }) {
+  const maxCost = Math.max(...types.map((t) => t.total_estimated_cost.affected_steps), 1);
 
   return (
     <div>
-      <SectionTitle icon={<BookOpen className="w-5 h-5 text-cyan-400" />} title="Mode Summary" />
+      <SectionTitle icon={<BookOpen className="w-5 h-5 text-cyan-400" />} title="Friction Types" />
       <div className="grid grid-cols-2 gap-3">
-        {modes.map((mode) => (
-          <ModeCard key={mode.mode} mode={mode} maxCost={maxCost} />
+        {types.map((type) => (
+          <TypeCard key={type.friction_type} type={type} maxCost={maxCost} />
         ))}
       </div>
     </div>
   );
 }
 
-function ModeCard({ mode, maxCost }: { mode: ModeSummary; maxCost: number }) {
-  const barWidth = (mode.total_estimated_cost.wasted_steps / maxCost) * 100;
+function TypeCard({ type, maxCost }: { type: TypeSummary; maxCost: number }) {
+  const barWidth = (type.total_estimated_cost.affected_steps / maxCost) * 100;
 
   return (
     <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4 space-y-3">
-      {/* Mode name + severity */}
       <div className="flex items-center justify-between">
-        <ModeBadge mode={mode.mode} />
-        <SeverityBadge severity={Math.round(mode.avg_severity)} />
+        <TypeBadge type={type.friction_type} />
+        <SeverityBadge severity={Math.round(type.avg_severity)} />
       </div>
 
-      {/* Stats row */}
       <div className="flex items-center gap-3">
-        <Tip text="Number of friction events with this mode">
+        <Tip text="Number of friction events of this type">
           <span className="flex items-center gap-1 text-xs text-zinc-300">
             <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
-            {mode.count} event{mode.count !== 1 ? "s" : ""}
+            {type.count} event{type.count !== 1 ? "s" : ""}
           </span>
         </Tip>
-        <Tip text="Number of distinct sessions affected by this mode">
+        <Tip text="Number of distinct sessions affected">
           <span className="flex items-center gap-1 text-xs text-zinc-300">
             <Hash className="w-3.5 h-3.5 text-violet-400" />
-            {mode.affected_sessions} session{mode.affected_sessions !== 1 ? "s" : ""}
+            {type.affected_sessions} session{type.affected_sessions !== 1 ? "s" : ""}
           </span>
         </Tip>
       </div>
 
-      {/* Cost breakdown — same style as EventCard */}
       <CostRow
-        steps={mode.total_estimated_cost.wasted_steps}
-        time={mode.total_estimated_cost.wasted_time_seconds}
-        tokens={mode.total_estimated_cost.wasted_tokens}
+        steps={type.total_estimated_cost.affected_steps}
+        time={type.total_estimated_cost.affected_time_seconds}
+        tokens={type.total_estimated_cost.affected_tokens}
       />
 
-      {/* Relative wasted-steps bar */}
-      <Tip text={`Relative wasted steps: ${mode.total_estimated_cost.wasted_steps} steps (${Math.round(barWidth)}% of the worst mode)`}>
+      <Tip text={`Relative affected steps: ${type.total_estimated_cost.affected_steps} (${Math.round(barWidth)}% of worst type)`}>
         <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-amber-500/60 rounded-full transition-all"
@@ -569,44 +694,6 @@ function ModeCard({ mode, maxCost }: { mode: ModeSummary; maxCost: number }) {
           />
         </div>
       </Tip>
-    </div>
-  );
-}
-
-function SuggestionsSection({
-  suggestions,
-}: {
-  suggestions: ClaudeMdSuggestion[];
-}) {
-  return (
-    <div>
-      <SectionTitle icon={<FileText className="w-5 h-5 text-violet-400" />} title="CLAUDE.md Suggestions" />
-      <div className="space-y-2">
-        {suggestions.map((s, i) => (
-          <SuggestionCard key={i} suggestion={s} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SuggestionCard({ suggestion }: { suggestion: ClaudeMdSuggestion }) {
-  return (
-    <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-lg p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm font-medium bg-cyan-900/30 border border-cyan-700/30 text-cyan-300 mb-2">
-            {suggestion.section}
-          </span>
-          <p className="text-sm text-zinc-100 font-mono leading-relaxed">
-            &ldquo;{suggestion.rule}&rdquo;
-          </p>
-          <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-            {suggestion.rationale}
-          </p>
-        </div>
-        <CopyButton text={suggestion.rule} className="shrink-0 mt-1" />
-      </div>
     </div>
   );
 }
@@ -623,9 +710,9 @@ function EventsSection({
     eventsBySession.set(sid, []);
   }
   for (const event of events) {
-    const list = eventsBySession.get(event.ref.session_id) ?? [];
+    const list = eventsBySession.get(event.span_ref.session_id) ?? [];
     list.push(event);
-    eventsBySession.set(event.ref.session_id, list);
+    eventsBySession.set(event.span_ref.session_id, list);
   }
 
   return (
@@ -672,7 +759,7 @@ function SessionEventGroup({
       {expanded && (
         <div className="divide-y divide-zinc-700/60">
           {events.map((event) => (
-            <EventCard key={event.event_id} event={event} />
+            <EventCard key={event.friction_id} event={event} />
           ))}
         </div>
       )}
@@ -686,15 +773,14 @@ function EventCard({ event }: { event: FrictionEvent }) {
   const handleGoToStep = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      const url = `${window.location.origin}?session=${event.ref.session_id}&step=${event.ref.start_step_id}`;
+      const url = `${window.location.origin}?session=${event.span_ref.session_id}&step=${event.span_ref.start_step_id}`;
       window.open(url, "_blank");
     },
-    [event.ref.session_id, event.ref.start_step_id]
+    [event.span_ref.session_id, event.span_ref.start_step_id]
   );
 
   return (
     <div className="px-4 py-3.5">
-      {/* Header row */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full text-left"
@@ -708,10 +794,11 @@ function EventCard({ event }: { event: FrictionEvent }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            {/* Tags row: severity + mode + jump */}
-            <div className="flex items-center gap-2 mb-1.5">
+            {/* Tags row: severity + type + helpfulness + jump */}
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <SeverityBadge severity={event.severity} />
-              <ModeBadge mode={event.mode} />
+              <TypeBadge type={event.friction_type} />
+              <HelpfulnessBadge level={event.claude_helpfulness} />
               <button
                 onClick={handleGoToStep}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm text-zinc-400 hover:text-cyan-400 hover:bg-cyan-900/20 rounded transition"
@@ -721,54 +808,78 @@ function EventCard({ event }: { event: FrictionEvent }) {
                 <span>Jump</span>
               </button>
             </div>
-            {/* Description */}
-            <p className={`text-sm text-zinc-200 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
-              {event.description}
+            {/* User intention */}
+            <p className="text-sm text-zinc-200 leading-relaxed font-medium">
+              {event.user_intention}
             </p>
-            {/* Cost row — shared component */}
+            {/* Friction detail */}
+            {event.friction_detail && (
+              <p className={`text-sm text-zinc-400 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
+                {event.friction_detail}
+              </p>
+            )}
+            {/* Cost row */}
             <div className="mt-2">
               <CostRow
-                steps={event.estimated_cost.wasted_steps}
-                time={event.estimated_cost.wasted_time_seconds}
-                tokens={event.estimated_cost.wasted_tokens}
-                stepCount={event.step_ids.length}
-                toolCallId={event.ref.tool_call_id}
+                steps={event.estimated_cost.affected_steps}
+                time={event.estimated_cost.affected_time_seconds}
+                tokens={event.estimated_cost.affected_tokens}
               />
             </div>
           </div>
         </div>
       </button>
 
-      {/* Expanded details */}
-      {expanded && (
-        <div className="ml-6 mt-3 pt-3 border-t border-zinc-700/40 divide-y divide-zinc-700/40">
-          <div className="pb-3">
-            <DetailBlock label="Evidence" icon={<Search className="w-4 h-4 text-sky-400" />}>
-              <p className="text-zinc-200 text-sm leading-relaxed">{event.evidence}</p>
-            </DetailBlock>
+      {/* Expanded: mitigations */}
+      {expanded && event.mitigations.length > 0 && (
+        <div className="ml-6 mt-3 pt-3 border-t border-zinc-700/40">
+          <div className="flex items-center gap-2 mb-2">
+            <Wrench className="w-4 h-4 text-emerald-400" />
+            <p className="text-sm font-semibold text-zinc-100">Mitigations</p>
           </div>
-          <div className="py-3">
-            <DetailBlock label="Root Cause" icon={<Target className="w-4 h-4 text-rose-400" />}>
-              <p className="text-zinc-200 text-sm leading-relaxed">{event.root_cause}</p>
-            </DetailBlock>
+          <div className="space-y-2">
+            {event.mitigations.map((m, i) => (
+              <MitigationCard key={i} mitigation={m} />
+            ))}
           </div>
-          {event.mitigations.length > 0 && (
-            <div className="py-3">
-              <DetailBlock label="Mitigations" icon={<Shield className="w-4 h-4 text-emerald-400" />}>
-                <ul className="space-y-1.5">
-                  {event.mitigations.map((m, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-200">
-                      <span className="text-emerald-400 mt-0.5 shrink-0">&#8226;</span>
-                      <span className="leading-relaxed">{m}</span>
-                    </li>
-                  ))}
-                </ul>
-              </DetailBlock>
-            </div>
-          )}
         </div>
       )}
     </div>
+  );
+}
+
+function MitigationCard({ mitigation }: { mitigation: Mitigation }) {
+  const colorClass = ACTION_TYPE_COLORS[mitigation.action_type] ?? "bg-zinc-800/60 border-zinc-700/60 text-zinc-300";
+
+  return (
+    <div className="bg-zinc-900/60 border border-zinc-700/40 rounded-lg p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
+          {mitigation.action_type.replace(/_/g, " ")}
+        </span>
+        <span className="text-xs text-zinc-400">{mitigation.target}</span>
+      </div>
+      <div className="flex items-start gap-2">
+        <p className="text-sm text-zinc-200 font-mono leading-relaxed flex-1">
+          {mitigation.content}
+        </p>
+        <CopyButton text={mitigation.content} className="shrink-0 mt-0.5" />
+      </div>
+    </div>
+  );
+}
+
+function HelpfulnessBadge({ level }: { level: number }) {
+  const label = HELPFULNESS_LABELS[level] ?? "Unknown";
+  const colorClass = HELPFULNESS_COLORS[level] ?? HELPFULNESS_COLORS[3];
+
+  return (
+    <Tip text={`Claude helpfulness: ${level}/5 — ${label}. How helpful was Claude for the overall task context.`}>
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
+        <Heart className="w-3 h-3" />
+        {label}
+      </span>
+    </Tip>
   );
 }
 
@@ -776,25 +887,21 @@ function CostRow({
   steps,
   time,
   tokens,
-  stepCount,
-  toolCallId,
 }: {
   steps: number;
   time: number | null;
   tokens: number | null;
-  stepCount?: number;
-  toolCallId?: string | null;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Tip text="Estimated steps consumed by friction (retries, rework, exploration)">
+      <Tip text="Steps affected by this friction">
         <span className="inline-flex items-center gap-1 text-xs text-zinc-300">
           <Footprints className="w-3.5 h-3.5 text-rose-400" />
-          {steps} step{steps !== 1 ? "s" : ""} wasted
+          {steps} step{steps !== 1 ? "s" : ""} affected
         </span>
       </Tip>
       {time != null && (
-        <Tip text="Estimated wall-clock time lost">
+        <Tip text="Time span of the friction">
           <span className="inline-flex items-center gap-1 text-xs text-zinc-300">
             <Clock className="w-3.5 h-3.5 text-sky-400" />
             {formatDuration(time)}
@@ -802,26 +909,10 @@ function CostRow({
         </Tip>
       )}
       {tokens != null && (
-        <Tip text="Estimated tokens spent on friction (input + output)">
+        <Tip text="Tokens consumed in the friction span">
           <span className="inline-flex items-center gap-1 text-xs text-zinc-300">
             <Coins className="w-3.5 h-3.5 text-amber-400" />
             {formatTokens(tokens)}
-          </span>
-        </Tip>
-      )}
-      {toolCallId && (
-        <Tip text="Specific tool call involved in this friction">
-          <span className="inline-flex items-center gap-1 text-xs text-violet-300">
-            <Wrench className="w-3.5 h-3.5 text-violet-400" />
-            {toolCallId.slice(0, SESSION_ID_MEDIUM)}
-          </span>
-        </Tip>
-      )}
-      {stepCount != null && (
-        <Tip text="Number of trajectory steps where this friction manifests">
-          <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
-            <Search className="w-3.5 h-3.5" />
-            {stepCount} step{stepCount !== 1 ? "s" : ""}
           </span>
         </Tip>
       )}
@@ -838,32 +929,12 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
   );
 }
 
-function DetailBlock({
-  label,
-  icon,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function TypeBadge({ type }: { type: string }) {
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <p className="text-sm font-semibold text-zinc-100">{label}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function ModeBadge({ mode }: { mode: string }) {
-  return (
-    <Tip text={`Friction mode: "${mode}" — a pattern of wasted effort identified by the LLM`}>
+    <Tip text={`Friction type: "${type}" — a pattern of user dissatisfaction`}>
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm font-medium bg-amber-900/30 border border-amber-700/30 text-amber-300">
         <Target className="w-4 h-4" />
-        {mode}
+        {type}
       </span>
     </Tip>
   );
@@ -894,6 +965,7 @@ function AnalysisMeta({ result }: { result: FrictionAnalysisResult }) {
         <span>
           {result.backend_id}/{result.model}
           {result.cost_usd != null && <> &middot; {formatCost(result.cost_usd)}</>}
+          {result.batch_count > 1 && <> &middot; {result.batch_count} batches</>}
         </span>
         <span>{timeStr}</span>
       </div>

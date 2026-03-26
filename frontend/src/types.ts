@@ -219,9 +219,9 @@ export interface FlowData {
 }
 
 export interface FrictionCost {
-  wasted_steps: number;
-  wasted_time_seconds: number | null;
-  wasted_tokens: number | null;
+  affected_steps: number;
+  affected_tokens: number | null;
+  affected_time_seconds: number | null;
 }
 
 export interface StepRef {
@@ -231,44 +231,42 @@ export interface StepRef {
   tool_call_id: string | null;
 }
 
+export interface Mitigation {
+  action_type: string;
+  target: string;
+  content: string;
+}
+
 export interface FrictionEvent {
-  event_id: string;
-  mode: string;
-  ref: StepRef;
-  step_ids: string[];
+  friction_id: string;
+  friction_type: string;
+  span_ref: StepRef;
   severity: number;
-  description: string;
-  evidence: string;
-  root_cause: string;
-  mitigations: string[];
+  user_intention: string;
+  friction_detail: string;
+  claude_helpfulness: number;
+  mitigations: Mitigation[];
+  related_friction_ids: string[];
   estimated_cost: FrictionCost;
-  related_event_ids: string[];
 }
 
-export interface ClaudeMdSuggestion {
-  rule: string;
-  section: string;
-  rationale: string;
-  source_event_ids: string[];
-}
-
-export interface ModeSummary {
-  mode: string;
+export interface TypeSummary {
+  friction_type: string;
   count: number;
   affected_sessions: number;
-  total_estimated_cost: FrictionCost;
   avg_severity: number;
+  total_estimated_cost: FrictionCost;
 }
 
 export interface FrictionAnalysisResult {
   analysis_id: string | null;
   events: FrictionEvent[];
   summary: string;
-  top_mitigation: string;
-  claude_md_suggestions: ClaudeMdSuggestion[];
-  mode_summary: ModeSummary[];
+  top_mitigation: Mitigation | null;
+  type_summary: TypeSummary[];
   session_ids: string[];
   sessions_skipped: string[];
+  batch_count: number;
   backend_id: string;
   model: string;
   cost_usd: number | null;
@@ -283,23 +281,128 @@ export interface FrictionMeta {
   computed_at: string;
   model: string;
   cost_usd: number | null;
+  batch_count: number;
 }
 
 export interface LLMStatus {
   available: boolean;
   backend_id: string;
   model: string | null;
+  api_key_masked: string | null;
+  base_url: string | null;
+  timeout: number;
+  max_tokens: number;
+}
+
+export interface SkillSource {
+  source_type: string;
+  source_path: string;
+}
+
+export interface SkillSourceInfo {
+  key: string;
+  label: string;
+  skill_count: number;
+  skills_dir: string;
 }
 
 export interface SkillInfo {
   name: string;
   description: string;
-  agent_type: AgentType;
-  path: string;
-  allowed_tools: string[];
-  subdirs: string[];
+  sources: SkillSource[];
+  central_path: string | null;
+  content_hash: string;
   metadata: Record<string, unknown>;
-  line_count: number;
+  skill_targets: string[];
+}
+
+export interface FeaturedSkill {
+  slug: string;
+  name: string;
+  summary: string;
+  downloads: number;
+  stars: number;
+  category: string;
+  tags: string[];
+  source_url: string;
+  updated_at: string;
+}
+
+export interface FeaturedSkillsResponse {
+  updated_at: string | null;
+  total: number;
+  categories: string[];
+  skills: FeaturedSkill[];
+}
+
+export type SkillMode = "retrieval" | "creation" | "evolution";
+
+export interface WorkflowPattern {
+  pattern_id: string;
+  description: string;
+  tool_sequence: string[];
+  frequency: number;
+  pain_point: string;
+  example_refs: StepRef[];
+}
+
+export interface SkillRecommendation {
+  skill_name: string;
+  source: string;
+  match_reason: string;
+  matched_patterns: string[];
+  url: string;
+  confidence: number;
+}
+
+export interface SkillCreation {
+  name: string;
+  description: string;
+  skill_md_content: string;
+  source_patterns: string[];
+  rationale: string;
+}
+
+export interface SkillEditKind {
+  kind: string;
+  target: string;
+  replacement: string | null;
+  rationale: string;
+}
+
+export interface SkillEvolutionSuggestion {
+  skill_name: string;
+  edits: SkillEditKind[];
+  rationale: string;
+  source_patterns: string[];
+}
+
+export interface SkillAnalysisResult {
+  analysis_id: string | null;
+  mode: SkillMode;
+  workflow_patterns: WorkflowPattern[];
+  recommendations: SkillRecommendation[];
+  generated_skills: SkillCreation[];
+  evolution_suggestions: SkillEvolutionSuggestion[];
+  summary: string;
+  user_profile: string;
+  session_ids: string[];
+  sessions_skipped: string[];
+  backend_id: string;
+  model: string;
+  cost_usd: number | null;
+  computed_at: string;
+}
+
+export interface SkillAnalysisMeta {
+  analysis_id: string;
+  mode: SkillMode;
+  session_ids: string[];
+  pattern_count: number;
+  summary_preview: string;
+  computed_at: string;
+  model: string;
+  cost_usd: number | null;
 }
 
 export type ToolType =

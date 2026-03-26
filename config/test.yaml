@@ -20,8 +20,7 @@ sources:
   codex_dir: ~/.codex
   gemini_dir: ~/.gemini
 
-llm:
-  backend: disabled
+# LLM config is now in config/llm.yaml (disabled by default)
 
 upload:
   dir: ~/.vibelens/uploads

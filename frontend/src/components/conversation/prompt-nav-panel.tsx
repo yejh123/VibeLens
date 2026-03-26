@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Bot, GitBranch, MessageSquare } from "lucide-react";
+import { Bot, MessageSquare, User } from "lucide-react";
 import { extractUserText, truncate } from "../../utils";
 import { ResizeHandle } from "../resize-handle";
 import type { Step, Trajectory } from "../../types";
-import type { FlowPhaseGroup } from "./flow-layout";
+import type { FlowPhaseGroup, FlowSection } from "./flow-layout";
 import {
   TOGGLE_CONTAINER, TOGGLE_BUTTON_BASE, TOGGLE_ACTIVE, TOGGLE_INACTIVE,
   PHASE_STYLE, CATEGORY_LABELS, SESSION_ID_MEDIUM, PREVIEW_MEDIUM, PREVIEW_LONG,
@@ -28,6 +28,7 @@ interface PromptNavPanelProps {
   onResize: (delta: number) => void;
   viewMode: "timeline" | "flow";
   flowPhases?: FlowPhaseGroup[];
+  flowSections?: FlowSection[];
   activePhaseIdx?: number | null;
   onPhaseNavigate?: (phaseIdx: number) => void;
 }
@@ -65,6 +66,7 @@ export function PromptNavPanel({
   onResize,
   viewMode,
   flowPhases,
+  flowSections,
   activePhaseIdx,
   onPhaseNavigate,
 }: PromptNavPanelProps) {
@@ -83,31 +85,70 @@ export function PromptNavPanel({
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // Flow mode: show phases panel
-  if (hasFlowPhases) {
+  // Flow mode: interleaved user prompts + phases
+  const hasFlowSections = viewMode === "flow" && flowSections && flowSections.length > 0;
+  if (hasFlowPhases || hasFlowSections) {
+    const sections = flowSections ?? [];
+    // Build a stepId→turnNumber lookup from prompt entries
+    const turnByStepId = new Map(entries.map((e) => [e.stepId, e]));
+    let phaseIdx = 0;
+
     return (
       <div
         style={{ width }}
         className="hidden xl:flex relative shrink-0 h-full flex-col border-l border-zinc-800 bg-zinc-900/50"
       >
         <ResizeHandle side="right" onResize={onResize} />
-        <div className="shrink-0 px-3 pt-3 pb-2">
-          <div className="flex items-center gap-1.5 text-sm text-zinc-300">
-            <GitBranch className="w-3.5 h-3.5" />
-            <span className="font-medium">Phases</span>
-            <span className="text-zinc-500">({flowPhases!.length})</span>
-          </div>
-        </div>
         <div className="flex-1 overflow-y-auto px-3 py-3">
           <div className="space-y-1">
-            {flowPhases!.map((phase, idx) => {
-              const isActive = activePhaseIdx === idx;
+            {sections.map((section, i) => {
+              if (section.type === "anchor") {
+                const anchor = section.data;
+                const entry = turnByStepId.get(anchor.id);
+                const turnNum = entry?.turnNumber ?? "?";
+                const preview = entry?.preview ?? truncate(anchor.label, PREVIEW_LONG);
+                const isActive = anchor.id === activeStepId;
+                return (
+                  <button
+                    key={`anchor-${anchor.id}`}
+                    onClick={() => onNavigate(anchor.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-md transition-colors text-sm group ${
+                      isActive
+                        ? "bg-indigo-500/20 border border-indigo-500/40"
+                        : "bg-indigo-950/30 hover:bg-indigo-900/30 border border-indigo-500/10 hover:border-indigo-500/25"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <User className={`w-3.5 h-3.5 ${isActive ? "text-indigo-400" : "text-indigo-400/60"}`} />
+                      <span
+                        className={`font-mono font-semibold text-xs ${
+                          isActive ? "text-indigo-300" : "text-indigo-400/70 group-hover:text-indigo-300"
+                        }`}
+                      >
+                        Prompt #{turnNum}
+                      </span>
+                    </div>
+                    <p
+                      className={`line-clamp-2 leading-snug pl-5 ${
+                        isActive ? "text-indigo-200/80" : "text-zinc-400 group-hover:text-zinc-300"
+                      }`}
+                    >
+                      {preview}
+                    </p>
+                  </button>
+                );
+              }
+
+              // Phase section
+              const phase = section.data;
+              const currentPhaseIdx = phaseIdx++;
+              const isActive = activePhaseIdx === currentPhaseIdx;
               const style = PHASE_STYLE[phase.phase] || PHASE_STYLE.mixed;
               const catLabel = CATEGORY_LABELS[phase.dominantCategory] || phase.dominantCategory;
               return (
                 <button
-                  key={idx}
-                  onClick={() => onPhaseNavigate?.(idx)}
+                  key={`phase-${i}`}
+                  onClick={() => onPhaseNavigate?.(currentPhaseIdx)}
                   className={`w-full text-left px-2 py-2 rounded-md transition-colors text-sm group ${
                     isActive
                       ? "bg-cyan-500/15 border border-cyan-500/30"
