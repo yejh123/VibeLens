@@ -11,6 +11,7 @@
 - **Friction API error handling**: Unexpected exceptions in the friction analysis endpoint now return structured 500 responses with type and message.
 
 ### Changed
+- **Non-blocking dashboard cache warming**: Cache warming now loads sessions in batches of 20 with GIL-releasing sleeps between batches. Runs as an async background task instead of a blocking thread. Friction history, LLM status, and skill endpoints respond in 1-3 seconds on cold start instead of waiting ~55 seconds for cache warming to finish.
 - **Friction prompts rewritten for users**: Synthesis prompt writes for a developer audience — no references to batches, chunks, or internal processing. Summary capped at 80 words (down from 150) for scanability.
 - **Cross-session patterns**: Renamed `cross_batch_patterns` → `cross_session_patterns` throughout models, prompts, and templates.
 - **Synthesis mitigations override batch mitigations**: If the synthesis call produces mitigations, the first one replaces the per-batch `top_mitigation`.
