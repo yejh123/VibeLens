@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.1] - 2026-03-25
+
+### Added
+- **Multi-agent skill ecosystem**: Central skill store (`~/.vibelens/skills/`) aggregates skills from Claude Code and Codex on startup. Cross-agent sync API copies skills between interfaces.
+- **Featured skill catalog**: Browse and install community skills from the Anthropic registry via the new Explore Skills tab.
+- **LLM-powered skill analysis**: Three modes — retrieval (recommend existing skills), creation (generate new SKILL.md), evolution (suggest edits) — with persistent history.
+- **Context extraction & session batching**: Reusable modules for compressing trajectories into LLM-ready batches, shared by friction and skill analysis.
+- **Shared UI components**: Extracted `Modal`, portal-based `Tooltip`, and skill UI primitives (badges, search bar, filter bar, empty states) into reusable files.
+- **Separated LLM config**: Decoupled `LLMConfig` into `config/llm.yaml` with hot-reload support.
+
+### Changed
+- **Storage restructure**: Conversation stores moved to `storage/conversation/`; skill stores expanded with `CentralSkillStore` and `CodexSkillStore`.
+- **Friction service refactor**: Split into `services/friction/` sub-package (`analysis.py`, `store.py`, `digest.py`). Reworked prompt templates.
+- **Skills panel refactor**: Split 1,777-line monolith into 7 focused files (~138-line orchestrator). Unified violet theme across all sub-tabs.
+- **Renamed** `get_managed_skill_store` → `get_central_skill_store`.
+- **CLAUDE.md**: Added frontend conventions (component size, shared UI patterns, color theme, file splitting).
+
+### Removed
+- Deleted `llm/digest_friction.py`, `models/analysis/behavior.py`, `models/skill.py`, and legacy `storage/base.py`/`disk.py`/`local.py` (all moved or consolidated).
+
 ## [0.9.0] - 2026-03-24
 
 ### Added

@@ -1,11 +1,16 @@
-"""Friction analysis models for multi-session LLM-powered analysis.
+"""User-centric friction analysis models.
 
-Defines the complete model hierarchy from input (StepSignal) through
-LLM output (FrictionLLMOutput) to the enriched service response
-(FrictionAnalysisResult). See docs/spec-friction-analysis.md v0.4.
+Friction = user dissatisfaction. If the user moves on without complaint,
+there is no friction — even if the agent read 20 files.
+
+Model hierarchy:
+- StepSignal: Input (kept for skill analysis compatibility)
+- FrictionLLMEvent → FrictionEvent: LLM output → enriched with computed cost
+- FrictionLLMBatchOutput: Raw output for one batch
+- FrictionAnalysisResult: Final merged result across all batches
 """
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.trajectories.step import Step
@@ -37,158 +42,119 @@ class StepSignal(BaseModel):
 
 
 class FrictionCost(BaseModel):
-    """Estimated cost of a friction event in steps, time, and tokens."""
+    """Computed from step span — NOT LLM-generated."""
 
-    wasted_steps: int = Field(
+    affected_steps: int = Field(
         default=0,
-        description="Estimated steps consumed by this friction (retries, rework, exploration).",
+        description="Count of steps in the friction span.",
     )
-    wasted_time_seconds: int | None = Field(
+    affected_tokens: int | None = Field(
         default=None,
-        description=(
-            "Estimated wall-clock seconds lost. Derived from step timestamps "
-            "when available, None otherwise."
-        ),
+        description="Sum of step metrics tokens in span. None if unavailable.",
     )
-    wasted_tokens: int | None = Field(
+    affected_time_seconds: int | None = Field(
         default=None,
-        description=(
-            "Estimated tokens spent on friction steps (input + output). "
-            "Derived from step metrics when available, None otherwise."
-        ),
+        description="Timestamp delta in seconds across span. None if unavailable.",
     )
 
 
-class FrictionEvent(BaseModel):
-    """A specific friction instance identified by the LLM within a session.
+class Mitigation(BaseModel):
+    """Structured mitigation action — ready to apply."""
 
-    Fine-grained and low-level: one FrictionEvent per concrete occurrence.
-    Multiple events may share the same mode if the same type of friction
-    recurs across steps or sessions.
-    """
-
-    event_id: str = Field(
-        description="Unique identifier for this friction event. Format: f-{sequential_number}.",
-    )
-    mode: str = Field(
+    action_type: str = Field(
         description=(
-            "Friction mode label determined by the LLM. Descriptive kebab-case "
-            "string (e.g., 'wrong-approach', 'excessive-planning')."
+            "Type of mitigation: 'update_claude_md', 'write_test', 'create_skill', "
+            "'update_skill', 'add_linter_rule', 'update_workflow'."
         ),
     )
-    ref: StepRef = Field(description="Canonical location of this friction event in the session.")
-    step_ids: list[str] = Field(
-        description=(
-            "Step IDs where this friction manifests (references Step.step_id). "
-            "Single-element for point events, multi-element for spanning sequences."
-        ),
+    target: str = Field(
+        description="CLAUDE.md section, test file path, skill name, or workflow target.",
+    )
+    content: str = Field(
+        description="Exact text to add or change — ready to apply.",
+    )
+
+
+class FrictionLLMEvent(BaseModel):
+    """What the LLM outputs for a single friction event. No cost fields."""
+
+    friction_id: str = Field(
+        description="Sequential identifier (friction-001, friction-002, ...).",
+    )
+    friction_type: str = Field(
+        description="Kebab-case friction type from taxonomy.",
+    )
+    span_ref: StepRef = Field(
+        description="Step span where this friction occurs.",
     )
     severity: int = Field(
-        description="Impact severity from 1 (minor inconvenience) to 5 (session blocker).",
+        description="Impact severity from 1 (minor) to 5 (critical).",
     )
-    description: str = Field(
-        description="What happened and why the LLM classified this as friction.",
+    user_intention: str = Field(
+        description="What the user fundamentally wanted.",
     )
-    evidence: str = Field(
-        description="Quoted or summarized evidence from the session data.",
+    friction_detail: str = Field(
+        description="Why the agent failed to satisfy the user (1 sentence or empty).",
     )
-    root_cause: str = Field(
-        description=(
-            "Underlying cause: what triggered this friction. Distinguishes symptom from cause."
-        ),
+    claude_helpfulness: int = Field(
+        description="1=unhelpful, 2=slightly, 3=moderately, 4=very, 5=essential.",
     )
-    mitigations: list[str] = Field(
-        description=(
-            "Actionable suggestions to prevent this friction. "
-            "Prefer CLAUDE.md rule additions where applicable."
-        ),
+    mitigations: list[Mitigation] = Field(
+        default_factory=list,
+        description="Structured mitigation actions.",
     )
+    related_friction_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of causally related friction events.",
+    )
+
+
+class FrictionEvent(FrictionLLMEvent):
+    """FrictionLLMEvent enriched with computed cost (post-inference)."""
+
     estimated_cost: FrictionCost = Field(
         default_factory=FrictionCost,
-        description="Estimated resources consumed by this friction event.",
-    )
-    related_event_ids: list[str] = Field(
-        default_factory=list, description="IDs of other FrictionEvents that are causally related."
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def backfill_ref(cls, data: dict) -> dict:
-        """Auto-build ref from legacy session_id/step_ids/tool_call_id fields."""
-        if isinstance(data, dict) and "ref" not in data and "session_id" in data:
-            step_ids = data.get("step_ids", [])
-            data["ref"] = {
-                "session_id": data.pop("session_id"),
-                "start_step_id": step_ids[0] if step_ids else "",
-                "end_step_id": step_ids[-1] if len(step_ids) > 1 else None,
-                "tool_call_id": data.pop("tool_call_id", None),
-            }
-        return data
-
-
-class ClaudeMdSuggestion(BaseModel):
-    """A suggested CLAUDE.md rule derived from observed friction."""
-
-    rule: str = Field(
-        description="The CLAUDE.md rule text to add.",
-    )
-    section: str = Field(
-        description="Suggested CLAUDE.md section to place the rule.",
-    )
-    rationale: str = Field(
-        description="Why this rule is recommended, citing observed friction events.",
-    )
-    source_event_ids: list[str] = Field(
-        default_factory=list, description="FrictionEvent IDs that motivated this suggestion."
+        description="Cost computed from step span metrics.",
     )
 
 
-class ModeSummary(BaseModel):
-    """Aggregated statistics for one friction mode across the analysis."""
+class FrictionLLMBatchOutput(BaseModel):
+    """Raw LLM output for one batch of sessions."""
 
-    mode: str = Field(description="Friction mode label (matches FrictionEvent.mode).")
-    count: int = Field(description="Total friction events with this mode.")
-    affected_sessions: int = Field(description="Number of distinct sessions containing this mode.")
-    avg_severity: float = Field(description="Average severity across events of this mode.")
-    total_estimated_cost: FrictionCost = Field(
-        default_factory=FrictionCost,
-        description="Aggregated estimated cost across all events of this mode.",
-    )
-
-
-class FrictionLLMOutput(BaseModel):
-    """Intermediate model for raw LLM friction analysis output.
-
-    The LLM produces events, summary, suggestions, and mode_summary.
-    The service wraps this with metadata to form FrictionAnalysisResult.
-    """
-
-    events: list[FrictionEvent] = Field(
+    events: list[FrictionLLMEvent] = Field(
         default_factory=list,
-        description="All identified friction events, ordered by session then step.",
+        description="Friction events identified in this batch.",
     )
     summary: str = Field(
-        description="Narrative overview of friction across analyzed sessions.",
+        description="Narrative overview of friction in this batch.",
     )
-    top_mitigation: str = Field(
-        description="Single highest-impact CLAUDE.md rule or workflow change.",
+    top_mitigation: Mitigation | None = Field(
+        default=None,
+        description="Single highest-impact mitigation across the batch.",
     )
-    claude_md_suggestions: list[ClaudeMdSuggestion] = Field(
-        default_factory=list,
-        description="Actionable CLAUDE.md additions derived from friction patterns.",
+
+
+class TypeSummary(BaseModel):
+    """Aggregated statistics per friction_type. Replaces ModeSummary."""
+
+    friction_type: str = Field(
+        description="Friction type label (matches FrictionEvent.friction_type).",
     )
-    mode_summary: list[ModeSummary] = Field(
-        default_factory=list,
-        description="Aggregated statistics per friction mode.",
+    count: int = Field(description="Total friction events of this type.")
+    affected_sessions: int = Field(
+        description="Number of distinct sessions containing this type.",
+    )
+    avg_severity: float = Field(
+        description="Average severity across events of this type.",
+    )
+    total_estimated_cost: FrictionCost = Field(
+        default_factory=FrictionCost,
+        description="Aggregated cost across all events of this type.",
     )
 
 
 class FrictionAnalysisResult(BaseModel):
-    """Complete friction analysis result with service metadata.
-
-    Extends FrictionLLMOutput fields with session tracking, backend info,
-    and cost metadata that the service adds after LLM inference.
-    """
+    """Complete friction analysis result merged across all batches."""
 
     analysis_id: str | None = Field(
         default=None,
@@ -196,34 +162,35 @@ class FrictionAnalysisResult(BaseModel):
     )
     events: list[FrictionEvent] = Field(
         default_factory=list,
-        description="All identified friction events, ordered by session then step.",
+        description="All friction events ordered by severity descending.",
     )
     summary: str = Field(
-        description="Narrative overview of friction across analyzed sessions.",
+        description="Narrative overview of friction across all sessions.",
     )
-    top_mitigation: str = Field(
-        description="Single highest-impact CLAUDE.md rule or workflow change.",
+    top_mitigation: Mitigation | None = Field(
+        default=None,
+        description="Single highest-impact mitigation across all batches.",
     )
-    claude_md_suggestions: list[ClaudeMdSuggestion] = Field(
+    type_summary: list[TypeSummary] = Field(
         default_factory=list,
-        description="Actionable CLAUDE.md additions derived from friction patterns.",
-    )
-    mode_summary: list[ModeSummary] = Field(
-        default_factory=list,
-        description="Aggregated statistics per friction mode (recomputed by service).",
+        description="Aggregated statistics per friction type.",
     )
     session_ids: list[str] = Field(
         description="Session IDs that were successfully loaded and analyzed.",
     )
     sessions_skipped: list[str] = Field(
         default_factory=list,
-        description="Session IDs from the request that were not found in the store.",
+        description="Session IDs from the request that were not found.",
+    )
+    batch_count: int = Field(
+        default=1,
+        description="Number of LLM batches used for this analysis.",
     )
     backend_id: str = Field(description="Inference backend used.")
     model: str = Field(description="Model identifier.")
     cost_usd: float | None = Field(
         default=None,
-        description="Inference cost in USD. None for free backends.",
+        description="Total inference cost in USD across all batches.",
     )
     computed_at: str = Field(description="ISO timestamp of analysis completion.")
 

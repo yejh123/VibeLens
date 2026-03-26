@@ -10,7 +10,7 @@ from vibelens.ingest.parsers.base import MAX_FIRST_MESSAGE_LENGTH, BaseParser, _
 from vibelens.ingest.parsers.dataclaw import DataclawParser
 from vibelens.models.enums import StepSource
 from vibelens.models.trajectories import Trajectory
-from vibelens.storage.disk import INDEX_FILENAME, DiskStore
+from vibelens.storage.conversation.disk import INDEX_FILENAME, DiskStore
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)

@@ -23,6 +23,10 @@ class InferenceRequest(BaseModel):
     temperature: float = Field(
         default=0.0, description="Sampling temperature (0.0 = deterministic)."
     )
+    timeout: int | None = Field(
+        default=None,
+        description="Request timeout in seconds. None uses the backend default.",
+    )
     json_schema: dict | None = Field(
         default=None,
         description="JSON schema for structured output constraint. None for free-form text.",

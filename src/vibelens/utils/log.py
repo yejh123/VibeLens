@@ -18,6 +18,8 @@ LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 
 PARSER_LOGGER_PREFIX = "vibelens.ingest.parsers."
+# Modules that get per-module log files (in addition to parser modules)
+PER_MODULE_LOGGERS = {"vibelens.services.friction.analysis"}
 
 _root_configured = False
 
@@ -112,9 +114,9 @@ def get_logger(
 
     logger = logging.getLogger(name)
 
-    # Parser modules get an additional per-module file handler
-    is_parser = name.startswith(PARSER_LOGGER_PREFIX)
-    if is_parser and not logger.handlers:
+    # Parser modules and specific service modules get per-module file handlers
+    needs_file = name.startswith(PARSER_LOGGER_PREFIX) or name in PER_MODULE_LOGGERS
+    if needs_file and not logger.handlers:
         resolved_log_dir.mkdir(parents=True, exist_ok=True)
         short_name = name.rsplit(".", 1)[-1]
 

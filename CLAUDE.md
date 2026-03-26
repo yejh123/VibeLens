@@ -77,6 +77,23 @@ tests/                 # Unit and integration tests mirroring src/ structure.
 - **Prompts**: Use the """ triple-quoted string conversion for long-text prompts. Not use \ line continuations to separate a single line.
 - **BaseModel**: All Pydantic `BaseModel` fields must use `Field(description=...)` to document their purpose.
 
+## Frontend Conventions (React + Vite + Tailwind)
+
+- **Build:** `npm run build` in `frontend/`. Must pass with zero TypeScript errors before commit.
+- **Component size:** One component per file, max ~200 lines. If longer, extract sub-components into separate files.
+- **Shared UI:** Reusable primitives live in `components/` (e.g., `modal.tsx`, `tooltip.tsx`, `confirm-dialog.tsx`). Domain-specific shared components live in their feature folder (e.g., `skills/skill-badges.tsx`, `skills/skill-shared.tsx`).
+- **Constants:** Extract repeated strings, colors, and config objects into dedicated `*-constants.ts` files. Global constants go in `styles.ts`.
+- **Modals:** Always use the shared `Modal` / `ModalHeader` / `ModalBody` / `ModalFooter` from `components/modal.tsx`. Never hand-roll fixed-inset overlay markup.
+- **Tooltips:** Always use the shared `Tooltip` from `components/tooltip.tsx`. It renders via portal, shows instantly, and auto-flips.
+- **Color theme:** The Skills tab accent is **violet** (`bg-violet-600/20 text-violet-300 border border-violet-500/30`). All sub-tabs under Skills must use the same violet accent. Other main tabs use cyan. Domain-specific colors (source badges, category pills) may differ.
+- **No dead imports:** Remove unused imports immediately. TypeScript strict mode catches these.
+- **File splitting pattern:** For feature panels, use this structure:
+  - `*-panel.tsx` — thin orchestrator (~100-150 lines) with tab routing and top-level state
+  - `*-tab.tsx` — one file per tab with its own state management
+  - `*-cards.tsx` — card and detail popup components
+  - `*-shared.tsx` — reusable sub-components (search bars, filter bars, empty states)
+  - `*-constants.ts` — color maps, label maps, config arrays
+
 ## Testing
 
 - Ruff: `ruff check src/ tests/`

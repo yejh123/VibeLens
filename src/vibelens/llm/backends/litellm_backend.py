@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 
 import litellm
 
+from vibelens.config.llm_config import LLMConfig, resolve_base_url
 from vibelens.llm.backend import (
     InferenceBackend,
     InferenceError,
@@ -34,19 +35,16 @@ class LiteLLMBackend(InferenceBackend):
     use litellm's provider-prefixed format (e.g. 'anthropic/claude-sonnet-4-5').
     """
 
-    def __init__(self, model: str, api_key: str, timeout: int = 120, max_tokens: int = 4096):
-        """Initialize LiteLLM backend.
+    def __init__(self, config: LLMConfig, model_override: str | None = None):
+        """Initialize LiteLLM backend from LLMConfig.
 
         Args:
-            model: Model name in litellm format (e.g. 'anthropic/claude-sonnet-4-5').
-            api_key: API key for the provider.
-            timeout: Request timeout in seconds.
-            max_tokens: Default max output tokens.
+            config: Full LLM configuration.
+            model_override: Override the model from config (used for legacy alias rewriting).
         """
-        self._model = model
-        self._api_key = api_key
-        self._timeout = timeout
-        self._max_tokens = max_tokens
+        self._config = config
+        self._model = model_override or config.model
+        self._base_url = resolve_base_url(config)
 
     async def generate(self, request: InferenceRequest) -> InferenceResult:
         """Send a non-streaming completion request via litellm.
@@ -63,13 +61,15 @@ class LiteLLMBackend(InferenceBackend):
             InferenceError: On other API errors.
         """
         messages = _build_messages(request)
-        kwargs = _build_kwargs(request, self._model, self._api_key, self._max_tokens, self._timeout)
+        kwargs = self._build_kwargs(request)
 
         start_ms = _now_ms()
         try:
             response = await litellm.acompletion(messages=messages, **kwargs)
         except litellm.exceptions.Timeout as exc:
             raise InferenceTimeoutError(f"Request timed out: {exc}") from exc
+        except litellm.exceptions.AuthenticationError as exc:
+            raise InferenceError(f"Authentication failed — check your API key: {exc}") from exc
         except litellm.exceptions.RateLimitError as exc:
             raise InferenceRateLimitError(f"Rate limited: {exc}") from exc
         except litellm.exceptions.APIError as exc:
@@ -98,7 +98,7 @@ class LiteLLMBackend(InferenceBackend):
             Text chunks as they arrive.
         """
         messages = _build_messages(request)
-        kwargs = _build_kwargs(request, self._model, self._api_key, self._max_tokens, self._timeout)
+        kwargs = self._build_kwargs(request)
 
         try:
             response = await litellm.acompletion(messages=messages, stream=True, **kwargs)
@@ -108,6 +108,8 @@ class LiteLLMBackend(InferenceBackend):
                     yield delta.content
         except litellm.exceptions.Timeout as exc:
             raise InferenceTimeoutError(f"Stream timed out: {exc}") from exc
+        except litellm.exceptions.AuthenticationError as exc:
+            raise InferenceError(f"Authentication failed — check your API key: {exc}") from exc
         except litellm.exceptions.RateLimitError as exc:
             raise InferenceRateLimitError(f"Rate limited: {exc}") from exc
         except litellm.exceptions.APIError as exc:
@@ -115,12 +117,28 @@ class LiteLLMBackend(InferenceBackend):
 
     async def is_available(self) -> bool:
         """Check if the API key is configured."""
-        return bool(self._api_key)
+        return bool(self._config.api_key)
 
     @property
     def backend_id(self) -> str:
         """Return the backend type identifier."""
         return "litellm"
+
+    def _build_kwargs(self, request: InferenceRequest) -> dict:
+        """Build keyword arguments for litellm.acompletion."""
+        cfg = self._config
+        kwargs: dict = {
+            "model": self._model,
+            "api_key": cfg.api_key,
+            "max_tokens": request.max_tokens or cfg.max_tokens,
+            "temperature": request.temperature,
+            "timeout": request.timeout or cfg.timeout,
+        }
+        if self._base_url:
+            kwargs["api_base"] = self._base_url
+        if request.json_schema:
+            kwargs["response_format"] = {"type": "json_object"}
+        return kwargs
 
 
 def _build_messages(request: InferenceRequest) -> list[dict]:
@@ -129,22 +147,6 @@ def _build_messages(request: InferenceRequest) -> list[dict]:
         {"role": "system", "content": request.system},
         {"role": "user", "content": request.user},
     ]
-
-
-def _build_kwargs(
-    request: InferenceRequest, model: str, api_key: str, max_tokens: int, timeout: int
-) -> dict:
-    """Build keyword arguments for litellm.acompletion."""
-    kwargs: dict = {
-        "model": model,
-        "api_key": api_key,
-        "max_tokens": request.max_tokens or max_tokens,
-        "temperature": request.temperature,
-        "timeout": timeout,
-    }
-    if request.json_schema:
-        kwargs["response_format"] = {"type": "json_object"}
-    return kwargs
 
 
 def _parse_usage(response) -> TokenUsage | None:

@@ -37,7 +37,7 @@ function MarkdownRendererInner({ content, className = "" }: MarkdownRendererProp
       <h6 className="text-xs font-medium text-zinc-300 mt-1.5 mb-0.5">{children}</h6>
     ),
     p: ({ children }) => (
-      <p className="text-[13px] leading-relaxed text-zinc-200 my-1.5">{children}</p>
+      <p className="leading-relaxed text-zinc-200 my-1.5">{children}</p>
     ),
     a: ({ href, children }) => (
       <a
@@ -95,10 +95,10 @@ function MarkdownRendererInner({ content, className = "" }: MarkdownRendererProp
       );
     },
     ul: ({ children }) => (
-      <ul className="list-disc list-outside pl-5 space-y-0.5 my-1.5 text-[13px] text-zinc-200">{children}</ul>
+      <ul className="list-disc list-outside pl-5 space-y-0.5 my-1.5 text-zinc-200">{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className="list-decimal list-outside pl-5 space-y-0.5 my-1.5 text-[13px] text-zinc-200">{children}</ol>
+      <ol className="list-decimal list-outside pl-5 space-y-0.5 my-1.5 text-zinc-200">{children}</ol>
     ),
     li: ({ children }) => (
       <li className="leading-relaxed [&>p]:my-0 [&>p]:inline">{children}</li>

@@ -16,8 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from vibelens.models.enums import AgentType
-from vibelens.models.skill import VALID_SKILL_NAME, SkillInfo
+from vibelens.models.skill import VALID_SKILL_NAME, SkillInfo, SkillSource, SkillSourceType
 from vibelens.storage.skill.base import SkillStore
 from vibelens.utils.log import get_logger
 
@@ -26,51 +25,6 @@ logger = get_logger(__name__)
 SKILL_FILENAME = "SKILL.md"
 KNOWN_SUBDIRS = ("scripts", "references", "agents", "assets")
 FRONTMATTER_DELIMITER = "---"
-
-
-def _parse_frontmatter(text: str) -> dict:
-    """Extract YAML frontmatter from a SKILL.md file.
-
-    Expects the file to start with '---' followed by YAML, closed by '---'.
-    Returns an empty dict if no valid frontmatter is found.
-    """
-    lines = text.split("\n")
-    if not lines or lines[0].strip() != FRONTMATTER_DELIMITER:
-        return {}
-
-    end_idx = None
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == FRONTMATTER_DELIMITER:
-            end_idx = i
-            break
-
-    if end_idx is None:
-        return {}
-
-    yaml_text = "\n".join(lines[1:end_idx])
-    try:
-        parsed = yaml.safe_load(yaml_text)
-        return parsed if isinstance(parsed, dict) else {}
-    except yaml.YAMLError as exc:
-        logger.warning("Failed to parse YAML frontmatter: %s", exc)
-        return {}
-
-
-def _parse_allowed_tools(raw: str | list | None) -> list[str]:
-    """Normalize allowed-tools from frontmatter into a list of tool names.
-
-    Handles both comma-separated strings and lists.
-    """
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        return [str(t).strip() for t in raw if str(t).strip()]
-    return [t.strip() for t in str(raw).split(",") if t.strip()]
-
-
-def _detect_subdirs(skill_dir: Path) -> list[str]:
-    """Return which KNOWN_SUBDIRS exist in the skill directory."""
-    return [name for name in KNOWN_SUBDIRS if (skill_dir / name).is_dir()]
 
 
 class ClaudeCodeSkillStore(SkillStore):
@@ -85,9 +39,9 @@ class ClaudeCodeSkillStore(SkillStore):
         self._skills_dir = skills_dir.expanduser().resolve()
 
     @property
-    def agent_type(self) -> AgentType:
-        """Return the agent type identifier."""
-        return AgentType.CLAUDE_CODE
+    def source_type(self) -> SkillSourceType:
+        """Unified source/store type for Claude Code."""
+        return SkillSourceType.CLAUDE_CODE
 
     @property
     def skills_dir(self) -> Path:
@@ -192,10 +146,65 @@ class ClaudeCodeSkillStore(SkillStore):
         return SkillInfo(
             name=name,
             description=description,
-            agent_type=self.agent_type,
-            path=skill_dir,
-            allowed_tools=allowed_tools,
-            subdirs=_detect_subdirs(skill_dir),
-            metadata=frontmatter,
-            line_count=text.count("\n") + 1,
+            sources=[
+                SkillSource(
+                    source_type=self.source_type,
+                    source_path=str(skill_dir),
+                )
+            ],
+            central_path=None,
+            content_hash=SkillInfo.hash_content(text),
+            metadata={
+                **frontmatter,
+                "allowed_tools": allowed_tools,
+                "subdirs": _detect_subdirs(skill_dir),
+                "store_path": str(skill_dir),
+                "line_count": text.count("\n") + 1,
+            },
+            skill_targets=[self.source_type],
         )
+
+
+def _parse_frontmatter(text: str) -> dict:
+    """Extract YAML frontmatter from a SKILL.md file.
+
+    Expects the file to start with '---' followed by YAML, closed by '---'.
+    Returns an empty dict if no valid frontmatter is found.
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != FRONTMATTER_DELIMITER:
+        return {}
+
+    end_idx = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == FRONTMATTER_DELIMITER:
+            end_idx = i
+            break
+
+    if end_idx is None:
+        return {}
+
+    yaml_text = "\n".join(lines[1:end_idx])
+    try:
+        parsed = yaml.safe_load(yaml_text)
+        return parsed if isinstance(parsed, dict) else {}
+    except yaml.YAMLError as exc:
+        logger.warning("Failed to parse YAML frontmatter: %s", exc)
+        return {}
+
+
+def _parse_allowed_tools(raw: str | list | None) -> list[str]:
+    """Normalize allowed-tools from frontmatter into a list of tool names.
+
+    Handles both comma-separated strings and lists.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(t).strip() for t in raw if str(t).strip()]
+    return [t.strip() for t in str(raw).split(",") if t.strip()]
+
+
+def _detect_subdirs(skill_dir: Path) -> list[str]:
+    """Return which KNOWN_SUBDIRS exist in the skill directory."""
+    return [name for name in KNOWN_SUBDIRS if (skill_dir / name).is_dir()]

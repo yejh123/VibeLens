@@ -1,9 +1,10 @@
 """Backend registry and factory for inference backends.
 
-The create_backend() factory reads settings and instantiates the
-configured backend, or returns None if inference is disabled.
+The create_backend_from_llm_config() factory reads LLMConfig and
+instantiates the configured backend, or returns None if inference is disabled.
 """
 
+from vibelens.config.llm_config import LLMConfig
 from vibelens.llm.backend import InferenceBackend
 from vibelens.utils.log import get_logger
 
@@ -24,16 +25,16 @@ LEGACY_PROVIDER_MAP = {
 }
 
 
-def create_backend(settings) -> InferenceBackend | None:
-    """Factory: create the configured backend, or None if disabled.
+def create_backend_from_llm_config(config: LLMConfig) -> InferenceBackend | None:
+    """Factory: create the configured backend from LLMConfig, or None if disabled.
 
     Args:
-        settings: Application settings with llm_* fields.
+        config: LLM configuration with backend, model, api_key, etc.
 
     Returns:
         Configured InferenceBackend instance, or None if disabled.
     """
-    backend_id = settings.llm_backend
+    backend_id = config.backend
     if backend_id == DISABLED_BACKEND_ID:
         logger.info("LLM inference disabled")
         return None
@@ -45,11 +46,11 @@ def create_backend(settings) -> InferenceBackend | None:
         return None
 
     if backend_id == LITELLM_BACKEND:
-        return _create_litellm_backend(settings.llm_model, settings)
+        return _create_litellm_backend(config.model, config)
 
     if backend_id in LEGACY_HTTP_ALIASES:
         provider = LEGACY_PROVIDER_MAP[backend_id]
-        model = settings.llm_model
+        model = config.model
         # Prepend provider prefix if not already present
         if "/" not in model:
             model = f"{provider}/{model}"
@@ -58,37 +59,34 @@ def create_backend(settings) -> InferenceBackend | None:
                 backend_id,
                 model,
             )
-        return _create_litellm_backend(model, settings)
+        return _create_litellm_backend(model, config)
 
-    return _create_subprocess_backend(backend_id, settings)
+    return _create_subprocess_backend(backend_id, config)
 
 
-def _create_litellm_backend(model: str, settings) -> InferenceBackend:
+def _create_litellm_backend(model: str, config: LLMConfig) -> InferenceBackend:
     """Create a LiteLLM backend instance.
 
     Args:
         model: Model name in litellm format (e.g. 'anthropic/claude-sonnet-4-5').
-        settings: Application settings.
+        config: LLM configuration.
 
     Returns:
         Configured LiteLLMBackend instance.
     """
     from vibelens.llm.backends.litellm_backend import LiteLLMBackend
 
-    return LiteLLMBackend(
-        model=model,
-        api_key=settings.llm_api_key,
-        timeout=settings.llm_timeout,
-        max_tokens=settings.llm_max_tokens,
-    )
+    # Pass model_override when legacy alias rewrote the model name
+    override = model if model != config.model else None
+    return LiteLLMBackend(config=config, model_override=override)
 
 
-def _create_subprocess_backend(backend_id: str, settings) -> InferenceBackend:
+def _create_subprocess_backend(backend_id: str, config: LLMConfig) -> InferenceBackend:
     """Create a subprocess CLI backend instance.
 
     Args:
         backend_id: One of 'claude-cli' or 'codex-cli'.
-        settings: Application settings.
+        config: LLM configuration.
 
     Returns:
         Configured SubprocessBackend instance.
@@ -99,6 +97,6 @@ def _create_subprocess_backend(backend_id: str, settings) -> InferenceBackend:
     return SubprocessBackend(
         cli_name=cli_name,
         backend_type=backend_id,
-        model=settings.llm_model or None,
-        timeout=settings.llm_timeout,
+        model=config.model or None,
+        timeout=config.timeout,
     )

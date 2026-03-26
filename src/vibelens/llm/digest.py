@@ -7,6 +7,7 @@ of trajectory data at three depth levels for different context budgets.
 from enum import StrEnum
 
 from vibelens.models.trajectories import Trajectory
+from vibelens.utils.text import extract_text, is_error_content, summarize_args, truncate
 
 MAX_MESSAGE_CHARS_BRIEF = 80
 MAX_MESSAGE_CHARS_STANDARD = 300
@@ -106,8 +107,8 @@ def _format_step(index: int, step, depth: DigestDepth) -> str:
 
 def _format_step_brief(index: int, step) -> str:
     """One-line summary per step."""
-    message = _extract_text(step.message)
-    truncated = _truncate(message, MAX_MESSAGE_CHARS_BRIEF)
+    message = extract_text(step.message)
+    truncated = truncate(message, MAX_MESSAGE_CHARS_BRIEF)
     tool_names = [tc.function_name for tc in step.tool_calls]
     tool_part = f" tools=[{','.join(tool_names)}]" if tool_names else ""
     has_error = _has_error_observation(step)
@@ -118,23 +119,26 @@ def _format_step_brief(index: int, step) -> str:
 def _format_step_standard(index: int, step) -> str:
     """Step with truncated message and tool call summaries."""
     lines: list[str] = []
-    message = _extract_text(step.message)
-    truncated = _truncate(message, MAX_MESSAGE_CHARS_STANDARD)
+    message = extract_text(step.message)
+    truncated = truncate(message, MAX_MESSAGE_CHARS_STANDARD)
     lines.append(f"[{index}] {step.source.value}: {truncated}")
 
     for tc in step.tool_calls:
-        args_summary = _summarize_args(tc.arguments)
+        args_summary = summarize_args(
+            tc.arguments,
+            max_total_chars=MAX_MESSAGE_CHARS_BRIEF,
+            max_value_chars=40,
+        )
         lines.append(f"  -> {tc.function_name}({args_summary})")
 
     if step.observation:
         for result in step.observation.results:
-            content = _extract_text(result.content)
-            is_error = _is_error_content(content)
-            if is_error:
+            content = extract_text(result.content)
+            if is_error_content(content):
                 # Always include error output in full for friction detection
-                lines.append(f"  <- ERROR: {_truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
+                lines.append(f"  <- ERROR: {truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
             else:
-                lines.append(f"  <- {_truncate(content, MAX_MESSAGE_CHARS_BRIEF)}")
+                lines.append(f"  <- {truncate(content, MAX_MESSAGE_CHARS_BRIEF)}")
 
     return "\n".join(lines)
 
@@ -142,8 +146,8 @@ def _format_step_standard(index: int, step) -> str:
 def _format_step_detailed(index: int, step) -> str:
     """Full step content with truncated tool outputs."""
     lines: list[str] = []
-    message = _extract_text(step.message)
-    truncated = _truncate(message, MAX_MESSAGE_CHARS_DETAILED)
+    message = extract_text(step.message)
+    truncated = truncate(message, MAX_MESSAGE_CHARS_DETAILED)
     lines.append(f"[{index}] {step.source.value}:")
     if truncated:
         lines.append(truncated)
@@ -152,68 +156,18 @@ def _format_step_detailed(index: int, step) -> str:
         args_str = str(tc.arguments) if tc.arguments else ""
         lines.append(f"  TOOL: {tc.function_name}")
         if args_str:
-            lines.append(f"  ARGS: {_truncate(args_str, MAX_TOOL_OUTPUT_CHARS)}")
+            lines.append(f"  ARGS: {truncate(args_str, MAX_TOOL_OUTPUT_CHARS)}")
 
     if step.observation:
         for result in step.observation.results:
-            content = _extract_text(result.content)
-            lines.append(f"  OUTPUT: {_truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
+            content = extract_text(result.content)
+            lines.append(f"  OUTPUT: {truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
 
     return "\n".join(lines)
-
-
-def _extract_text(content) -> str:
-    """Extract plain text from a message or observation content field."""
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        # ContentPart list — extract text parts
-        text_parts = []
-        for part in content:
-            if hasattr(part, "text") and part.text:
-                text_parts.append(part.text)
-            elif hasattr(part, "type"):
-                text_parts.append(f"[{part.type}]")
-        return " ".join(text_parts)
-    return str(content)
-
-
-def _truncate(text: str, max_chars: int) -> str:
-    """Truncate text to max_chars, adding ellipsis if truncated."""
-    text = text.strip().replace("\n", " ")
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + "..."
-
-
-def _summarize_args(arguments) -> str:
-    """Create a compact summary of tool call arguments."""
-    if arguments is None:
-        return ""
-    if isinstance(arguments, str):
-        return _truncate(arguments, MAX_MESSAGE_CHARS_BRIEF)
-    if isinstance(arguments, dict):
-        parts = []
-        for key, value in arguments.items():
-            val_str = str(value)
-            parts.append(f"{key}={_truncate(val_str, 40)}")
-        return ", ".join(parts)
-    return _truncate(str(arguments), MAX_MESSAGE_CHARS_BRIEF)
 
 
 def _has_error_observation(step) -> bool:
     """Check whether a step has any error observations."""
     if not step.observation:
         return False
-    return any(_is_error_content(_extract_text(r.content)) for r in step.observation.results)
-
-
-def _is_error_content(content: str) -> bool:
-    """Heuristic check for error content in tool output."""
-    if not content:
-        return False
-    lower = content.lower()
-    error_signals = ["error:", "traceback", "exception", "failed", "fatal", "errno"]
-    return any(signal in lower for signal in error_signals)
+    return any(is_error_content(extract_text(r.content)) for r in step.observation.results)

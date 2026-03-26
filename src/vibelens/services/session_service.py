@@ -4,7 +4,7 @@ from vibelens.deps import get_store
 from vibelens.models.trajectories import Trajectory
 from vibelens.schemas.session import DonateResult
 from vibelens.services.upload_visibility import filter_visible, is_session_visible
-from vibelens.storage.disk import DiskStore
+from vibelens.storage.conversation.disk import DiskStore
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)

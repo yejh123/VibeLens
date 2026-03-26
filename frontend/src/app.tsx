@@ -475,7 +475,7 @@ export function App() {
           {/* Content Area */}
           <div className="flex-1 min-h-0 relative">
             {mainView === "skills" ? (
-              <SkillsPanel />
+              <SkillsPanel checkedIds={checkedIds} />
             ) : mainView === "friction" ? (
               <FrictionPanel checkedIds={checkedIds} />
             ) : mainView === "analyze" ? (

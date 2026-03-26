@@ -63,7 +63,13 @@ class Settings(BaseSettings):
         description="Directory for shared session snapshots.",
     )
 
-    # Skills
+    # Managed skills
+    managed_skills_dir: Path = Field(
+        default=Path.home() / ".vibelens" / "skills",
+        description="Central directory containing VibeLens-managed skills.",
+    )
+
+    # Agent-native skills
     skills_dir: Path = Field(
         default=Path.home() / ".claude" / "skills",
         description="Root directory containing installed Claude Code skills.",
@@ -73,6 +79,12 @@ class Settings(BaseSettings):
     friction_dir: Path = Field(
         default=Path.home() / ".vibelens" / "friction",
         description="Directory for persisted friction analysis results.",
+    )
+
+    # Skill analysis persistence
+    skill_analysis_dir: Path = Field(
+        default=Path.home() / ".vibelens" / "skill_analyses",
+        description="Directory for persisted skill analysis results.",
     )
 
     # Upload
@@ -97,6 +109,22 @@ class Settings(BaseSettings):
         description="Chunk size in bytes for streaming uploads to disk.",
     )
 
+    # LLM batching
+    max_batch_chars: int = Field(
+        default=80_000,
+        description=(
+            "Maximum character count for the entire LLM prompt in one batch "
+            "(system + user + contexts). Increase for models with larger context windows."
+        ),
+    )
+    prompt_overhead_chars: int = Field(
+        default=12_000,
+        description=(
+            "Chars reserved for system prompt, JSON schema, and template. "
+            "Subtracted from max_batch_chars to get available budget for session contexts."
+        ),
+    )
+
     # Agent visibility
     visible_agents: list[str] = Field(
         default=["all"],
@@ -105,35 +133,6 @@ class Settings(BaseSettings):
             'Use ["all"] to show every agent, or specify names like '
             '["claude-code", "codex"].'
         ),
-    )
-
-    # LLM inference
-    llm_backend: str = Field(
-        default="disabled",
-        description=(
-            "Inference backend: 'litellm' (recommended), 'claude-cli', 'codex-cli', "
-            "or 'disabled'. Legacy aliases 'anthropic-api' and 'openai-api' are "
-            "supported and route to litellm with provider prefix."
-        ),
-    )
-    llm_api_key: str = Field(
-        default="",
-        description="API key for the LLM provider (required for litellm backend).",
-    )
-    llm_model: str = Field(
-        default="anthropic/claude-sonnet-4-5",
-        description=(
-            "Model name in litellm format with provider prefix "
-            "(e.g. 'anthropic/claude-sonnet-4-5', 'openai/gpt-4.1')."
-        ),
-    )
-    llm_timeout: int = Field(
-        default=120,
-        description="Inference request timeout in seconds.",
-    )
-    llm_max_tokens: int = Field(
-        default=4096,
-        description="Maximum output tokens for inference requests.",
     )
 
     # Demo mode
@@ -157,9 +156,11 @@ class Settings(BaseSettings):
         self.claude_dir = self.claude_dir.expanduser()
         self.codex_dir = self.codex_dir.expanduser()
         self.gemini_dir = self.gemini_dir.expanduser()
+        self.managed_skills_dir = self.managed_skills_dir.expanduser()
         self.skills_dir = self.skills_dir.expanduser()
         self.share_dir = self.share_dir.expanduser()
         self.friction_dir = self.friction_dir.expanduser()
+        self.skill_analysis_dir = self.skill_analysis_dir.expanduser()
         self.upload_dir = self.upload_dir.expanduser()
         return self
 

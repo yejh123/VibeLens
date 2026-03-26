@@ -137,4 +137,5 @@ def _build_meta(analysis_id: str, result: FrictionAnalysisResult) -> FrictionMet
         computed_at=result.computed_at,
         model=result.model,
         cost_usd=result.cost_usd,
+        batch_count=result.batch_count,
     )

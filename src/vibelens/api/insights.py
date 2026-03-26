@@ -12,12 +12,15 @@ from vibelens.services.insight_service import (
     analyze_session,
     estimate_cost,
     get_session_report,
-    is_inference_available,
 )
 
 router = APIRouter(prefix="/analysis", tags=["insights"])
 
-SERVICE_UNAVAILABLE_DETAIL = "No inference backend configured. Set llm.backend in config."
+
+def _map_value_error(exc: ValueError) -> HTTPException:
+    """Map ValueError to 503 (no backend) or 404 (not found)."""
+    status = 503 if "inference backend" in str(exc) else 404
+    return HTTPException(status_code=status, detail=str(exc))
 
 
 @router.get("/sessions/{session_id}/report")
@@ -33,11 +36,10 @@ async def session_report(
     Returns:
         Combined InsightReport.
     """
-    _require_available()
     try:
         return await get_session_report(session_id, session_token=x_session_token)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _map_value_error(exc) from exc
     except InferenceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -55,7 +57,6 @@ async def session_highlights(
     Returns:
         SessionHighlights with summary, highlights list, and effectiveness score.
     """
-    _require_available()
     from vibelens.llm.prompts import get_prompt
 
     prompt = get_prompt("highlights")
@@ -64,7 +65,7 @@ async def session_highlights(
     try:
         return await analyze_session(session_id, prompt, session_token=x_session_token)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _map_value_error(exc) from exc
     except InferenceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -82,7 +83,6 @@ async def session_friction(
     Returns:
         FrictionReport with friction points, wasted steps, and recommendations.
     """
-    _require_available()
     from vibelens.llm.prompts import get_prompt
 
     prompt = get_prompt("friction")
@@ -91,7 +91,7 @@ async def session_friction(
     try:
         return await analyze_session(session_id, prompt, session_token=x_session_token)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _map_value_error(exc) from exc
     except InferenceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -112,9 +112,3 @@ async def report_estimate(session_id: str, x_session_token: str | None = Header(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"estimated_cost_usd": cost}
-
-
-def _require_available() -> None:
-    """Raise 503 if no inference backend is configured."""
-    if not is_inference_available():
-        raise HTTPException(status_code=503, detail=SERVICE_UNAVAILABLE_DETAIL)

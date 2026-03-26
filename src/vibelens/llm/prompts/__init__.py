@@ -6,12 +6,14 @@ New analysis types register here for discovery by the insight service.
 
 from vibelens.llm.prompts.friction_analysis import FRICTION_ANALYSIS_PROMPT
 from vibelens.llm.prompts.insights import FRICTION_PROMPT, HIGHLIGHTS_PROMPT
+from vibelens.llm.prompts.skill_retrieval import SKILL_RETRIEVAL_PROMPT
 from vibelens.models.analysis.prompts import AnalysisPrompt
 
 PROMPT_REGISTRY: dict[str, AnalysisPrompt] = {
     HIGHLIGHTS_PROMPT.task_id: HIGHLIGHTS_PROMPT,
     FRICTION_PROMPT.task_id: FRICTION_PROMPT,
     FRICTION_ANALYSIS_PROMPT.task_id: FRICTION_ANALYSIS_PROMPT,
+    SKILL_RETRIEVAL_PROMPT.task_id: SKILL_RETRIEVAL_PROMPT,
 }
 
 
