@@ -35,8 +35,9 @@ EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "claude-codex-example
 LOGS_DIR = Path(__file__).parent.parent / "logs" / "friction"
 CHARS_PER_TOKEN = 2.5
 
-SKIP_LIVE = os.environ.get("SKIP_LIVE_LLM", "0") == "1"
-SKIP_REASON = "SKIP_LIVE_LLM=1 — skipping live LLM tests"
+_no_api_key = not os.environ.get("ANTHROPIC_API_KEY")
+SKIP_LIVE = os.environ.get("SKIP_LIVE_LLM", "0") == "1" or _no_api_key
+SKIP_REASON = "No ANTHROPIC_API_KEY or SKIP_LIVE_LLM=1 — skipping live LLM tests"
 
 
 def _load_trajectory_groups() -> dict[str, list[Trajectory]]:
