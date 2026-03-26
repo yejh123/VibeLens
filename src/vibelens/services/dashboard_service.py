@@ -28,6 +28,12 @@ logger = get_logger(__name__)
 # but short enough to pick up newly uploaded sessions promptly.
 CACHE_TTL_SECONDS = 300
 
+# Number of sessions to load per batch during cache warming.
+# After each batch, the thread sleeps briefly to release the GIL
+# so the event loop can serve other requests (friction history, LLM status).
+WARM_BATCH_SIZE = 20
+WARM_YIELD_SECONDS = 0.01
+
 _dashboard_cache: dict[str, tuple[float, DashboardStats]] = {}
 _tool_usage_cache: dict[str, tuple[float, list[ToolUsageStat]]] = {}
 
@@ -171,6 +177,10 @@ def warm_cache() -> None:
     Dashboard stats use enriched metadata (fast-scanned token counts)
     to avoid loading full trajectories. Tool usage still requires full
     trajectories since it needs per-tool function names.
+
+    Sessions are loaded in batches of WARM_BATCH_SIZE with brief
+    GIL-releasing sleeps between batches so the event loop can serve
+    other endpoints (friction history, LLM status) concurrently.
     """
     logger.info("Warming dashboard cache...")
     cache_key_dash = "dash:all:None:None:None"
@@ -191,12 +201,50 @@ def warm_cache() -> None:
         _reconcile_session_counts(stats, trajectories, filtered)
     _dashboard_cache[cache_key_dash] = (time.monotonic(), stats)
 
-    # Tool usage requires full trajectories for function names
-    trajectories, _meta = load_filtered_trajectories(None, None, None, None)
+    # Tool usage requires full trajectories — load in batches to yield GIL
+    trajectories = _load_trajectories_yielding(filtered)
     usage = compute_tool_usage(trajectories)
     _tool_usage_cache[cache_key_tools] = (time.monotonic(), usage)
 
     logger.info("Dashboard cache warmed")
+
+
+def _load_trajectories_yielding(metadata: list[dict]) -> list[Trajectory]:
+    """Load trajectories in batches, sleeping between batches to release the GIL.
+
+    When called from a background thread, the brief sleep between batches
+    allows the async event loop to serve other requests. Without this,
+    continuous JSON parsing of hundreds of sessions monopolizes the GIL
+    and blocks lightweight endpoints like /friction/history and /llm/status.
+
+    Args:
+        metadata: Filtered metadata list with session_ids to load.
+
+    Returns:
+        List of loaded Trajectory objects.
+    """
+    store = get_store()
+    trajectories: list[Trajectory] = []
+
+    for i, meta in enumerate(metadata):
+        session_id = meta.get("session_id", "")
+        if not session_id:
+            continue
+        try:
+            group = store.load(session_id)
+            if group:
+                traj = group[0]
+                if not traj.project_path:
+                    traj.project_path = meta.get("project_path")
+                trajectories.append(traj)
+        except Exception:
+            logger.warning("Failed to load session %s during cache warming", session_id)
+
+        # Release the GIL between batches so the event loop can run
+        if (i + 1) % WARM_BATCH_SIZE == 0:
+            time.sleep(WARM_YIELD_SECONDS)
+
+    return trajectories
 
 
 def _has_enriched_metrics(metadata: list[dict]) -> bool:

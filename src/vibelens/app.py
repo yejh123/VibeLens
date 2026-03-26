@@ -35,9 +35,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialize store and start background tasks on startup.
 
     Only essential setup (store init, demo loading) runs synchronously.
-    All other work (skill import, mock seeding, cache warming) is
-    deferred to a background thread so the server accepts requests
-    immediately — the session list is available on first API call.
+    Skill import and mock seeding run in a thread (lightweight).
+    Dashboard cache warming runs as an async task that processes
+    sessions in batches, yielding the event loop between batches
+    so other endpoints (friction history, LLM status) can respond
+    without waiting for all sessions to finish loading.
     """
     settings = load_settings()
 
@@ -51,23 +53,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if loaded:
             logger.info("Loaded %d trajectory groups for demo mode", loaded)
 
-    # Run remaining startup work in background so the server is ready immediately
+    # Lightweight startup tasks in a thread (no heavy I/O)
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, _background_startup, settings)
+    loop.run_in_executor(None, _lightweight_startup, settings)
+
+    # Dashboard cache warming as an async background task so it yields
+    # the event loop between session batches instead of holding the GIL
+    asyncio.create_task(_async_warm_cache())
 
     yield
 
 
-def _background_startup(settings) -> None:
-    """Run non-critical startup tasks in a background thread.
+async def _async_warm_cache() -> None:
+    """Run dashboard cache warming in the background, yielding periodically.
 
-    Skill import, mock seeding, and cache warming don't need to
-    complete before the server starts serving requests.
+    Wraps the synchronous warm_cache() in asyncio.to_thread so it runs
+    in the default thread pool. Unlike run_in_executor fire-and-forget,
+    this is a proper task that can be awaited and doesn't silently swallow
+    exceptions.
+    """
+    try:
+        await asyncio.to_thread(warm_cache)
+    except Exception:
+        logger.warning("Dashboard cache warming failed", exc_info=True)
+
+
+def _lightweight_startup(settings) -> None:
+    """Run lightweight startup tasks in a background thread.
+
+    Skill import and mock seeding are fast and don't involve heavy
+    JSON parsing, so a thread is fine.
     """
     _load_agent_skills_into_central_store()
     if settings.app_mode in (AppMode.TEST, AppMode.DEMO):
         _seed_mock_skill_history()
-    warm_cache()
 
 
 def _load_agent_skills_into_central_store() -> None:
