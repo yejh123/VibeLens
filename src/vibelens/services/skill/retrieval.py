@@ -1,7 +1,7 @@
-"""Skill analysis service — LLM-powered workflow pattern detection and skill recommendations.
+"""Skill retrieval mode — recommend existing skills from the featured catalog.
 
-Pipeline: load sessions -> build signals -> digest -> gather context ->
-select prompt by mode -> infer -> validate -> persist -> cache.
+Contains shared infrastructure (caching, session loading, parsing, validation)
+used by all three skill analysis modes.
 """
 
 import hashlib
@@ -12,7 +12,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from vibelens.analysis.step_signals import build_step_signals
 from vibelens.deps import (
     get_central_skill_store,
     get_inference_backend,
@@ -21,8 +20,6 @@ from vibelens.deps import (
     is_demo_mode,
 )
 from vibelens.llm.backend import InferenceBackend, InferenceError
-from vibelens.llm.prompts.skill_creation import SKILL_CREATION_PROMPT
-from vibelens.llm.prompts.skill_evolution import SKILL_EVOLUTION_PROMPT
 from vibelens.llm.prompts.skill_retrieval import SKILL_RETRIEVAL_PROMPT
 from vibelens.models.inference import InferenceRequest
 from vibelens.models.prompts import AnalysisPrompt
@@ -33,8 +30,9 @@ from vibelens.models.skill.skills import (
     WorkflowPattern,
 )
 from vibelens.models.trajectories import Trajectory
+from vibelens.services.friction.signals import build_step_signals
 from vibelens.services.skill.digest import digest_step_signals_for_skills
-from vibelens.services.upload_visibility import is_session_visible
+from vibelens.services.upload.visibility import is_session_visible
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -44,18 +42,12 @@ FEATURED_SKILLS_PATH = Path(__file__).resolve().parents[3] / "featured-skills.js
 
 _cache: dict[str, tuple[float, BaseModel]] = {}
 
-PROMPT_BY_MODE: dict[SkillMode, AnalysisPrompt] = {
-    SkillMode.RETRIEVAL: SKILL_RETRIEVAL_PROMPT,
-    SkillMode.CREATION: SKILL_CREATION_PROMPT,
-    SkillMode.EVOLUTION: SKILL_EVOLUTION_PROMPT,
-}
 
-
-async def analyze_skills(
-    session_ids: list[str], mode: SkillMode, session_token: str | None = None
+async def analyze_retrieval(
+    session_ids: list[str], session_token: str | None = None
 ) -> SkillAnalysisResult:
-    """Run LLM-powered skill analysis across specified sessions."""
-    cache_key = _skill_cache_key(session_ids, mode)
+    """Run retrieval-mode skill analysis: recommend existing skills from catalog."""
+    cache_key = _skill_cache_key(session_ids, SkillMode.RETRIEVAL)
     cached = _get_cached(cache_key)
     if cached:
         return cached
@@ -69,39 +61,79 @@ async def analyze_skills(
     signals = build_step_signals(loaded_trajectories)
     digest = digest_step_signals_for_skills(signals)
 
-    prompt = PROMPT_BY_MODE[mode]
+    prompt = SKILL_RETRIEVAL_PROMPT
     installed_skills = _gather_installed_skills()
-    user_prompt = _render_user_prompt(prompt, digest, len(loaded_ids), installed_skills, mode)
+    user_prompt = _render_retrieval_prompt(prompt, digest, len(loaded_ids), installed_skills)
 
     system_prompt = prompt.render_system()
     request = InferenceRequest(system=system_prompt, user=user_prompt)
-    _log_prompt(system_prompt, user_prompt, loaded_ids, mode)
+    _log_prompt(system_prompt, user_prompt, loaded_ids, SkillMode.RETRIEVAL)
 
     result = await backend.generate(request)
-    _log_response(result.text, loaded_ids, mode)
+    _log_response(result.text, loaded_ids, SkillMode.RETRIEVAL)
 
     llm_output = _parse_llm_output(result.text)
     validated_patterns = _validate_patterns(llm_output.workflow_patterns, loaded_trajectories)
 
-    skill_result = SkillAnalysisResult(
-        mode=mode,
-        workflow_patterns=validated_patterns,
-        recommendations=llm_output.recommendations,
-        generated_skills=llm_output.generated_skills,
-        evolution_suggestions=llm_output.evolution_suggestions,
-        summary=llm_output.summary,
-        user_profile=llm_output.user_profile,
-        session_ids=loaded_ids,
-        sessions_skipped=skipped_ids,
-        backend_id=backend.backend_id,
-        model=_get_backend_model(backend),
-        cost_usd=result.cost_usd,
-        created_at=datetime.now(UTC).isoformat(),
+    skill_result = _build_result(
+        SkillMode.RETRIEVAL,
+        validated_patterns,
+        llm_output,
+        loaded_ids,
+        skipped_ids,
+        backend,
+        result.cost_usd,
     )
     get_skill_analysis_store().save(skill_result)
 
     _cache[cache_key] = (time.monotonic(), skill_result)
     return skill_result
+
+
+def _render_retrieval_prompt(
+    prompt: AnalysisPrompt,
+    digest: str,
+    session_count: int,
+    installed_skills: list[dict],
+) -> str:
+    """Render retrieval-specific user prompt with skill candidates."""
+    output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)
+    skill_candidates = _load_skill_candidates()
+    return prompt.render_user(
+        session_count=session_count,
+        session_digest=digest,
+        output_schema=output_schema,
+        installed_skills=installed_skills if installed_skills else None,
+        skill_candidates=skill_candidates if skill_candidates else None,
+    )
+
+
+def _load_skill_candidates() -> list[dict]:
+    """Load skill candidates from the featured skills catalog.
+
+    Returns a list of dicts with name, summary, and tags for each candidate.
+    The LLM picks from these candidates when recommending skills.
+    """
+    if not FEATURED_SKILLS_PATH.is_file():
+        return []
+    try:
+        raw = FEATURED_SKILLS_PATH.read_text(encoding="utf-8")
+        catalog = json.loads(raw)
+        return [
+            {
+                "name": entry.get("slug", entry.get("name", "")),
+                "summary": entry.get("summary", ""),
+                "tags": entry.get("tags", []),
+            }
+            for entry in catalog.get("skills", [])
+            if entry.get("summary")
+        ]
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Failed to load featured skills catalog for retrieval candidates")
+        return []
+
+
+# ── Shared infrastructure used by all modes ──────────────────────────
 
 
 def _skill_cache_key(session_ids: list[str], mode: SkillMode) -> str:
@@ -163,85 +195,6 @@ def _gather_installed_skills() -> list[dict]:
     ]
 
 
-def _gather_installed_skill_contents() -> list[dict]:
-    """Collect installed skills with full SKILL.md content for evolution mode."""
-    managed_store = get_central_skill_store()
-    skills = managed_store.get_cached()
-    result = []
-    for skill_info in skills:
-        content = managed_store.read_content(skill_info.name)
-        result.append({
-            "name": skill_info.name,
-            "description": skill_info.description,
-            "content": content or "",
-        })
-    return result
-
-
-def _load_skill_candidates() -> list[dict]:
-    """Load skill candidates from the featured skills catalog for retrieval mode.
-
-    Returns a list of dicts with name, summary, and tags for each candidate.
-    The LLM picks from these candidates when recommending skills.
-    """
-    if not FEATURED_SKILLS_PATH.is_file():
-        return []
-    try:
-        raw = FEATURED_SKILLS_PATH.read_text(encoding="utf-8")
-        catalog = json.loads(raw)
-        return [
-            {
-                "name": entry.get("slug", entry.get("name", "")),
-                "summary": entry.get("summary", ""),
-                "tags": entry.get("tags", []),
-            }
-            for entry in catalog.get("skills", [])
-            if entry.get("summary")
-        ]
-    except (json.JSONDecodeError, OSError):
-        logger.warning("Failed to load featured skills catalog for retrieval candidates")
-        return []
-
-
-def _render_user_prompt(
-    prompt: AnalysisPrompt,
-    digest: str,
-    session_count: int,
-    installed_skills: list[dict],
-    mode: SkillMode,
-) -> str:
-    """Render the user prompt with mode-specific template variables."""
-    output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)
-
-    if mode == SkillMode.RETRIEVAL:
-        skill_candidates = _load_skill_candidates()
-        return prompt.render_user(
-            session_count=session_count,
-            session_digest=digest,
-            output_schema=output_schema,
-            installed_skills=installed_skills if installed_skills else None,
-            skill_candidates=skill_candidates if skill_candidates else None,
-        )
-
-    if mode == SkillMode.EVOLUTION:
-        # Evolution needs full skill content to suggest granular edits
-        skill_contents = _gather_installed_skill_contents()
-        return prompt.render_user(
-            session_count=session_count,
-            session_digest=digest,
-            output_schema=output_schema,
-            installed_skills=skill_contents,
-        )
-
-    # Creation mode: only needs installed skill names to avoid duplicates
-    return prompt.render_user(
-        session_count=session_count,
-        session_digest=digest,
-        output_schema=output_schema,
-        installed_skills=installed_skills if installed_skills else None,
-    )
-
-
 def _parse_llm_output(text: str) -> SkillLLMOutput:
     if not text or not text.strip():
         raise InferenceError(
@@ -288,6 +241,33 @@ def _validate_patterns(
         pattern.example_refs = filtered_refs
         validated.append(pattern)
     return validated
+
+
+def _build_result(
+    mode: SkillMode,
+    validated_patterns: list[WorkflowPattern],
+    llm_output: SkillLLMOutput,
+    loaded_ids: list[str],
+    skipped_ids: list[str],
+    backend: InferenceBackend,
+    cost_usd: float | None,
+) -> SkillAnalysisResult:
+    """Build a SkillAnalysisResult from common fields."""
+    return SkillAnalysisResult(
+        mode=mode,
+        workflow_patterns=validated_patterns,
+        recommendations=llm_output.recommendations,
+        generated_skills=llm_output.generated_skills,
+        evolution_suggestions=llm_output.evolution_suggestions,
+        summary=llm_output.summary,
+        user_profile=llm_output.user_profile,
+        session_ids=loaded_ids,
+        sessions_skipped=skipped_ids,
+        backend_id=backend.backend_id,
+        model=_get_backend_model(backend),
+        cost_usd=cost_usd,
+        created_at=datetime.now(UTC).isoformat(),
+    )
 
 
 def _log_prompt(system: str, user: str, session_ids: list[str], mode: SkillMode) -> None:

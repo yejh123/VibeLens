@@ -109,8 +109,9 @@ def _build_chains(contexts: list[SessionContext]) -> list[_Chain]:
     visited: set[str] = set()
     chains: list[_Chain] = []
 
+    # Sort contexts by timestamp
     sorted_contexts = sorted(contexts, key=lambda c: c.timestamp or datetime.min)
-
+    # Iterate in chronological order, building chains from unvisited sessions
     for ctx in sorted_contexts:
         if ctx.session_id in visited:
             continue
@@ -121,7 +122,6 @@ def _build_chains(contexts: list[SessionContext]) -> list[_Chain]:
         chains.append(
             _Chain(contexts=chain_ctxs, tokens=tokens, project=project, timestamp=earliest)
         )
-
     return chains
 
 

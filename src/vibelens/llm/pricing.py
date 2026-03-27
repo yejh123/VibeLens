@@ -4,7 +4,7 @@ Per-million-token rates for supported models, plus a lookup function
 that bridges model name normalization with the pricing table.
 
 Cost computation that operates on trajectory models lives in
-vibelens.analysis.pricing.
+vibelens.services.dashboard.pricing.
 """
 
 from vibelens.llm.normalizer import normalize_model_name

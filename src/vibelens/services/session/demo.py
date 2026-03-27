@@ -6,7 +6,11 @@ from pathlib import Path
 from vibelens.config.settings import Settings
 from vibelens.ingest.discovery import discover_all_session_files
 from vibelens.ingest.parsers import LOCAL_PARSER_CLASSES
-from vibelens.ingest.parsers.base import MAX_FIRST_MESSAGE_LENGTH, BaseParser, _is_meaningful_prompt
+from vibelens.ingest.parsers.base import (
+    MAX_FIRST_MESSAGE_LENGTH,
+    BaseParser,
+    _is_meaningful_prompt,
+)
 from vibelens.ingest.parsers.dataclaw import DataclawParser
 from vibelens.models.enums import StepSource
 from vibelens.models.trajectories import Trajectory

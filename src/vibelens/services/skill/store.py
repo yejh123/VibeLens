@@ -40,9 +40,7 @@ class SkillAnalysisStore:
         analysis_id = secrets.token_urlsafe(TOKEN_BYTES)
         result.analysis_id = analysis_id
 
-        self._data_path(analysis_id).write_text(
-            result.model_dump_json(indent=2), encoding="utf-8"
-        )
+        self._data_path(analysis_id).write_text(result.model_dump_json(indent=2), encoding="utf-8")
 
         meta = _build_meta(analysis_id, result)
         self._append_meta(meta)
@@ -109,9 +107,7 @@ class SkillAnalysisStore:
             return
         for meta_file in legacy_files:
             try:
-                meta = SkillAnalysisMeta.model_validate_json(
-                    meta_file.read_text(encoding="utf-8")
-                )
+                meta = SkillAnalysisMeta.model_validate_json(meta_file.read_text(encoding="utf-8"))
                 self._append_meta(meta)
                 meta_file.unlink()
             except (json.JSONDecodeError, ValueError):

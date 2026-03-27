@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.7] - 2026-03-27
+
+### Changed
+- **Services restructured**: Grouped 13 root-level service files into domain subdirs (`session/`, `dashboard/`, `upload/`). Merged `analysis/` package into consuming service subdirs. Deleted obsolete `services/mock/` package.
+- **Skill analysis split**: Split monolithic `skill/analysis.py` into `retrieval.py`, `creation.py`, `evolvement.py` with thin dispatcher in `skill/__init__.py`.
+- **CSV export expanded**: Added `agent`, `cache_read_tokens`, `cache_creation_tokens`, `cost_usd` columns. Eliminated duplicated aggregation logic by reusing `aggregate_session()` from stats.
+- **Pricing cleanup**: Removed `__all__` and dead re-exports from `pricing.py`. Consumers now import `normalize_model_name` and `lookup_pricing` from their source modules.
+- **Skill store renamed**: `skill/analysis_store.py` → `skill/store.py`.
+
 ## [0.9.6] - 2026-03-27
 
 ### Added

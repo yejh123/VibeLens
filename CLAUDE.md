@@ -7,7 +7,6 @@ Agent trajectory analysis and visualization platform. Parses, normalizes, and vi
 ```
 src/vibelens/
 ├── api/               # FastAPI route handlers. Thin HTTP layer delegating to services/.
-├── analysis/          # Pure computation on trajectories → analytics results. No Pydantic model definitions here.
 ├── config/            # Pydantic Settings model, YAML config loading, auto-discovery.
 ├── ingest/            # Raw data → ATIF trajectories. Parsers, discovery, fingerprinting.
 │   └── parsers/       # One parser per agent CLI format (Claude Code, Codex, Gemini, Dataclaw).
@@ -18,6 +17,11 @@ src/vibelens/
 │   └── trajectories/  # ATIF v1.6 trajectory model (Step, ToolCall, Observation, Metrics, etc.).
 ├── schemas/           # API request/response schemas (HTTP boundary models).
 ├── services/          # Orchestration layer: caching, I/O, store integration, export.
+│   ├── session/       # Session CRUD, search, sharing, flow analysis, demo loading, correlator, phases, tool graph.
+│   ├── dashboard/     # Dashboard loading/caching, export, stats, analytics, tool usage, pricing.
+│   ├── upload/        # ZIP upload processing, session visibility management.
+│   ├── friction/      # Friction analysis, digest, store, mock, step signals.
+│   └── skill/         # Skill analysis (retrieval, creation, evolvement), digest, store, mock.
 ├── storage/           # Trajectory storage backends (read-only TrajectoryStore ABC + DiskStore, LocalStore).
 ├── utils/             # Shared utilities (logging, timestamps, paths, JSON helpers, zip).
 ├── static/            # Frontend build assets served by FastAPI.

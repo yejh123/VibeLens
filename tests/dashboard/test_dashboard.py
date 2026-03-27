@@ -4,9 +4,6 @@ from datetime import UTC, datetime
 
 import pytest
 
-from vibelens.analysis.dashboard_stats import compute_dashboard_stats, filter_metadata
-from vibelens.analysis.session_analytics import compute_session_analytics
-from vibelens.analysis.tool_usage import compute_tool_usage
 from vibelens.models.trajectories import (
     Agent,
     FinalMetrics,
@@ -17,6 +14,9 @@ from vibelens.models.trajectories import (
     ToolCall,
     Trajectory,
 )
+from vibelens.services.dashboard.analytics import compute_session_analytics
+from vibelens.services.dashboard.stats import compute_dashboard_stats, filter_metadata
+from vibelens.services.dashboard.tool_usage import compute_tool_usage
 
 
 def _make_metadata(

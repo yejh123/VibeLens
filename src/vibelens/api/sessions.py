@@ -9,14 +9,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from vibelens.deps import get_store
 from vibelens.schemas.session import DonateRequest, DonateResult, DownloadRequest
-from vibelens.services.flow_service import get_session_flow
-from vibelens.services.search_service import search_sessions
-from vibelens.services.session_service import (
+from vibelens.services.session.crud import (
     donate_sessions,
     get_session,
     list_projects,
     list_sessions,
 )
+from vibelens.services.session.flow import get_session_flow
+from vibelens.services.session.search import search_sessions
 
 router = APIRouter(tags=["sessions"])
 

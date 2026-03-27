@@ -49,9 +49,7 @@ class FrictionStore:
         analysis_id = secrets.token_urlsafe(TOKEN_BYTES)
         result.analysis_id = analysis_id
 
-        self._data_path(analysis_id).write_text(
-            result.model_dump_json(indent=2), encoding="utf-8"
-        )
+        self._data_path(analysis_id).write_text(result.model_dump_json(indent=2), encoding="utf-8")
 
         meta = _build_meta(analysis_id, result)
         with self._meta_path.open("a", encoding="utf-8") as fh:

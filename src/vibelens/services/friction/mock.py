@@ -137,13 +137,11 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-
             estimated_cost=FrictionCost(
                 affected_steps=3, affected_tokens=12000, affected_time_seconds=90
             ),
         ),
         FrictionEvent(
-
             friction_type="quality-rejection",
             span_ref=StepRef(
                 session_id=sid_2,
@@ -167,13 +165,11 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-
             estimated_cost=FrictionCost(
                 affected_steps=2, affected_tokens=6500, affected_time_seconds=45
             ),
         ),
         FrictionEvent(
-
             friction_type="scope-violation",
             span_ref=StepRef(
                 session_id=sid_3,
@@ -201,13 +197,11 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     content="Add visual regression test for login button alignment.",
                 ),
             ],
-
             estimated_cost=FrictionCost(
                 affected_steps=4, affected_tokens=18000, affected_time_seconds=120
             ),
         ),
         FrictionEvent(
-
             friction_type="abandoned-task",
             span_ref=StepRef(
                 session_id=sid_4,
@@ -218,13 +212,11 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
             friction_detail="",
             claude_helpfulness=4,
             mitigations=[],
-
             estimated_cost=FrictionCost(
                 affected_steps=1, affected_tokens=2000, affected_time_seconds=15
             ),
         ),
         FrictionEvent(
-
             friction_type="repeated-failure",
             span_ref=StepRef(
                 session_id=sid_5,
@@ -248,7 +240,6 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
                     ),
                 ),
             ],
-
             estimated_cost=FrictionCost(
                 affected_steps=3, affected_tokens=9500, affected_time_seconds=60
             ),

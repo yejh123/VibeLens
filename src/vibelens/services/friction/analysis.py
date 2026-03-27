@@ -50,7 +50,7 @@ from vibelens.services.context_extraction import (
 )
 from vibelens.services.friction.digest import format_batch_digest
 from vibelens.services.session_batcher import SessionBatch, build_batches
-from vibelens.services.upload_visibility import is_session_visible
+from vibelens.services.upload.visibility import is_session_visible
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)

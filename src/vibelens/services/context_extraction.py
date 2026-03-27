@@ -115,6 +115,7 @@ def extract_session_context(trajectory_group: list[Trajectory]) -> SessionContex
     compaction_agents = _find_compaction_agents(trajectory_group)
     tracker = _IndexTracker()
 
+    # Extract context text with or without compaction-aware formatting
     if compaction_agents:
         context_text = _extract_with_compactions(main, compaction_agents, tracker)
     else:

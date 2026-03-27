@@ -11,11 +11,11 @@ identity.  Phase segment indices still refer to the original (full)
 step list so the frontend can map segments to steps directly.
 """
 
-from vibelens.analysis.tool_categories import TOOL_CATEGORY_MAP
 from vibelens.ingest.parsers.base import is_error_content
 from vibelens.models.analysis.phase import PhaseSegment
 from vibelens.models.enums import SessionPhase
 from vibelens.models.trajectories import Step
+from vibelens.services.session.tool_categories import TOOL_CATEGORY_MAP
 
 PHASE_WINDOW_SIZE = 5
 
@@ -42,9 +42,7 @@ def detect_phases(steps: list[Step]) -> list[PhaseSegment]:
         return []
 
     # Build (original_index, step) pairs for agent steps only
-    agent_entries = [
-        (i, step) for i, step in enumerate(steps) if step.source == "agent"
-    ]
+    agent_entries = [(i, step) for i, step in enumerate(steps) if step.source == "agent"]
     if not agent_entries:
         return []
 
@@ -165,8 +163,13 @@ def _merge_adjacent(
             orig_start = original_indices[current_start]
             orig_end = original_indices[agent_idx - 1]
             segments.append(
-                _make_segment(agent_steps, orig_start, orig_end, current_phase,
-                              agent_range=(current_start, agent_idx - 1))
+                _make_segment(
+                    agent_steps,
+                    orig_start,
+                    orig_end,
+                    current_phase,
+                    agent_range=(current_start, agent_idx - 1),
+                )
             )
             current_start = agent_idx
             current_phase = phase
@@ -174,8 +177,13 @@ def _merge_adjacent(
     orig_start = original_indices[current_start]
     orig_end = original_indices[-1]
     segments.append(
-        _make_segment(agent_steps, orig_start, orig_end, current_phase,
-                      agent_range=(current_start, len(agent_steps) - 1))
+        _make_segment(
+            agent_steps,
+            orig_start,
+            orig_end,
+            current_phase,
+            agent_range=(current_start, len(agent_steps) - 1),
+        )
     )
     return segments
 
@@ -203,9 +211,7 @@ def _absorb_small_segments(
         span = seg.end_index - seg.start_index + 1
         if span <= 1 and result:
             prev = result[-1]
-            result[-1] = _make_segment(
-                all_steps, prev.start_index, seg.end_index, prev.phase
-            )
+            result[-1] = _make_segment(all_steps, prev.start_index, seg.end_index, prev.phase)
         else:
             result.append(seg)
     return result

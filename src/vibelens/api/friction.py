@@ -10,7 +10,7 @@ from vibelens.models.analysis.friction import (
 )
 from vibelens.schemas.friction import FrictionEstimateResponse, FrictionMeta
 from vibelens.services.friction.analysis import analyze_friction, estimate_friction
-from vibelens.services.mock import build_mock_friction_result
+from vibelens.services.friction.mock import build_mock_friction_result
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)

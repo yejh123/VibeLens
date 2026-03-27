@@ -1,10 +1,10 @@
 """Flow analysis service — tool dependency graph and phase detection."""
 
-from vibelens.analysis.phase_detector import detect_phases
-from vibelens.analysis.tool_graph import build_tool_graph
 from vibelens.deps import get_store
 from vibelens.models.trajectories import Trajectory
-from vibelens.services.upload_visibility import is_session_visible
+from vibelens.services.session.phase import detect_phases
+from vibelens.services.session.tool_graph import build_tool_graph
+from vibelens.services.upload.visibility import is_session_visible
 
 
 def compute_flow_from_trajectories(

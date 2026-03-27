@@ -3,13 +3,6 @@
 import time
 from datetime import datetime, timedelta
 
-from vibelens.analysis.dashboard_stats import (
-    compute_dashboard_stats,
-    compute_dashboard_stats_from_metadata,
-    filter_metadata,
-)
-from vibelens.analysis.session_analytics import compute_session_analytics
-from vibelens.analysis.tool_usage import compute_tool_usage
 from vibelens.deps import get_store
 from vibelens.models.dashboard.dashboard import (
     DashboardStats,
@@ -17,7 +10,14 @@ from vibelens.models.dashboard.dashboard import (
     ToolUsageStat,
 )
 from vibelens.models.trajectories import Trajectory
-from vibelens.services.upload_visibility import filter_visible, is_session_visible
+from vibelens.services.dashboard.analytics import compute_session_analytics
+from vibelens.services.dashboard.stats import (
+    compute_dashboard_stats,
+    compute_dashboard_stats_from_metadata,
+    filter_metadata,
+)
+from vibelens.services.dashboard.tool_usage import compute_tool_usage
+from vibelens.services.upload.visibility import filter_visible, is_session_visible
 from vibelens.utils import get_logger
 from vibelens.utils.timestamps import parse_metadata_timestamp
 

@@ -1,26 +1,12 @@
-"""Model pricing data, name normalization, and cost computation.
+"""Cost computation for steps and trajectories.
 
-Facade module: re-exports pricing data and name normalization from
-sub-modules for backward compatibility. Cost computation functions
-are defined here.
+Bridges per-step token metrics with the pricing table in llm/pricing
+to produce USD cost estimates.
 """
 
-from vibelens.llm.normalizer import normalize_model_name
-from vibelens.llm.pricing import PRICING_TABLE, TOKENS_PER_MTOK, lookup_pricing
-from vibelens.models.pricing import ModelPricing
+from vibelens.llm.pricing import TOKENS_PER_MTOK, lookup_pricing
 from vibelens.models.trajectories.step import Step
 from vibelens.models.trajectories.trajectory import Trajectory
-
-__all__ = [
-    "ModelPricing",
-    "PRICING_TABLE",
-    "TOKENS_PER_MTOK",
-    "compute_cost_from_tokens",
-    "compute_step_cost",
-    "compute_trajectory_cost",
-    "lookup_pricing",
-    "normalize_model_name",
-]
 
 
 def compute_cost_from_tokens(

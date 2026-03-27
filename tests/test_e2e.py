@@ -882,7 +882,7 @@ class TestFilterVisible:
 
     def test_root_sessions_always_visible(self):
         """Root-level sessions (no _upload_id) are always visible."""
-        from vibelens.services.upload_visibility import filter_visible
+        from vibelens.services.upload.visibility import filter_visible
 
         summaries = [{"session_id": "root-001"}, {"session_id": "root-002"}]
         result = filter_visible(summaries, session_token=None)
@@ -891,7 +891,7 @@ class TestFilterVisible:
 
     def test_upload_sessions_hidden_without_token(self):
         """Upload-scoped sessions are hidden when no token is provided."""
-        from vibelens.services.upload_visibility import filter_visible
+        from vibelens.services.upload.visibility import filter_visible
 
         summaries = [
             {"session_id": "root-001"},
@@ -904,7 +904,7 @@ class TestFilterVisible:
 
     def test_upload_sessions_visible_with_owning_token(self):
         """Upload sessions are visible when the token owns the upload."""
-        from vibelens.services.upload_visibility import filter_visible, register_upload
+        from vibelens.services.upload.visibility import filter_visible, register_upload
 
         register_upload("token-abc", "upload_abc")
 
@@ -918,7 +918,7 @@ class TestFilterVisible:
 
     def test_upload_sessions_hidden_with_wrong_token(self):
         """Upload sessions are hidden when the token doesn't own the upload."""
-        from vibelens.services.upload_visibility import filter_visible
+        from vibelens.services.upload.visibility import filter_visible
 
         summaries = [
             {"session_id": "root-001"},
@@ -931,7 +931,7 @@ class TestFilterVisible:
 
     def test_is_session_visible(self):
         """is_session_visible() checks single session visibility."""
-        from vibelens.services.upload_visibility import (
+        from vibelens.services.upload.visibility import (
             is_session_visible,
             register_upload,
         )

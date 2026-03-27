@@ -3,14 +3,14 @@
 Sits between the API (presentation) and stores/sources (data access) layers.
 """
 
-from vibelens.services.demo_loader import load_demo_examples
-from vibelens.services.session_service import (
+from vibelens.services.session.crud import (
     donate_sessions,
     get_session,
     list_projects,
     list_sessions,
 )
-from vibelens.services.upload_service import get_upload_command, process_zip
+from vibelens.services.session.demo import load_demo_examples
+from vibelens.services.upload.processor import get_upload_command, process_zip
 
 __all__ = [
     "donate_sessions",

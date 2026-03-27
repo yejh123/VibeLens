@@ -20,8 +20,8 @@ from vibelens.deps import (
     get_store,
 )
 from vibelens.models.enums import AppMode
-from vibelens.services.dashboard_service import warm_cache
-from vibelens.services.demo_loader import load_demo_examples
+from vibelens.services.dashboard.loader import warm_cache
+from vibelens.services.session.demo import load_demo_examples
 from vibelens.storage.conversation.disk import DiskStore
 from vibelens.utils import get_logger
 
@@ -120,7 +120,7 @@ def _seed_mock_skill_history() -> None:
     evolution modes so the History sidebar has sample entries.
     """
     from vibelens.models.skill.skills import SkillMode
-    from vibelens.services.mock import build_mock_skill_result
+    from vibelens.services.skill.mock import build_mock_skill_result
 
     analysis_store = get_skill_analysis_store()
 

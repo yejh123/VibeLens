@@ -6,8 +6,8 @@ from vibelens.deps import get_skill_analysis_store, is_demo_mode, is_test_mode
 from vibelens.llm.backend import InferenceError
 from vibelens.models.skill.skills import SkillAnalysisResult
 from vibelens.schemas.skills import SkillAnalysisMeta, SkillAnalysisRequest
-from vibelens.services.mock import build_mock_skill_result
-from vibelens.services.skill.analysis import analyze_skills
+from vibelens.services.skill import analyze_skills
+from vibelens.services.skill.mock import build_mock_skill_result
 
 router = APIRouter(prefix="/skills/analysis", tags=["skill-analysis"])
 

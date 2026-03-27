@@ -7,9 +7,9 @@ that reveals the agent's problem-solving strategy beyond a flat
 chronological list.
 """
 
-from vibelens.analysis.tool_categories import TOOL_CATEGORY_MAP
 from vibelens.models.analysis.tool_graph import ToolDependencyGraph, ToolEdge
 from vibelens.models.trajectories import Step
+from vibelens.services.session.tool_categories import TOOL_CATEGORY_MAP
 
 _FILE_PATH_KEYS = {"file_path", "path", "filename", "notebook_path", "directory"}
 

@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
-from vibelens.analysis.pricing import compute_trajectory_cost, normalize_model_name
+from vibelens.llm.normalizer import normalize_model_name
 from vibelens.models.dashboard.dashboard import (
     DailyStat,
     DashboardStats,
@@ -18,6 +18,7 @@ from vibelens.models.dashboard.dashboard import (
 )
 from vibelens.models.enums import StepSource
 from vibelens.models.trajectories import Trajectory
+from vibelens.services.dashboard.pricing import compute_trajectory_cost
 from vibelens.utils import get_logger
 from vibelens.utils.timestamps import parse_metadata_timestamp
 
@@ -48,7 +49,7 @@ def compute_dashboard_stats(
     acc = _StatsAccumulator(local_tz)
 
     for traj in trajectories:
-        session = _aggregate_session(traj)
+        session = aggregate_session(traj)
         acc.add_session(session)
 
     session_count = total_sessions if total_sessions is not None else len(trajectories)
@@ -87,7 +88,7 @@ def filter_metadata(
     return result
 
 
-class _SessionAggregate:
+class SessionAggregate:
     """Aggregated metrics for a single session."""
 
     __slots__ = (
@@ -189,7 +190,7 @@ class _StatsAccumulator:
             ts = ts.replace(tzinfo=UTC)
         return ts.astimezone(self.local_tz)
 
-    def add_session(self, session: _SessionAggregate) -> None:
+    def add_session(self, session: SessionAggregate) -> None:
         """Accumulate one session's metrics."""
         tokens = session.input_tokens + session.output_tokens
 
@@ -243,7 +244,7 @@ class _StatsAccumulator:
         self.heatmap[f"{local_ts.weekday()}_{local_ts.hour}"] += 1
 
     def _accumulate_period(
-        self, period: PeriodStats, in_period: bool, session: _SessionAggregate, tokens: int
+        self, period: PeriodStats, in_period: bool, session: SessionAggregate, tokens: int
     ) -> None:
         """Add session metrics to a period if it falls within the boundary."""
         if not in_period:
@@ -353,13 +354,13 @@ def compute_dashboard_stats_from_metadata(metadata_list: list[dict]) -> Dashboar
     return stats
 
 
-def _aggregate_metadata(meta: dict) -> _SessionAggregate:
+def _aggregate_metadata(meta: dict) -> SessionAggregate:
     """Extract aggregate metrics from a single metadata dict.
 
     Reads from the enriched final_metrics and agent fields stored in
     the metadata cache, avoiding full trajectory loading.
     """
-    agg = _SessionAggregate()
+    agg = SessionAggregate()
     agg.project = meta.get("project_path") or NO_PROJECT
     agg.agent_name = (meta.get("agent") or {}).get("name") or "unknown"
 
@@ -385,7 +386,7 @@ def _aggregate_metadata(meta: dict) -> _SessionAggregate:
 
     # Cost estimation from pricing table using token totals + model
     if agg.model and agg.model != UNKNOWN_MODEL:
-        from vibelens.analysis.pricing import compute_cost_from_tokens
+        from vibelens.services.dashboard.pricing import compute_cost_from_tokens
 
         cost = compute_cost_from_tokens(
             agg.model,
@@ -412,9 +413,9 @@ def _is_real_model(name: str | None) -> bool:
     return not name.startswith("<")
 
 
-def _aggregate_session(traj: Trajectory) -> _SessionAggregate:
+def aggregate_session(traj: Trajectory) -> SessionAggregate:
     """Extract aggregate metrics from a single trajectory."""
-    agg = _SessionAggregate()
+    agg = SessionAggregate()
     # Exclude system steps (context continuations, tool result summaries)
     # from the message count — they inflate numbers without representing
     # real user-agent interaction.

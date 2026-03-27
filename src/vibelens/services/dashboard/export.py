@@ -6,9 +6,30 @@ import json
 
 from fastapi.responses import StreamingResponse
 
-from vibelens.analysis.dashboard_stats import compute_dashboard_stats
-from vibelens.models.trajectories import Trajectory
-from vibelens.services.dashboard_service import load_filtered_trajectories
+from vibelens.services.dashboard.loader import load_filtered_trajectories
+from vibelens.services.dashboard.stats import (
+    SessionAggregate,
+    aggregate_session,
+    compute_dashboard_stats,
+)
+
+EXPORT_FILENAME_PREFIX = "vibelens-dashboard"
+
+CSV_COLUMNS = [
+    "session_id",
+    "project_path",
+    "agent",
+    "model",
+    "timestamp",
+    "duration_s",
+    "messages",
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_creation_tokens",
+    "tool_calls",
+    "cost_usd",
+]
 
 
 def export_dashboard_csv(
@@ -36,31 +57,18 @@ def export_dashboard_csv(
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "session_id",
-            "project_path",
-            "model",
-            "timestamp",
-            "duration_s",
-            "input_tokens",
-            "output_tokens",
-            "tool_calls",
-            "messages",
-        ]
-    )
+    writer.writerow(CSV_COLUMNS)
 
     for traj in trajectories:
-        row = _build_csv_row(traj)
-        writer.writerow(row)
+        agg = aggregate_session(traj)
+        writer.writerow(_format_csv_row(traj.session_id, agg))
 
     buf.seek(0)
+    filename = f"{EXPORT_FILENAME_PREFIX}-{timestamp}.csv"
     return StreamingResponse(
         iter([buf.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="vibelens-dashboard-{timestamp}.csv"',
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -89,50 +97,28 @@ def export_dashboard_json(
     stats = compute_dashboard_stats(trajectories)
     payload = json.dumps(stats.model_dump(mode="json"), indent=2, ensure_ascii=False)
 
+    filename = f"{EXPORT_FILENAME_PREFIX}-{timestamp}.json"
     return StreamingResponse(
         iter([payload]),
         media_type="application/json",
-        headers={
-            "Content-Disposition": f'attachment; filename="vibelens-dashboard-{timestamp}.json"',
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
-def _build_csv_row(traj: Trajectory) -> list:
-    """Build a single CSV row from a trajectory."""
-    input_tok = 0
-    output_tok = 0
-    tool_count = 0
-    for step in traj.steps:
-        if step.metrics:
-            input_tok += step.metrics.prompt_tokens
-            output_tok += step.metrics.completion_tokens
-        tool_count += len(step.tool_calls)
-
-    duration = 0
-    if traj.final_metrics and traj.final_metrics.duration > 0:
-        duration = traj.final_metrics.duration
-    elif len(traj.steps) >= 2:
-        first_ts = traj.steps[0].timestamp
-        last_ts = traj.steps[-1].timestamp
-        if first_ts and last_ts:
-            duration = max(0, int((last_ts - first_ts).total_seconds()))
-
-    model = (traj.agent.model_name if traj.agent else None) or ""
-    if not model:
-        for step in traj.steps:
-            if step.model_name:
-                model = step.model_name
-                break
-
+def _format_csv_row(session_id: str, agg: SessionAggregate) -> list:
+    """Format a SessionAggregate into a CSV row matching CSV_COLUMNS order."""
     return [
-        traj.session_id,
-        traj.project_path or "",
-        model,
-        traj.timestamp.isoformat() if traj.timestamp else "",
-        duration,
-        input_tok,
-        output_tok,
-        tool_count,
-        len(traj.steps),
+        session_id,
+        agg.project,
+        agg.agent_name,
+        agg.model,
+        agg.timestamp.isoformat() if agg.timestamp else "",
+        agg.duration,
+        agg.messages,
+        agg.input_tokens,
+        agg.output_tokens,
+        agg.cache_read_tokens,
+        agg.cache_creation_tokens,
+        agg.tool_calls,
+        round(agg.cost_usd, 6) if agg.cost_usd else "",
     ]

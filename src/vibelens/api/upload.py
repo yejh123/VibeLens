@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, Header, HTTPException, UploadFile
 
 from vibelens.models.enums import AgentType
 from vibelens.schemas.upload import UploadResult
-from vibelens.services.upload_service import get_upload_command, process_zip
+from vibelens.services.upload.processor import get_upload_command, process_zip
 
 router = APIRouter(tags=["upload"])
 

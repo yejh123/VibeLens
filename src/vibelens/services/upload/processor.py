@@ -14,11 +14,11 @@ from vibelens.ingest.discovery import discover_session_files, get_parser
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.models.enums import AgentType
 from vibelens.schemas.upload import UploadResult
-from vibelens.services.dashboard_service import (
+from vibelens.services.dashboard.loader import (
     invalidate_cache as invalidate_dashboard_cache,
 )
-from vibelens.services.search_service import invalidate_search_index
-from vibelens.services.upload_visibility import register_upload
+from vibelens.services.session.search import invalidate_search_index
+from vibelens.services.upload.visibility import register_upload
 from vibelens.storage.conversation.disk import DiskStore
 from vibelens.utils import get_logger
 from vibelens.utils.zip import extract_zip, validate_zip
@@ -306,10 +306,7 @@ async def process_zip(
 
 
 def _parse_and_store_files(
-    session_files: list[Path],
-    parser: BaseParser,
-    store: DiskStore,
-    result: UploadResult,
+    session_files: list[Path], parser: BaseParser, store: DiskStore, result: UploadResult
 ) -> list[dict]:
     """Parse discovered session files and persist via the disk store.
 

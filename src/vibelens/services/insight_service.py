@@ -20,7 +20,7 @@ from vibelens.models.analysis.insights import InsightReport
 from vibelens.models.inference import BackendType, InferenceRequest
 from vibelens.models.prompts import AnalysisPrompt
 from vibelens.models.trajectories import Trajectory
-from vibelens.services.upload_visibility import is_session_visible
+from vibelens.services.upload.visibility import is_session_visible
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)

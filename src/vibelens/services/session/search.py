@@ -12,7 +12,7 @@ from vibelens.deps import get_store
 from vibelens.models.enums import StepSource
 from vibelens.models.trajectories import Trajectory
 from vibelens.models.trajectories.content import ContentPart
-from vibelens.services.upload_visibility import filter_visible
+from vibelens.services.upload.visibility import filter_visible
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)

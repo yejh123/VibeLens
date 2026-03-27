@@ -2,7 +2,13 @@
 
 from pathlib import Path
 
-from vibelens.config import LLMConfig, Settings, load_llm_config, load_settings, save_llm_config
+from vibelens.config import (
+    LLMConfig,
+    Settings,
+    load_llm_config,
+    load_settings,
+    save_llm_config,
+)
 from vibelens.config.llm_config import DEFAULT_LLM_CONFIG_PATH, discover_llm_config_path
 from vibelens.llm.backend import InferenceBackend
 from vibelens.models.enums import AppMode
@@ -45,7 +51,7 @@ def is_test_mode() -> bool:
 
 def get_share_service():
     """Return cached ShareService singleton."""
-    from vibelens.services.share_service import ShareService
+    from vibelens.services.session.share import ShareService
 
     global _share_service
     if _share_service is None:
@@ -95,7 +101,7 @@ def get_central_skill_store():
 
 def get_skill_analysis_store():
     """Return cached SkillAnalysisStore singleton."""
-    from vibelens.services.skill.analysis_store import SkillAnalysisStore
+    from vibelens.services.skill.store import SkillAnalysisStore
 
     global _skill_analysis_store
     if _skill_analysis_store is None:

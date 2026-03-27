@@ -6,12 +6,12 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from vibelens.models.dashboard.dashboard import DashboardStats, SessionAnalytics, ToolUsageStat
-from vibelens.services.dashboard_service import (
+from vibelens.services.dashboard.export import export_dashboard_csv, export_dashboard_json
+from vibelens.services.dashboard.loader import (
     get_dashboard_stats,
     get_session_analytics,
     get_tool_usage,
 )
-from vibelens.services.export_service import export_dashboard_csv, export_dashboard_json
 
 router = APIRouter(tags=["analysis"])
 

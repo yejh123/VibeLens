@@ -26,7 +26,7 @@ DEFAULT_LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 CATEGORY_LOG_FILES: dict[str, str] = {
     "vibelens.ingest.parsers.": "parsers.log",
     "vibelens.services.friction.": "analysis-friction.log",
-    "vibelens.services.skill.analysis": "analysis-skill.log",
+    "vibelens.services.skill.": "analysis-skill.log",
 }
 
 _root_configured = False
