@@ -114,11 +114,8 @@ function HistoryCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0 space-y-1.5">
-          {item.title && (
-            <p className="text-xs text-zinc-200 font-semibold truncate">{item.title}</p>
-          )}
-          <p className="text-xs text-zinc-100 line-clamp-2 leading-relaxed font-medium">
-            {item.summary_preview}
+          <p className="text-xs text-zinc-200 font-semibold truncate">
+            {item.title || `Analysis · ${item.session_ids.length} sessions`}
           </p>
 
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -133,9 +130,9 @@ function HistoryCard({
                 Clean
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-[10px] text-zinc-300">
-              <Layers className="w-2.5 h-2.5 text-violet-400" />
-              {item.session_ids.length}
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-900/30 border border-violet-700/30 text-[10px] font-medium text-violet-300">
+              <Layers className="w-2.5 h-2.5" />
+              {item.session_ids.length} session{item.session_ids.length !== 1 ? "s" : ""}
             </span>
             {item.cost_usd != null && (
               <span className="inline-flex items-center gap-1 text-[10px] text-zinc-300">
@@ -157,8 +154,6 @@ function HistoryCard({
               </span>
             )}
           </div>
-
-          <p className="text-[10px] text-zinc-500 truncate">{item.model}</p>
         </div>
         <button
           onClick={(e) => {

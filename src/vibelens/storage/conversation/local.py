@@ -145,9 +145,7 @@ class LocalStore(TrajectoryStore):
             # Perfect cache hit — restore everything from cache
             self._remap_index(cached_path_map)
             self._metadata_cache = {
-                sid: cached_entries[sid]
-                for sid in self._index
-                if sid in cached_entries
+                sid: cached_entries[sid] for sid in self._index if sid in cached_entries
             }
             logger.info("Loaded %d sessions from index cache", len(self._metadata_cache))
             return True
@@ -162,13 +160,16 @@ class LocalStore(TrajectoryStore):
         if stale_ratio > INCREMENTAL_THRESHOLD:
             logger.info(
                 "Index cache stale: %d/%d changed (%.0f%%) — full rebuild",
-                len(stale_sids), total_files, stale_ratio * 100,
+                len(stale_sids),
+                total_files,
+                stale_ratio * 100,
             )
             return False
 
         logger.info(
             "Index cache: %d changed, %d removed — incremental update",
-            len(stale_sids), len(removed_paths),
+            len(stale_sids),
+            len(removed_paths),
         )
         self._incremental_update(cache, stale_sids, removed_paths)
         return True
@@ -225,16 +226,15 @@ class LocalStore(TrajectoryStore):
                     self._index.pop(sid, None)
                     self._index[real_sid] = (fpath, parser)
 
-                self._metadata_cache[real_sid] = traj.model_dump(
-                    exclude={"steps"}, mode="json"
-                )
+                self._metadata_cache[real_sid] = traj.model_dump(exclude={"steps"}, mode="json")
                 reparsed += 1
             except Exception:
                 logger.debug("Failed to re-parse stale file %s", fpath)
 
         logger.info(
             "Incremental update: %d cached, %d re-parsed",
-            len(self._metadata_cache) - reparsed, reparsed,
+            len(self._metadata_cache) - reparsed,
+            reparsed,
         )
 
         # Write merged cache back to disk
@@ -279,9 +279,7 @@ class LocalStore(TrajectoryStore):
         )
 
         # Build path -> real session_id map for cache restoration
-        path_to_session_id = {
-            str(fpath): sid for sid, (fpath, _parser) in self._index.items()
-        }
+        path_to_session_id = {str(fpath): sid for sid, (fpath, _parser) in self._index.items()}
         continuation_map = _extract_continuation_map(self._metadata_cache)
         save_cache(self._metadata_cache, pre_rebuild_mtimes, continuation_map, path_to_session_id)
 
@@ -320,8 +318,7 @@ def _apply_scanned_metrics(traj: Trajectory, metrics: dict) -> None:
 
 
 def _enrich_skeleton_metrics(
-    trajectories: list[Trajectory],
-    file_index: dict[str, tuple[Path, BaseParser]],
+    trajectories: list[Trajectory], file_index: dict[str, tuple[Path, BaseParser]]
 ) -> None:
     """Enrich skeleton trajectories with fast-scanned metrics.
 

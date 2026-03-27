@@ -143,19 +143,27 @@ def test_extract_with_compaction():
     ctx = extract_session_context([main, compaction])
 
     assert ctx.session_id == "session-2"
-    # Compaction summaries present
+    # Compaction summary interleaved chronologically (not grouped at top)
     assert "COMPACTION SUMMARY 1" in ctx.context_text
     assert "User requested dark mode" in ctx.context_text
-    # ALL steps present in chronological section
-    assert "ALL ACTIVITY" in ctx.context_text
     assert "Add dark mode" in ctx.context_text
     assert "Also add light theme" in ctx.context_text
-    # No separate USER MESSAGES section (removed to prevent duplication)
-    assert "USER MESSAGES" not in ctx.context_text
 
     # Verify no duplication: each user message appears exactly once
     assert ctx.context_text.count("Add dark mode") == 1
     assert ctx.context_text.count("Also add light theme") == 1
+
+    # Verify interleaving: compaction summary appears AFTER pre-compaction steps
+    # but BEFORE post-compaction steps
+    summary_pos = ctx.context_text.index("COMPACTION SUMMARY 1")
+    dark_mode_pos = ctx.context_text.index("Add dark mode")
+    edit_pos = ctx.context_text.index("fn=Edit")
+    assert dark_mode_pos < summary_pos, "Pre-compaction step should precede summary"
+    assert summary_pos < edit_pos, "Summary should precede post-compaction step"
+
+    # Steps use 0-indexed IDs
+    assert "[step_id=0]" in ctx.context_text
+    assert ctx.step_index_map is not None
 
     print(f"Context:\n{ctx.context_text}")
 

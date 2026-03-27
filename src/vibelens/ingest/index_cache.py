@@ -76,8 +76,7 @@ def save_cache(
 
 
 def detect_stale_files(
-    file_index: dict[str, tuple[Path, object]],
-    cached_mtimes: dict[str, float],
+    file_index: dict[str, tuple[Path, object]], cached_mtimes: dict[str, float]
 ) -> tuple[set[str], set[str]]:
     """Compare current file mtimes against cached values.
 

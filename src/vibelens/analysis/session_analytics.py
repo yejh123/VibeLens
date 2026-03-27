@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from vibelens.analysis.phase_detector import detect_phases
 from vibelens.analysis.pricing import compute_trajectory_cost
-from vibelens.models.analysis.dashboard import SessionAnalytics
+from vibelens.models.dashboard.dashboard import SessionAnalytics
 from vibelens.models.trajectories import Trajectory
 
 

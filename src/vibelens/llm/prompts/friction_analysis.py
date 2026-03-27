@@ -6,7 +6,7 @@ Two-phase pipeline:
 """
 
 from vibelens.models.analysis.friction import FrictionLLMBatchOutput, FrictionSynthesisOutput
-from vibelens.models.analysis.prompts import AnalysisPrompt, load_template
+from vibelens.models.prompts import AnalysisPrompt, load_template
 
 FRICTION_ANALYSIS_PROMPT = AnalysisPrompt(
     task_id="friction_analysis",

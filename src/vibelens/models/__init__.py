@@ -18,6 +18,7 @@ from vibelens.models.enums import (
     SessionPhase,
     StepSource,
 )
+from vibelens.models.prompts import AnalysisPrompt
 from vibelens.models.skill import SkillInfo
 from vibelens.models.trajectories import (
     Agent,
@@ -33,15 +34,14 @@ from vibelens.models.trajectories import (
     Trajectory,
     TrajectoryRef,
 )
-from vibelens.schemas import (
-    RemoteSessionsQuery,
-)
+from vibelens.schemas import RemoteSessionsQuery
 
 __all__ = [
     "Agent",
     "AgentBehaviorResult",
     "AgentType",
     "AppMode",
+    "AnalysisPrompt",
     "Base64Source",
     "ContentPart",
     "ContentType",

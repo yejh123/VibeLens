@@ -24,14 +24,14 @@ from vibelens.llm.backend import InferenceBackend, InferenceError
 from vibelens.llm.prompts.skill_creation import SKILL_CREATION_PROMPT
 from vibelens.llm.prompts.skill_evolution import SKILL_EVOLUTION_PROMPT
 from vibelens.llm.prompts.skill_retrieval import SKILL_RETRIEVAL_PROMPT
-from vibelens.models.analysis.prompts import AnalysisPrompt
-from vibelens.models.analysis.skills import (
+from vibelens.models.inference import InferenceRequest
+from vibelens.models.prompts import AnalysisPrompt
+from vibelens.models.skill.skills import (
     SkillAnalysisResult,
     SkillLLMOutput,
     SkillMode,
     WorkflowPattern,
 )
-from vibelens.models.inference import InferenceRequest
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.skill.digest import digest_step_signals_for_skills
 from vibelens.services.upload_visibility import is_session_visible

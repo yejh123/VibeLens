@@ -11,7 +11,7 @@ from vibelens.analysis.dashboard_stats import (
 from vibelens.analysis.session_analytics import compute_session_analytics
 from vibelens.analysis.tool_usage import compute_tool_usage
 from vibelens.deps import get_store
-from vibelens.models.analysis.dashboard import (
+from vibelens.models.dashboard.dashboard import (
     DashboardStats,
     SessionAnalytics,
     ToolUsageStat,

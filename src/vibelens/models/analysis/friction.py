@@ -13,7 +13,7 @@ Model hierarchy:
 
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.inference import BackendType
@@ -55,21 +55,39 @@ class FrictionCost(BaseModel):
     )
 
 
+ACTION_TYPE_LABELS: dict[str, str] = {
+    "update_claude_md": "Update CLAUDE.md",
+    "write_test": "Write test",
+    "create_skill": "Create skill",
+    "update_skill": "Update skill",
+    "add_linter_rule": "Add linter rule",
+    "update_workflow": "Update workflow",
+}
+
+
 class Mitigation(BaseModel):
     """Structured mitigation action — ready to apply."""
 
-    action_type: str = Field(
+    action: str = Field(
         description=(
-            "Type of mitigation: 'update_claude_md', 'write_test', 'create_skill', "
-            "'update_skill', 'add_linter_rule', 'update_workflow'."
+            "Human-readable action label, e.g. 'Update CLAUDE.md code style section', "
+            "'Write test for auth validation', 'Add ESLint no-unused-vars rule'."
         ),
     )
-    target: str = Field(
-        description="CLAUDE.md section, test file path, skill name, or workflow target.",
-    )
-    content: str = Field(
-        description="Exact text to add or change — ready to apply.",
-    )
+    content: str = Field(description="Exact text to add or change — ready to apply.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_action_type_target(cls, data: dict) -> dict:
+        """Migrate old action_type + target fields into action string."""
+        if not isinstance(data, dict):
+            return data
+        if "action" not in data and "action_type" in data:
+            action_type = data.pop("action_type", "")
+            target = data.pop("target", "")
+            label = ACTION_TYPE_LABELS.get(action_type, action_type.replace("_", " ").title())
+            data["action"] = f"{label}: {target}" if target else label
+        return data
 
 
 class FrictionLLMEvent(BaseModel):
@@ -99,11 +117,14 @@ class FrictionLLMEvent(BaseModel):
 
 
 class FrictionEvent(FrictionLLMEvent):
-    """FrictionLLMEvent enriched with server-generated ID and computed cost."""
+    """FrictionLLMEvent enriched with server-generated ID, project path, and computed cost."""
 
     friction_id: str = Field(
         default_factory=lambda: str(uuid4()),
         description="Server-generated UUID for this friction event.",
+    )
+    project_path: str | None = Field(
+        default=None, description="Project directory for this event's session."
     )
     estimated_cost: FrictionCost = Field(
         default_factory=FrictionCost, description="Cost computed from step span metrics."
@@ -118,7 +139,7 @@ class FrictionLLMBatchOutput(BaseModel):
     )
     summary: str = Field(description="Narrative overview of friction in this batch.")
     top_mitigation: Mitigation | None = Field(
-        default=None, description="Single highest-impact mitigation across the batch."
+        default=None, description="Single highest-impact mitigation from batch LLM."
     )
 
 
@@ -135,9 +156,7 @@ class FrictionSynthesisOutput(BaseModel):
     """LLM output from post-batch synthesis — cohesive narrative across all sessions."""
 
     title: str = Field(description="Short title for the analysis (max 10 words).")
-    summary: str = Field(
-        description="High-level narrative overview (max 80 words)."
-    )
+    summary: str = Field(description="High-level narrative overview (max 80 words).")
     type_descriptions: list[FrictionTypeDescription] = Field(
         default_factory=list, description="One description per friction type found."
     )
@@ -172,22 +191,20 @@ class FrictionAnalysisResult(BaseModel):
     analysis_id: str | None = Field(
         default=None, description="Persistence ID. Set when the result is saved to disk."
     )
-    title: str | None = Field(
-        default=None, description="Short title from synthesis LLM call."
-    )
+    title: str | None = Field(default=None, description="Short title from synthesis LLM call.")
     model: str = Field(description="Model identifier.")
     created_at: str = Field(description="ISO timestamp of analysis completion.")
     backend_id: BackendType = Field(description="Inference backend used.")
     session_ids: list[str] = Field(
         description="Session IDs that were successfully loaded and analyzed."
     )
-    batch_count: int = Field(default=1, description="Number of LLM batches used for this analysis.")
+    batch_count: int = Field(default=1, description="Number of LLM batches used.")
     summary: str = Field(description="Narrative overview of friction across all sessions.")
     type_summary: list[TypeSummary] = Field(
         default_factory=list, description="Aggregated statistics per friction type."
     )
-    top_mitigation: Mitigation | None = Field(
-        default=None, description="Single highest-impact mitigation across all batches."
+    top_mitigations: list[Mitigation] = Field(
+        default_factory=list, description="0-3 highest-impact mitigations across all batches."
     )
     cross_batch_patterns: list[str] = Field(
         default_factory=list, description="Aggregate observations spanning multiple batches."
@@ -201,6 +218,17 @@ class FrictionAnalysisResult(BaseModel):
     events: list[FrictionEvent] = Field(
         default_factory=list, description="All friction events ordered by severity descending."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_top_mitigation(cls, data: dict) -> dict:
+        """Migrate old top_mitigation field into top_mitigations list."""
+        if not isinstance(data, dict):
+            return data
+        old_mit = data.pop("top_mitigation", None)
+        if old_mit and not data.get("top_mitigations"):
+            data["top_mitigations"] = [old_mit]
+        return data
 
 
 class FrictionAnalysisRequest(BaseModel):

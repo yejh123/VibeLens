@@ -7,6 +7,7 @@ and uses their summaries alongside the full step chronology.
 Reusable by friction analysis, skill analysis, and other LLM-powered modules.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -20,6 +21,9 @@ logger = get_logger(__name__)
 
 BASH_COMMAND_MAX_CHARS = 80
 ERROR_TRUNCATE_CHARS = 300
+USER_PROMPT_MAX_CHARS = 2000
+USER_PROMPT_HEAD_CHARS = 1500
+USER_PROMPT_TAIL_CHARS = 500
 
 # Tool-specific argument keys to extract for summarization
 TOOL_ARG_KEYS: dict[str, list[str]] = {
@@ -35,6 +39,48 @@ TOOL_ARG_KEYS: dict[str, list[str]] = {
 
 
 @dataclass
+class _IndexTracker:
+    """Assigns sequential 0-based indices to steps during formatting."""
+
+    _counter: int = 0
+    index_to_real_id: dict[int, str] = field(default_factory=dict)
+
+    def assign(self, real_id: str) -> int:
+        """Assign the next sequential index to a real step ID."""
+        idx = self._counter
+        self.index_to_real_id[idx] = real_id
+        self._counter += 1
+        return idx
+
+
+@dataclass
+class IdMapping:
+    """Maps 0-indexed synthetic IDs back to real UUIDs."""
+
+    session_index_to_id: dict[int, str] = field(default_factory=dict)
+    step_index_to_id: dict[int, dict[int, str]] = field(default_factory=dict)
+
+    def resolve_session_id(self, synthetic: str) -> str | None:
+        """Convert a synthetic session index string (e.g. "0") to real UUID."""
+        try:
+            idx = int(synthetic)
+        except (ValueError, TypeError):
+            return None
+        return self.session_index_to_id.get(idx)
+
+    def resolve_step_id(self, session_index: int, synthetic: str) -> str | None:
+        """Convert a synthetic step index string (e.g. "5") to real UUID."""
+        try:
+            step_idx = int(synthetic)
+        except (ValueError, TypeError):
+            return None
+        step_map = self.step_index_to_id.get(session_index)
+        if step_map is None:
+            return None
+        return step_map.get(step_idx)
+
+
+@dataclass
 class SessionContext:
     """Compressed context for one session, ready for LLM consumption."""
 
@@ -46,18 +92,18 @@ class SessionContext:
     last_trajectory_ref_id: str | None = None
     continued_trajectory_ref_id: str | None = None
     timestamp: datetime | None = None
+    step_index_map: dict[int, str] = field(default_factory=dict)
 
 
 def extract_session_context(trajectory_group: list[Trajectory]) -> SessionContext:
     """Extract compressed context from a session's trajectory group.
 
     Detects compaction sub-agents and adapts extraction strategy:
-    - With compactions: compaction summaries + ALL steps chronologically
+    - With compactions: compaction summaries interleaved with steps chronologically
     - Without compactions: all steps with user messages, tool calls, and errors
 
-    The compaction branch includes every step (not just post-compaction) so the
-    LLM sees the full session timeline. Compaction summaries provide compressed
-    context for the pre-compaction portion that may lack detailed tool info.
+    Steps use 0-indexed IDs via _IndexTracker for compact LLM prompts.
+    The mapping from index → real UUID is stored in step_index_map.
 
     Args:
         trajectory_group: All trajectories for one session (main + sub-agents).
@@ -67,11 +113,12 @@ def extract_session_context(trajectory_group: list[Trajectory]) -> SessionContex
     """
     main = _find_main_trajectory(trajectory_group)
     compaction_agents = _find_compaction_agents(trajectory_group)
+    tracker = _IndexTracker()
 
     if compaction_agents:
-        context_text = _extract_with_compactions(main, compaction_agents)
+        context_text = _extract_with_compactions(main, compaction_agents, tracker)
     else:
-        context_text = _extract_without_compactions(main)
+        context_text = _extract_without_compactions(main, tracker)
 
     header = _build_header(main)
     full_text = f"{header}\n\n{context_text}"
@@ -89,6 +136,7 @@ def extract_session_context(trajectory_group: list[Trajectory]) -> SessionContex
             main.continued_trajectory_ref.session_id if main.continued_trajectory_ref else None
         ),
         timestamp=main.timestamp,
+        step_index_map=tracker.index_to_real_id,
     )
 
 
@@ -130,73 +178,111 @@ def _build_header(main: Trajectory) -> str:
     return "\n".join(lines)
 
 
-def _extract_with_compactions(main: Trajectory, compaction_agents: list[Trajectory]) -> str:
+def _extract_with_compactions(
+    main: Trajectory, compaction_agents: list[Trajectory], tracker: _IndexTracker
+) -> str:
     """Extract context for sessions WITH compaction sub-agents.
 
-    Strategy:
-    1. Compaction summaries — compressed context from each compaction agent
-    2. ALL steps chronologically — the full session timeline via _format_steps_basic()
-
-    Previous implementation had a separate "USER MESSAGES" section plus only
-    post-compaction steps, which caused user messages after compaction to appear
-    twice. This version includes all steps exactly once and lets compaction
-    summaries provide compressed context for the pre-compaction portion.
+    Interleaves compaction summaries at their chronological position among steps.
+    Each summary is inserted just before the first step whose timestamp exceeds
+    the compaction boundary. Falls back to summaries-first if timestamps are unavailable.
     """
+    boundaries = _build_compaction_boundaries(compaction_agents)
     parts: list[str] = []
 
-    # Compaction summaries provide compressed context for pre-compaction history
-    summaries = _extract_compaction_summaries(compaction_agents)
-    for i, summary in enumerate(summaries, 1):
-        parts.append(f"--- COMPACTION SUMMARY {i} ---")
-        parts.append(summary)
+    # Track which boundaries have been inserted
+    boundary_idx = 0
+    summary_counter = 0
 
-    # All steps from the entire session — user messages, agent tool calls,
-    # errors appear exactly once in chronological order
-    activity = _format_steps_basic(main.steps)
-    if activity:
-        parts.append("--- ALL ACTIVITY ---")
-        parts.append(activity)
+    for step in main.steps:
+        # Insert any compaction summaries whose timestamp precedes this step
+        while boundary_idx < len(boundaries):
+            boundary_ts, summary_text = boundaries[boundary_idx]
+            step_ts = step.timestamp
+
+            # If either timestamp is missing, defer to fallback (summaries first)
+            if boundary_ts is None or step_ts is None:
+                break
+
+            if boundary_ts < step_ts:
+                summary_counter += 1
+                parts.append(f"--- COMPACTION SUMMARY {summary_counter} ---")
+                parts.append(summary_text)
+                boundary_idx += 1
+            else:
+                break
+
+        formatted = _format_step(step, tracker)
+        if formatted:
+            parts.append(formatted)
+
+    # Append any remaining summaries that follow all steps
+    while boundary_idx < len(boundaries):
+        _, summary_text = boundaries[boundary_idx]
+        summary_counter += 1
+        parts.append(f"--- COMPACTION SUMMARY {summary_counter} ---")
+        parts.append(summary_text)
+        boundary_idx += 1
 
     return "\n\n".join(parts)
 
 
-def _extract_without_compactions(main: Trajectory) -> str:
+def _extract_without_compactions(main: Trajectory, tracker: _IndexTracker) -> str:
     """Extract context for sessions WITHOUT compaction.
 
-    Includes all user messages verbatim, agent steps with tool calls
+    Includes user messages (truncated if long), agent steps with tool calls
     (function name + key args only), and error observations in full.
     """
     parts: list[str] = []
     for step in main.steps:
-        formatted = _format_step_full(step)
+        formatted = _format_step(step, tracker)
         if formatted:
             parts.append(formatted)
     return "\n\n".join(parts)
 
 
-def _extract_compaction_summaries(compaction_agents: list[Trajectory]) -> list[str]:
-    """Extract summary text from compaction agent response steps.
+def _build_compaction_boundaries(
+    compaction_agents: list[Trajectory],
+) -> list[tuple[datetime | None, str]]:
+    """Build timestamped compaction summaries sorted by timestamp.
 
-    The compaction agent typically has step[0] as system/user prompt and
-    step[1] as the agent's summary response.
+    Each compaction agent typically has step[0] as system/user prompt and
+    step[1] as the agent's summary response. The agent's trajectory timestamp
+    marks when the compaction occurred.
+
+    Returns:
+        Sorted list of (timestamp, summary_text) pairs.
     """
-    summaries: list[str] = []
+    boundaries: list[tuple[datetime | None, str]] = []
     for agent in compaction_agents:
-        # Find the agent response step (usually step[1])
         for step in agent.steps:
             if step.source == StepSource.AGENT:
                 summary = extract_text(step.message)
                 if summary.strip():
-                    summaries.append(summary.strip())
+                    boundaries.append((agent.timestamp, summary.strip()))
                 break
-    return summaries
+    boundaries.sort(key=lambda b: b[0] or datetime.min)
+    return boundaries
 
 
-def _format_step_full(step: Step) -> str:
-    """Format a step with user messages verbatim, agent steps with tool info.
+def _truncate_user_prompt(message: str) -> str:
+    """Truncate long user prompts to save tokens.
+
+    Keeps the first USER_PROMPT_HEAD_CHARS and last USER_PROMPT_TAIL_CHARS
+    with a truncation marker in between.
+    """
+    if len(message) <= USER_PROMPT_MAX_CHARS:
+        return message
+    head = message[:USER_PROMPT_HEAD_CHARS]
+    tail = message[-USER_PROMPT_TAIL_CHARS:]
+    return f"{head}\n[...truncated...]\n{tail}"
+
+
+def _format_step(step: Step, tracker: _IndexTracker) -> str:
+    """Format a step with 0-indexed IDs, truncated user prompts, and tool info.
 
     Filtering logic:
-    - USER steps: include full message text
+    - USER steps: truncate long messages, assign 0-indexed step ID
     - AGENT steps: include only if they have tool calls or error observations.
       Agent-only text responses (no tools, no errors) are skipped to reduce noise.
     - SYSTEM steps: skipped entirely (internal prompts, not useful for analysis)
@@ -209,10 +295,13 @@ def _format_step_full(step: Step) -> str:
     if step.source == StepSource.USER:
         message = extract_text(step.message)
         if message.strip():
-            lines.append(f"[step_id={step.step_id}] USER: {message.strip()}")
+            idx = tracker.assign(step.step_id)
+            truncated = _truncate_user_prompt(message.strip())
+            lines.append(f"[step_id={idx}] USER: {truncated}")
 
     elif step.source == StepSource.AGENT:
-        agent_lines = [f"[step_id={step.step_id}] AGENT:"]
+        idx = tracker.assign(step.step_id)
+        agent_lines = [f"[step_id={idx}] AGENT:"]
         for tc in step.tool_calls:
             tool_summary = _summarize_tool_args(tc.function_name, tc.arguments)
             agent_lines.append(f"  TOOL: fn={tc.function_name} {tool_summary}")
@@ -232,16 +321,6 @@ def _format_step_full(step: Step) -> str:
             lines.extend(agent_lines)
 
     return "\n".join(lines)
-
-
-def _format_steps_basic(steps: list[Step]) -> str:
-    """Format a list of steps with basic info."""
-    parts: list[str] = []
-    for step in steps:
-        formatted = _format_step_full(step)
-        if formatted:
-            parts.append(formatted)
-    return "\n".join(parts)
 
 
 def _summarize_tool_args(function_name: str, arguments) -> str:
@@ -281,3 +360,32 @@ def _summarize_tool_args(function_name: str, arguments) -> str:
         if key in arguments:
             return f"{key}={truncate(str(arguments[key]), BASH_COMMAND_MAX_CHARS)}"
     return ""
+
+
+def remap_session_ids(contexts: list[SessionContext]) -> IdMapping:
+    """Assign 0-based session indices and replace session_id in context_text.
+
+    Mutates each context's context_text, replacing the real session UUID
+    in the header with a 0-based index. Returns the combined mapping for
+    resolving synthetic IDs back to real UUIDs after LLM inference.
+
+    Args:
+        contexts: Session contexts to remap (mutated in place).
+
+    Returns:
+        IdMapping with session and step index→UUID mappings.
+    """
+    mapping = IdMapping()
+    for idx, ctx in enumerate(contexts):
+        mapping.session_index_to_id[idx] = ctx.session_id
+        mapping.step_index_to_id[idx] = dict(ctx.step_index_map)
+
+        # Replace the session UUID in the header line
+        ctx.context_text = re.sub(
+            rf"=== SESSION: {re.escape(ctx.session_id)} ===",
+            f"=== SESSION: {idx} ===",
+            ctx.context_text,
+            count=1,
+        )
+        ctx.char_count = len(ctx.context_text)
+    return mapping

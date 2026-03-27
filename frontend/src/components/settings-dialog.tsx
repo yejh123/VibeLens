@@ -1,4 +1,5 @@
-import { X, Bug, Lightbulb, Sparkles } from "lucide-react";
+import { X, Bug, Lightbulb, Sparkles, BookOpen } from "lucide-react";
+import { ONBOARDING_STORAGE_KEY } from "./onboarding-constants";
 import { useSettings } from "../settings-context";
 import type { FontScale } from "../settings-context";
 
@@ -55,6 +56,7 @@ Why would this improvement matter?`,
 
 interface SettingsDialogProps {
   onClose: () => void;
+  onShowOnboarding?: () => void;
 }
 
 function openFeedback(label: string): void {
@@ -67,7 +69,7 @@ function openFeedback(label: string): void {
   window.open(`${GITHUB_ISSUES_URL}?${params}`, "_blank", "noopener,noreferrer");
 }
 
-export function SettingsDialog({ onClose }: SettingsDialogProps) {
+export function SettingsDialog({ onClose, onShowOnboarding }: SettingsDialogProps) {
   const { fontScale, setFontScale, fontScaleOptions } = useSettings();
 
   return (
@@ -143,6 +145,23 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
                 Improvement
               </button>
             </div>
+          </div>
+
+          {/* Help */}
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
+              Help
+            </h3>
+            <button
+              onClick={() => {
+                localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+                onShowOnboarding?.();
+              }}
+              className="flex items-center gap-2 w-full py-2.5 px-3 text-xs font-medium text-zinc-300 hover:text-zinc-100 bg-zinc-800/80 hover:bg-zinc-700 rounded-lg border border-zinc-700/50 transition"
+            >
+              <BookOpen className="w-4 h-4 text-cyan-400" />
+              Show Welcome Guide
+            </button>
           </div>
         </div>
       </div>

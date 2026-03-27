@@ -46,14 +46,15 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
             "producing code that didn't match requirements. The highest-impact issue "
             "was repeated scope violations despite clear user instructions."
         ),
-        top_mitigation=Mitigation(
-            action_type="update_claude_md",
-            target="Task Execution",
-            content=(
-                "Before starting implementation, restate the user's requirement "
-                "in your own words and wait for confirmation."
+        top_mitigations=[
+            Mitigation(
+                action="Update CLAUDE.md task execution section",
+                content=(
+                    "Before starting implementation, restate the user's requirement "
+                    "in your own words and wait for confirmation."
+                ),
             ),
-        ),
+        ],
         type_summary=type_summary,
         session_ids=list(step_id_pool.keys()),
         sessions_skipped=skipped,

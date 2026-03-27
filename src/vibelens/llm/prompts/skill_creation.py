@@ -4,8 +4,8 @@ Detects workflow patterns from session transcripts and generates
 new SKILL.md definitions. Uses SkillLLMOutput as the output model.
 """
 
-from vibelens.models.analysis.prompts import AnalysisPrompt, load_template
-from vibelens.models.analysis.skills import SkillLLMOutput
+from vibelens.models.prompts import AnalysisPrompt, load_template
+from vibelens.models.skill.skills import SkillLLMOutput
 
 SKILL_CREATION_PROMPT = AnalysisPrompt(
     task_id="skill_creation",

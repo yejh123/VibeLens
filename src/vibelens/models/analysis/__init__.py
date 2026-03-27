@@ -1,19 +1,6 @@
 """Analysis result models for VibeLens dashboard and behavior analytics."""
 
-from vibelens.models.analysis.correlator import (
-    CorrelatedGroup,
-    CorrelatedSession,
-)
-from vibelens.models.analysis.dashboard import (
-    AgentBehaviorResult,
-    DailyStat,
-    DashboardStats,
-    PeriodStats,
-    SessionAnalytics,
-    TimePattern,
-    ToolUsageStat,
-    UserPreferenceResult,
-)
+from vibelens.models.analysis.correlator import CorrelatedGroup, CorrelatedSession
 from vibelens.models.analysis.friction import (
     FrictionAnalysisRequest,
     FrictionAnalysisResult,
@@ -33,24 +20,19 @@ from vibelens.models.analysis.insights import (
     SessionHighlights,
 )
 from vibelens.models.analysis.phase import PhaseSegment
-from vibelens.models.analysis.pricing import ModelPricing
-from vibelens.models.analysis.prompts import AnalysisPrompt
-from vibelens.models.analysis.skills import (
-    SkillAnalysisResult,
-    SkillCreation,
-    SkillEdit,
-    SkillEditKind,
-    SkillEvolutionSuggestion,
-    SkillLLMOutput,
-    SkillMode,
-    SkillRecommendation,
-    WorkflowPattern,
-)
 from vibelens.models.analysis.step_ref import StepRef
-from vibelens.models.analysis.tool_graph import (
-    ToolDependencyGraph,
-    ToolEdge,
+from vibelens.models.analysis.tool_graph import ToolDependencyGraph, ToolEdge
+from vibelens.models.dashboard.dashboard import (
+    AgentBehaviorResult,
+    DailyStat,
+    DashboardStats,
+    PeriodStats,
+    SessionAnalytics,
+    TimePattern,
+    ToolUsageStat,
+    UserPreferenceResult,
 )
+from vibelens.models.pricing import ModelPricing
 
 __all__ = [
     "AgentBehaviorResult",
@@ -75,14 +57,6 @@ __all__ = [
     "PeriodStats",
     "SessionAnalytics",
     "SessionHighlights",
-    "SkillAnalysisResult",
-    "SkillCreation",
-    "SkillEdit",
-    "SkillEditKind",
-    "SkillEvolutionSuggestion",
-    "SkillLLMOutput",
-    "SkillMode",
-    "SkillRecommendation",
     "StepRef",
     "StepSignal",
     "TimePattern",

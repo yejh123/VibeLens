@@ -19,6 +19,8 @@ import { DashboardView } from "./components/analysis/dashboard-view";
 import { FrictionPanel } from "./components/analysis/friction-panel";
 import { SkillsPanel } from "./components/skills/skills-panel";
 import { SettingsDialog } from "./components/settings-dialog";
+import { OnboardingDialog } from "./components/onboarding-dialog";
+import { hasSeenOnboarding } from "./components/onboarding-constants";
 import type { DashboardStats, DonateResult, ToolUsageStat, Trajectory } from "./types";
 
 type MainView = "browse" | "analyze" | "friction" | "skills";
@@ -71,6 +73,8 @@ export function App() {
   const [visibleAgents, setVisibleAgents] = useState<string[]>(["all"]);
   const [mainView, setMainView] = useState<MainView>("browse");
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [pendingScrollStepId, setPendingScrollStepId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("step") || null;
@@ -122,9 +126,21 @@ export function App() {
         if (data.app_mode === "demo") setAppMode("demo");
         if (data.max_zip_bytes) setMaxZipBytes(data.max_zip_bytes);
         if (data.visible_agents) setVisibleAgents(data.visible_agents);
+        setSettingsLoaded(true);
       })
-      .catch((err) => console.error("Failed to load settings:", err));
+      .catch((err) => {
+        console.error("Failed to load settings:", err);
+        setSettingsLoaded(true);
+      });
   }, [fetchWithToken]);
+
+  // Show onboarding on first visit in self mode
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    if (appMode !== "self") return;
+    if (hasSeenOnboarding()) return;
+    setShowOnboarding(true);
+  }, [appMode, settingsLoaded]);
 
   useEffect(() => {
     fetchWithToken("/api/projects")
@@ -522,7 +538,17 @@ export function App() {
 
         {/* Settings dialog */}
         {showSettingsDialog && (
-          <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+          <SettingsDialog
+            onClose={() => setShowSettingsDialog(false)}
+            onShowOnboarding={() => {
+              setShowSettingsDialog(false);
+              setShowOnboarding(true);
+            }}
+          />
+        )}
+
+        {showOnboarding && (
+          <OnboardingDialog onClose={() => setShowOnboarding(false)} />
         )}
       </div>
     </AppContext.Provider>

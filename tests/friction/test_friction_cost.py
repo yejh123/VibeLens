@@ -59,11 +59,7 @@ def _make_llm_event(session_id: str, start: str, end: str | None = None) -> Fric
 
 def _make_trajectory(session_id: str, steps: list[Step]) -> Trajectory:
     """Build a minimal Trajectory for testing."""
-    return Trajectory(
-        session_id=session_id,
-        agent={"name": "claude_code"},
-        steps=steps,
-    )
+    return Trajectory(session_id=session_id, agent={"name": "claude_code"}, steps=steps)
 
 
 def test_cost_with_metrics_and_timestamps():

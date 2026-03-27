@@ -10,7 +10,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from vibelens.analysis.pricing import compute_trajectory_cost, normalize_model_name
-from vibelens.models.analysis.dashboard import (
+from vibelens.models.dashboard.dashboard import (
     DailyStat,
     DashboardStats,
     PeriodStats,

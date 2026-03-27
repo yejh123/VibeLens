@@ -119,7 +119,7 @@ def _seed_mock_skill_history() -> None:
     and generates mock analysis results for retrieval, creation, and
     evolution modes so the History sidebar has sample entries.
     """
-    from vibelens.models.analysis.skills import SkillMode
+    from vibelens.models.skill.skills import SkillMode
     from vibelens.services.mock import build_mock_skill_result
 
     analysis_store = get_skill_analysis_store()

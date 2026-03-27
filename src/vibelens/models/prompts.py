@@ -5,7 +5,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, Template
 from pydantic import BaseModel, ConfigDict, Field
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "llm" / "prompts" / "templates"
+TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "llm" / "prompts" / "templates"
 
 _jinja_env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -36,7 +36,6 @@ class AnalysisPrompt(BaseModel):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
     task_id: str = Field(
         description="Unique identifier for this analysis type (e.g. 'highlights')."
     )

@@ -12,7 +12,10 @@ import {
   Footprints,
   Hash,
   History,
+  Layers,
   Loader2,
+  PanelRightClose,
+  PanelRightOpen,
   Pencil,
   Play,
   Plus,
@@ -22,11 +25,12 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAppContext } from "../../app";
 import type {
   FrictionAnalysisResult,
+  FrictionEstimate,
   FrictionEvent,
   LLMStatus,
   Mitigation,
@@ -36,6 +40,7 @@ import { formatCost, formatDuration, formatTokens } from "../../utils";
 import { SEVERITY_COLORS, SESSION_ID_SHORT } from "../../styles";
 import { CopyButton } from "../copy-button";
 import { LoadingSpinner } from "../loading-spinner";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "../modal";
 import { FrictionHistory } from "./friction-history";
 
 const SEVERITY_LABELS: Record<number, string> = {
@@ -54,14 +59,26 @@ const SEVERITY_DESCRIPTIONS: Record<number, string> = {
   5: "Critical — User abandons task or loses work",
 };
 
-const ACTION_TYPE_COLORS: Record<string, string> = {
-  update_claude_md: "bg-violet-900/30 border-violet-700/30 text-violet-300",
-  write_test: "bg-emerald-900/30 border-emerald-700/30 text-emerald-300",
-  create_skill: "bg-cyan-900/30 border-cyan-700/30 text-cyan-300",
-  update_skill: "bg-sky-900/30 border-sky-700/30 text-sky-300",
-  add_linter_rule: "bg-amber-900/30 border-amber-700/30 text-amber-300",
-  update_workflow: "bg-rose-900/30 border-rose-700/30 text-rose-300",
-};
+const ACTION_KEYWORD_COLORS: [RegExp, string][] = [
+  [/claude\.?md/i, "bg-violet-500/25 border-violet-400/50 text-violet-200"],
+  [/test/i, "bg-emerald-500/25 border-emerald-400/50 text-emerald-200"],
+  [/skill/i, "bg-cyan-500/25 border-cyan-400/50 text-cyan-200"],
+  [/lint|eslint|ruff/i, "bg-amber-500/25 border-amber-400/50 text-amber-200"],
+  [/workflow|ci|pipeline/i, "bg-rose-500/25 border-rose-400/50 text-rose-200"],
+];
+
+const DEFAULT_ACTION_COLOR = "bg-teal-500/20 border-teal-400/40 text-teal-200";
+
+const SIDEBAR_MIN_WIDTH = 180;
+const SIDEBAR_MAX_WIDTH = 400;
+const SIDEBAR_DEFAULT_WIDTH = 224;
+
+function _actionColor(action: string): string {
+  for (const [pattern, color] of ACTION_KEYWORD_COLORS) {
+    if (pattern.test(action)) return color;
+  }
+  return DEFAULT_ACTION_COLOR;
+}
 
 interface FrictionPanelProps {
   checkedIds: Set<string>;
@@ -74,6 +91,38 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [llmStatus, setLlmStatus] = useState<LLMStatus | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const draggingRef = useRef(false);
+
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      draggingRef.current = true;
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!draggingRef.current) return;
+        const delta = startX - ev.clientX;
+        const newWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta));
+        setSidebarWidth(newWidth);
+      };
+      const onMouseUp = () => {
+        draggingRef.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [sidebarWidth],
+  );
 
   const refreshLlmStatus = useCallback(async () => {
     try {
@@ -88,8 +137,33 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
     refreshLlmStatus();
   }, [refreshLlmStatus]);
 
-  const handleRunAnalysis = useCallback(async () => {
+  const [estimate, setEstimate] = useState<FrictionEstimate | null>(null);
+  const [estimating, setEstimating] = useState(false);
+
+  const handleRequestAnalysis = useCallback(async () => {
     if (checkedIds.size === 0) return;
+    setEstimating(true);
+    setError(null);
+    try {
+      const res = await fetchWithToken("/api/analysis/friction/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_ids: [...checkedIds] }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || `HTTP ${res.status}`);
+      }
+      setEstimate(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEstimating(false);
+    }
+  }, [checkedIds, fetchWithToken]);
+
+  const handleConfirmAnalysis = useCallback(async () => {
+    setEstimate(null);
     setLoading(true);
     setError(null);
     try {
@@ -121,11 +195,71 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
     setError(null);
   }, []);
 
-  if (loading) {
+  const sidebar = useMemo(() => (
+    <>
+      {showSidebar && (
+        <>
+          {/* Drag handle */}
+          <div
+            onMouseDown={handleDragStart}
+            className="w-1 shrink-0 cursor-col-resize bg-zinc-800 hover:bg-zinc-600 transition-colors"
+          />
+          {/* Sidebar content */}
+          <div
+            className="shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col"
+            style={{ width: sidebarWidth }}
+          >
+            <div className="shrink-0 flex items-center justify-between px-3 pt-3 pb-1">
+              <div className="flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-zinc-500" />
+                <span className="text-xs font-medium text-zinc-400">History</span>
+              </div>
+              <button
+                onClick={() => setShowSidebar(false)}
+                className="p-0.5 text-zinc-500 hover:text-zinc-300 transition"
+                title="Hide history"
+              >
+                <PanelRightClose className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 pt-1">
+              <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
+            </div>
+          </div>
+        </>
+      )}
+      {!showSidebar && (
+        <div className="shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col items-center pt-3 px-1">
+          <button
+            onClick={() => setShowSidebar(true)}
+            className="p-1 text-zinc-500 hover:text-zinc-300 transition"
+            title="Show history"
+          >
+            <PanelRightOpen className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </>
+  ), [showSidebar, sidebarWidth, handleDragStart, handleHistorySelect, historyRefresh]);
+
+  const estimateDialog = estimate && (
+    <CostEstimateDialog
+      estimate={estimate}
+      sessionCount={checkedIds.size}
+      onConfirm={handleConfirmAnalysis}
+      onCancel={() => setEstimate(null)}
+    />
+  );
+
+  if (loading || estimating) {
     return (
       <LoadingSpinner
-        label={`Analyzing ${checkedIds.size} session${checkedIds.size !== 1 ? "s" : ""} for friction`}
-        sublabel="This may take a moment"
+        label={
+          estimating
+            ? `Estimating cost for ${checkedIds.size} session${checkedIds.size !== 1 ? "s" : ""}`
+            : `Analyzing ${checkedIds.size} session${checkedIds.size !== 1 ? "s" : ""} for friction`
+        }
+        sublabel={estimating ? "Preparing batches…" : "This may take a moment"}
       />
     );
   }
@@ -137,15 +271,14 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
           <EmptyState
             checkedCount={checkedIds.size}
             error={error}
-            onRun={handleRunAnalysis}
+            onRun={handleRequestAnalysis}
             llmStatus={llmStatus}
             fetchWithToken={fetchWithToken}
             onLlmConfigured={refreshLlmStatus}
           />
         </div>
-        <div className="w-56 shrink-0 border-l border-zinc-800 bg-zinc-900/50 overflow-y-auto p-3">
-          <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
-        </div>
+        {sidebar}
+        {estimateDialog}
       </div>
     );
   }
@@ -154,24 +287,20 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
     <div className="h-full flex">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-          <ResultHeader result={result} onRerun={handleRunAnalysis} onNew={handleNewAnalysis} />
-          <SummarySection summary={result.summary} topMitigation={result.top_mitigation} crossBatchPatterns={result.cross_batch_patterns} />
+          <ResultHeader result={result} onNew={handleNewAnalysis} />
+          <SummarySection
+            summary={result.summary}
+            topMitigations={result.top_mitigations ?? []}
+            crossBatchPatterns={result.cross_batch_patterns}
+          />
           {result.type_summary.length > 0 && (
             <TypeSummarySection types={result.type_summary} />
           )}
-          <EventsSection events={result.events} sessionIds={result.session_ids} />
+          <EventsSection events={result.events} />
           <AnalysisMeta result={result} />
         </div>
       </div>
-      <div className="w-56 shrink-0 border-l border-zinc-800 bg-zinc-900/50 flex flex-col">
-        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 pb-1">
-          <History className="w-3.5 h-3.5 text-zinc-500" />
-          <span className="text-xs font-medium text-zinc-400">History</span>
-        </div>
-        <div className="flex-1 overflow-y-auto p-3 pt-1">
-          <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
-        </div>
-      </div>
+      {sidebar}
     </div>
   );
 }
@@ -522,11 +651,9 @@ function EmptyState({
 
 function ResultHeader({
   result,
-  onRerun,
   onNew,
 }: {
   result: FrictionAnalysisResult;
-  onRerun: () => void;
   onNew: () => void;
 }) {
   const eventCount = result.events.length;
@@ -550,54 +677,59 @@ function ResultHeader({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onNew}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700 rounded-md transition"
-        >
-          <Plus className="w-3 h-3" />
-          New
-        </button>
-        <button
-          onClick={onRerun}
-          className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700 rounded-md transition"
-        >
-          Re-run
-        </button>
-      </div>
+      <button
+        onClick={onNew}
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700 rounded-md transition"
+      >
+        <Plus className="w-3 h-3" />
+        New
+      </button>
     </div>
   );
 }
 
 function SummarySection({
   summary,
-  topMitigation,
+  topMitigations,
   crossBatchPatterns,
 }: {
   summary: string;
-  topMitigation: Mitigation | null;
+  topMitigations: Mitigation[];
   crossBatchPatterns?: string[];
 }) {
+  const hasPatterns = crossBatchPatterns && crossBatchPatterns.length > 0;
+
   return (
-    <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
-      <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
-      {crossBatchPatterns && crossBatchPatterns.length > 0 && (
-        <ul className="space-y-1 ml-4 list-disc">
-          {crossBatchPatterns.map((pattern, i) => (
-            <li key={i} className="text-xs text-zinc-300">{pattern}</li>
-          ))}
-        </ul>
-      )}
-      {topMitigation && (
-        <Tip text="The single highest-impact action to reduce friction across all analyzed sessions.">
-          <div className="flex items-start gap-3 bg-amber-900/15 border border-amber-700/30 rounded-lg px-5 py-4">
-            <Zap className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-300 mb-1">Top recommendation</p>
-              <MitigationCard mitigation={topMitigation} />
-            </div>
+    <div className="space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
+        <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+        {hasPatterns && (
+          <div className="border-t border-zinc-700/40 pt-3 space-y-2">
+            {crossBatchPatterns.map((pattern, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
+                <p className="text-sm text-zinc-200 leading-relaxed">{pattern}</p>
+              </div>
+            ))}
           </div>
-        </Tip>
+        )}
+      </div>
+      {topMitigations.length > 0 && (
+        <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
+          <Tip text="Highest-impact actions to reduce friction across all analyzed sessions.">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base font-semibold text-zinc-100">
+                Top Recommendation{topMitigations.length > 1 ? "s" : ""}
+              </h3>
+            </div>
+          </Tip>
+          <div className="space-y-2">
+            {topMitigations.map((m, i) => (
+              <MitigationCard key={i} mitigation={m} />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -667,48 +799,56 @@ function TypeCard({ type, maxCost }: { type: TypeSummary; maxCost: number }) {
 
 function EventsSection({
   events,
-  sessionIds,
 }: {
   events: FrictionEvent[];
-  sessionIds: string[];
 }) {
-  const eventsBySession = new Map<string, FrictionEvent[]>();
-  for (const sid of sessionIds) {
-    eventsBySession.set(sid, []);
-  }
+  // Group events by project_path instead of session
+  const eventsByProject = new Map<string, FrictionEvent[]>();
   for (const event of events) {
-    const list = eventsBySession.get(event.span_ref.session_id) ?? [];
+    const project = _extractProjectName(event);
+    const list = eventsByProject.get(project) ?? [];
     list.push(event);
-    eventsBySession.set(event.span_ref.session_id, list);
+    eventsByProject.set(project, list);
   }
 
   return (
     <div>
       <SectionTitle icon={<AlertTriangle className="w-5 h-5 text-amber-400" />} title="Friction Events" />
       <div className="space-y-3">
-        {[...eventsBySession.entries()]
-          .filter(([, evts]) => evts.length > 0)
+        {[...eventsByProject.entries()]
           .sort(([, a], [, b]) => {
             const maxA = Math.max(...a.map((e) => e.severity));
             const maxB = Math.max(...b.map((e) => e.severity));
             return maxB - maxA;
           })
-          .map(([sid, evts]) => (
-            <SessionEventGroup key={sid} sessionId={sid} events={evts} />
+          .map(([project, evts], groupIndex) => (
+            <ProjectEventGroup key={project} projectName={project} events={evts} isFirstGroup={groupIndex === 0} />
           ))}
       </div>
     </div>
   );
 }
 
-function SessionEventGroup({
-  sessionId,
+function _extractProjectName(event: FrictionEvent): string {
+  if (!event.project_path) {
+    return `Session ${event.span_ref.session_id.slice(0, 8)}`;
+  }
+  const parts = event.project_path.replace(/\/$/, "").split("/");
+  return parts[parts.length - 1] || event.project_path;
+}
+
+function ProjectEventGroup({
+  projectName,
   events,
+  isFirstGroup = false,
 }: {
-  sessionId: string;
+  projectName: string;
   events: FrictionEvent[];
+  isFirstGroup?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const sortedEvents = [...events].sort((a, b) => b.severity - a.severity);
+  const sessionCount = new Set(events.map((e) => e.span_ref.session_id)).size;
 
   return (
     <div className="border border-zinc-700/60 rounded-xl overflow-hidden">
@@ -722,16 +862,17 @@ function SessionEventGroup({
           <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
         )}
         <span className="text-sm font-medium text-zinc-200">
-          Session {sessionId.slice(0, SESSION_ID_SHORT)}
+          {projectName}
         </span>
         <span className="text-xs text-zinc-500">
           {events.length} event{events.length !== 1 ? "s" : ""}
+          {sessionCount > 1 && ` · ${sessionCount} sessions`}
         </span>
       </button>
       {expanded && (
         <div className="divide-y divide-zinc-700/60">
-          {events.map((event) => (
-            <EventCard key={event.friction_id} event={event} />
+          {sortedEvents.map((event, i) => (
+            <EventCard key={event.friction_id} event={event} defaultExpanded={isFirstGroup && i === 0} />
           ))}
         </div>
       )}
@@ -739,8 +880,8 @@ function SessionEventGroup({
   );
 }
 
-function EventCard({ event }: { event: FrictionEvent }) {
-  const [expanded, setExpanded] = useState(false);
+function EventCard({ event, defaultExpanded = false }: { event: FrictionEvent; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   const handleGoToStep = useCallback(
     (e: React.MouseEvent) => {
@@ -766,10 +907,15 @@ function EventCard({ event }: { event: FrictionEvent }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            {/* Tags row: severity + type + helpfulness + jump */}
+            {/* Tags row: severity + type + session + jump */}
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <SeverityBadge severity={event.severity} />
               <TypeBadge type={event.friction_type} />
+              <Tip text={`Session: ${event.span_ref.session_id}`}>
+                <span className="text-xs text-zinc-500 font-mono">
+                  {event.span_ref.session_id.slice(0, SESSION_ID_SHORT)}
+                </span>
+              </Tip>
               <button
                 onClick={handleGoToStep}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm text-zinc-400 hover:text-cyan-400 hover:bg-cyan-900/20 rounded transition"
@@ -820,15 +966,19 @@ function EventCard({ event }: { event: FrictionEvent }) {
 }
 
 function MitigationCard({ mitigation }: { mitigation: Mitigation }) {
-  const colorClass = ACTION_TYPE_COLORS[mitigation.action_type] ?? "bg-zinc-800/60 border-zinc-700/60 text-zinc-300";
+  const actionLabel = mitigation.action
+    || (mitigation.action_type
+      ? `${mitigation.action_type.replace(/_/g, " ")}${mitigation.target ? `: ${mitigation.target}` : ""}`
+      : "Action");
+  const colorClass = _actionColor(actionLabel);
 
   return (
     <div className="bg-zinc-900/60 border border-zinc-700/40 rounded-lg p-3">
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
-          {mitigation.action_type.replace(/_/g, " ")}
+      <div className="mb-2">
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-semibold border ${colorClass}`}>
+          <Wrench className="w-3.5 h-3.5" />
+          {actionLabel}
         </span>
-        <span className="text-xs text-zinc-400">{mitigation.target}</span>
       </div>
       <div className="flex items-start gap-2">
         <p className="text-sm text-zinc-200 font-mono leading-relaxed flex-1">
@@ -889,8 +1039,8 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 function TypeBadge({ type }: { type: string }) {
   return (
     <Tip text={`Friction type: "${type}" — a pattern of user dissatisfaction`}>
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm font-medium bg-amber-900/30 border border-amber-700/30 text-amber-300">
-        <Target className="w-4 h-4" />
+      <span className="inline-flex items-center gap-1.5 min-w-[10rem] px-2.5 py-1 rounded text-sm font-medium bg-amber-900/30 border border-amber-700/30 text-amber-300">
+        <Target className="w-4 h-4 shrink-0" />
         {type}
       </span>
     </Tip>
@@ -912,19 +1062,30 @@ function SeverityBadge({ severity }: { severity: number }) {
 
 function AnalysisMeta({ result }: { result: FrictionAnalysisResult }) {
   const computedDate = new Date(result.created_at);
-  const timeStr = isNaN(computedDate.getTime())
+  const dateStr = isNaN(computedDate.getTime())
     ? result.created_at
-    : computedDate.toLocaleString();
+    : computedDate.toLocaleDateString();
+  const timeStr = isNaN(computedDate.getTime())
+    ? ""
+    : computedDate.toLocaleTimeString();
 
   return (
     <Tip text="Inference backend, model, and estimated API cost for this analysis run">
-      <div className="border-t border-zinc-800 pt-4 text-xs text-zinc-500 flex items-center justify-between">
-        <span>
-          {result.backend_id}/{result.model}
-          {result.cost_usd != null && <> &middot; {formatCost(result.cost_usd)}</>}
-          {result.batch_count > 1 && <> &middot; {result.batch_count} batches</>}
-        </span>
-        <span>{timeStr}</span>
+      <div className="border-t border-zinc-800 pt-4 text-xs text-zinc-500 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span>{result.backend_id}/{result.model}</span>
+          {result.cost_usd != null && (
+            <span className="border-l border-zinc-700 pl-2">
+              {formatCost(result.cost_usd)}
+            </span>
+          )}
+          {result.batch_count > 1 && (
+            <span className="border-l border-zinc-700 pl-2">
+              {result.batch_count} batches
+            </span>
+          )}
+        </div>
+        <span className="shrink-0">{dateStr} {timeStr}</span>
       </div>
     </Tip>
   );
@@ -966,6 +1127,78 @@ function Tip({
           </div>,
           document.body,
         )}
+    </div>
+  );
+}
+
+function CostEstimateDialog({
+  estimate,
+  sessionCount,
+  onConfirm,
+  onCancel,
+}: {
+  estimate: FrictionEstimate;
+  sessionCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal onClose={onCancel} maxWidth="max-w-md">
+      <ModalHeader title="Confirm Analysis" onClose={onCancel} />
+      <ModalBody>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <InfoRow icon={<Layers className="w-3.5 h-3.5 text-violet-400" />} label="Sessions" value={String(sessionCount)} />
+            <InfoRow icon={<BarChart3 className="w-3.5 h-3.5 text-cyan-400" />} label="Batches" value={String(estimate.batch_count)} />
+            <InfoRow icon={<Hash className="w-3.5 h-3.5 text-zinc-400" />} label="Input tokens" value={formatTokens(estimate.total_input_tokens)} />
+            <InfoRow icon={<Hash className="w-3.5 h-3.5 text-zinc-400" />} label="Output budget" value={formatTokens(estimate.total_output_tokens_budget)} />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Model: {estimate.model}</span>
+          </div>
+          <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Coins className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-medium text-amber-200">
+                Estimated cost: {estimate.formatted_cost}
+              </span>
+            </div>
+            {!estimate.pricing_found && (
+              <p className="mt-1 text-xs text-amber-400/70">
+                Model not in pricing table — actual cost may vary.
+              </p>
+            )}
+          </div>
+        </div>
+      </ModalBody>
+      <ModalFooter>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700 rounded-md transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md transition"
+        >
+          <Play className="w-3 h-3" />
+          Run Analysis
+        </button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg">
+      {icon}
+      <div className="flex flex-col">
+        <span className="text-[10px] text-zinc-500">{label}</span>
+        <span className="text-xs text-zinc-200">{value}</span>
+      </div>
     </div>
   );
 }

@@ -17,8 +17,8 @@ from vibelens.llm.digest import digest_trajectory, select_depth
 from vibelens.llm.prompts import PROMPT_REGISTRY
 from vibelens.llm.tokenizer import count_tokens
 from vibelens.models.analysis.insights import InsightReport
-from vibelens.models.analysis.prompts import AnalysisPrompt
 from vibelens.models.inference import BackendType, InferenceRequest
+from vibelens.models.prompts import AnalysisPrompt
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.upload_visibility import is_session_visible
 from vibelens.utils.log import get_logger

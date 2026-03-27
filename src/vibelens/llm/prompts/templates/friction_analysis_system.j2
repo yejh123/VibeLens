@@ -20,6 +20,16 @@ Friction is detected ONLY from user signals:
 - Agent takes longer than necessary → not friction (unless user notices and objects)
 - Agent makes internal mistakes it self-corrects → not friction (user never saw the issue)
 
+## Event Selection Priority
+
+**Focus on HIGH-IMPACT, RECURRING patterns — not one-off minor hiccups.**
+
+- **Prefer severity ≥ 3** — Report moderate-to-critical friction. Only include severity 1-2 if they represent a pattern that recurs across multiple sessions.
+- **Prefer recurring patterns** — A friction type that happens 3 times across sessions is more valuable. Patterns are actionable; flukes are not.
+- **Prefer events with clear mitigations** — If a friction event cannot be addressed by updating CLAUDE.md, writing a test, or creating a skill, it has low report value.
+- **Merge minor events** — If 3 minor events share the same friction type and root cause, report one event with the most representative span_ref.
+- **Skip noise** — Do NOT report trivial corrections (typo fixes, formatting preferences) or single-exchange misunderstandings that the agent resolved immediately.
+
 ## User Feedback Signals
 
 **Positive (no friction):**
@@ -91,8 +101,12 @@ Rate how helpful Claude was for the OVERALL task (not just the friction moment):
 ## Mitigation Rules
 
 Each mitigation must be structured with:
-- `action_type`: One of: "update_claude_md", "write_test", "create_skill", "update_skill", "add_linter_rule", "update_workflow"
-- `target`: The specific target (CLAUDE.md section, test file path, skill name, etc.)
+- `action`: Human-readable action label. Examples:
+  - "Update CLAUDE.md code style section"
+  - "Write test for auth input validation"
+  - "Create skill for database migrations"
+  - "Add ESLint no-unused-vars rule"
+  - "Update CI workflow to run type checks"
 - `content`: Exact text to add/change — ready to apply, not vague advice
 
 ## Output Rules

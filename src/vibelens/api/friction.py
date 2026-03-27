@@ -8,8 +8,8 @@ from vibelens.models.analysis.friction import (
     FrictionAnalysisRequest,
     FrictionAnalysisResult,
 )
-from vibelens.schemas.friction import FrictionMeta
-from vibelens.services.friction.analysis import analyze_friction
+from vibelens.schemas.friction import FrictionEstimateResponse, FrictionMeta
+from vibelens.services.friction.analysis import analyze_friction, estimate_friction
 from vibelens.services.mock import build_mock_friction_result
 from vibelens.utils.log import get_logger
 
@@ -50,6 +50,40 @@ async def friction_analysis(
             status_code=500,
             detail=f"Internal error: {type(exc).__name__}: {exc}",
         ) from exc
+
+
+@router.post("/friction/estimate")
+async def friction_estimate(
+    body: FrictionAnalysisRequest, x_session_token: str | None = Header(None)
+) -> FrictionEstimateResponse:
+    """Pre-flight cost estimate for friction analysis.
+
+    Args:
+        body: Request with session IDs.
+        x_session_token: Browser tab token for upload scoping.
+
+    Returns:
+        Cost estimate with model info and token counts.
+    """
+    if not body.session_ids:
+        raise HTTPException(status_code=400, detail="session_ids must not be empty")
+
+    try:
+        est = estimate_friction(body.session_ids, session_token=x_session_token)
+    except ValueError as exc:
+        status = 503 if "inference backend" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+    return FrictionEstimateResponse(
+        model=est.model,
+        batch_count=est.batch_count,
+        total_input_tokens=est.total_input_tokens,
+        total_output_tokens_budget=est.total_output_tokens_budget,
+        cost_min_usd=est.cost_min_usd,
+        cost_max_usd=est.cost_max_usd,
+        pricing_found=est.pricing_found,
+        formatted_cost=est.formatted_cost,
+    )
 
 
 @router.get("/friction/history")

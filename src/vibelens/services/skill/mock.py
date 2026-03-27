@@ -7,7 +7,9 @@ recommendations, using real step IDs from loaded trajectories.
 from datetime import UTC, datetime
 
 from vibelens.deps import get_central_skill_store, get_store
-from vibelens.models.analysis.skills import (
+from vibelens.models.analysis.step_ref import StepRef
+from vibelens.models.inference import BackendType
+from vibelens.models.skill.skills import (
     SkillAnalysisResult,
     SkillCreation,
     SkillEvolutionSuggestion,
@@ -15,8 +17,6 @@ from vibelens.models.analysis.skills import (
     SkillRecommendation,
     WorkflowPattern,
 )
-from vibelens.models.analysis.step_ref import StepRef
-from vibelens.models.inference import BackendType
 
 
 def build_mock_skill_result(session_ids: list[str], mode: SkillMode) -> SkillAnalysisResult:

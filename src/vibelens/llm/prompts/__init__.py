@@ -9,7 +9,7 @@ from vibelens.llm.prompts.insights import FRICTION_PROMPT, HIGHLIGHTS_PROMPT
 from vibelens.llm.prompts.skill_creation import SKILL_CREATION_PROMPT
 from vibelens.llm.prompts.skill_evolution import SKILL_EVOLUTION_PROMPT
 from vibelens.llm.prompts.skill_retrieval import SKILL_RETRIEVAL_PROMPT
-from vibelens.models.analysis.prompts import AnalysisPrompt
+from vibelens.models.prompts import AnalysisPrompt
 
 PROMPT_REGISTRY: dict[str, AnalysisPrompt] = {
     HIGHLIGHTS_PROMPT.task_id: HIGHLIGHTS_PROMPT,

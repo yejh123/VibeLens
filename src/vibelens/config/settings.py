@@ -115,7 +115,8 @@ class Settings(BaseSettings):
         description=(
             "Maximum input token budget for session contexts in one LLM batch. "
             "Prompt overhead (system prompt, schema, template) is computed dynamically "
-            "and subtracted automatically. Increase for models with larger context windows."
+            "and subtracted automatically. Most models support 128K-200K context; "
+            "80K leaves ample room for system prompt + output."
         ),
     )
 

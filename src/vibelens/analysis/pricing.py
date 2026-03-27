@@ -7,7 +7,7 @@ are defined here.
 
 from vibelens.llm.normalizer import normalize_model_name
 from vibelens.llm.pricing import PRICING_TABLE, TOKENS_PER_MTOK, lookup_pricing
-from vibelens.models.analysis.pricing import ModelPricing
+from vibelens.models.pricing import ModelPricing
 from vibelens.models.trajectories.step import Step
 from vibelens.models.trajectories.trajectory import Trajectory
 

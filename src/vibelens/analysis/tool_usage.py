@@ -7,7 +7,7 @@ across trajectories for the dashboard tool usage breakdown.
 from collections import defaultdict
 
 from vibelens.ingest.parsers.base import is_error_content
-from vibelens.models.analysis.dashboard import ToolUsageStat
+from vibelens.models.dashboard.dashboard import ToolUsageStat
 from vibelens.models.trajectories import Step, Trajectory
 
 

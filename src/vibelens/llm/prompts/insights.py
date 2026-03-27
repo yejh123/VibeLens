@@ -1,7 +1,7 @@
 """Prompt instances for session highlights and friction analysis."""
 
 from vibelens.models.analysis.insights import FrictionReport, SessionHighlights
-from vibelens.models.analysis.prompts import AnalysisPrompt, load_template
+from vibelens.models.prompts import AnalysisPrompt, load_template
 
 HIGHLIGHTS_PROMPT = AnalysisPrompt(
     task_id="highlights",

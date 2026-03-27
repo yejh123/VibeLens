@@ -5,8 +5,8 @@ existing skills from a pre-built candidate list. Uses SkillLLMOutput
 as the output model.
 """
 
-from vibelens.models.analysis.prompts import AnalysisPrompt, load_template
-from vibelens.models.analysis.skills import SkillLLMOutput
+from vibelens.models.prompts import AnalysisPrompt, load_template
+from vibelens.models.skill.skills import SkillLLMOutput
 
 SKILL_RETRIEVAL_PROMPT = AnalysisPrompt(
     task_id="skill_retrieval",

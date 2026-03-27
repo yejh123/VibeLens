@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from vibelens.models.analysis.dashboard import DashboardStats, SessionAnalytics, ToolUsageStat
+from vibelens.models.dashboard.dashboard import DashboardStats, SessionAnalytics, ToolUsageStat
 from vibelens.services.dashboard_service import (
     get_dashboard_stats,
     get_session_analytics,

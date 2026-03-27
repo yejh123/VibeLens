@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from vibelens.models.analysis.skills import SkillMode
+from vibelens.models.skill.skills import SkillMode
 
 
 class SkillWriteRequest(BaseModel):

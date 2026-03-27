@@ -231,9 +231,10 @@ export interface StepRef {
 }
 
 export interface Mitigation {
-  action_type: string;
-  target: string;
+  action: string;
   content: string;
+  action_type?: string;
+  target?: string;
 }
 
 export interface FrictionEvent {
@@ -246,6 +247,7 @@ export interface FrictionEvent {
   claude_helpfulness: number;
   mitigations: Mitigation[];
   estimated_cost: FrictionCost;
+  project_path?: string | null;
 }
 
 export interface TypeSummary {
@@ -262,7 +264,7 @@ export interface FrictionAnalysisResult {
   title?: string | null;
   events: FrictionEvent[];
   summary: string;
-  top_mitigation: Mitigation | null;
+  top_mitigations: Mitigation[];
   type_summary: TypeSummary[];
   cross_batch_patterns?: string[];
   session_ids: string[];
@@ -284,6 +286,17 @@ export interface FrictionMeta {
   model: string;
   cost_usd: number | null;
   batch_count: number;
+}
+
+export interface FrictionEstimate {
+  model: string;
+  batch_count: number;
+  total_input_tokens: number;
+  total_output_tokens_budget: number;
+  cost_min_usd: number;
+  cost_max_usd: number;
+  pricing_found: boolean;
+  formatted_cost: string;
 }
 
 export interface LLMStatus {

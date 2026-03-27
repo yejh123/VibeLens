@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.9.6] - 2026-03-27
+
+### Added
+- **Pre-flight cost estimation**: New `POST /friction/estimate` endpoint and `CostEstimateDialog` modal show estimated LLM cost (min/max range) before running friction analysis. Users must confirm before incurring charges.
+- **Onboarding dialog**: Two-step welcome guide on first visit covering privacy guarantees and LLM cost transparency. Shown once per browser (`localStorage`), re-triggerable from Settings.
+- **Cost estimator module**: `llm/cost_estimator.py` computes input/output token costs with optimistic/pessimistic output ratios and synthesis call estimates.
+- **Session ID remapping**: `IdMapping` and `_IndexTracker` in context extraction replace verbose UUIDs with 0-indexed integers in LLM prompts, reducing token usage. `_resolve_synthetic_ids()` converts back after inference.
+- **User prompt truncation**: Long user prompts (>2000 chars) are truncated to head (1500) + `[...truncated...]` + tail (500) to save tokens.
+- **Compaction interleaving**: Compaction summaries are inserted at their chronological position among steps instead of being grouped at the top, giving the LLM better temporal context.
+- **Step-boundary session splitting**: Oversized sessions that exceed the batch token budget are split at `[step_id=...]` boundaries with the session header preserved on each part.
+- **Affinity-based batch packing**: Session batcher seeds each batch then greedily fills by project affinity and time proximity, keeping related sessions together.
+
+### Changed
+- **Mitigation model simplified**: `action_type` + `target` fields replaced with a single `action` label (e.g., "Update CLAUDE.md code style section"). Backward-compatible `model_validator` migrates old data.
+- **Multiple top mitigations**: `top_mitigation` (singular) → `top_mitigations` (list of up to 3), ranked by batch severity and deduplicated by content.
+- **Friction events grouped by project**: UI groups events by project name instead of session ID, with per-group session count display.
+- **Prompt quality**: Max events per batch reduced from 7 to 5 with minimum severity 2 threshold. Added recurring-pattern prioritization, merge instructions for same-type events, and noise filtering guidance.
+- **Models reorganized**: Moved `models/analysis/dashboard.py` → `models/dashboard/`, `models/analysis/pricing.py` → `models/pricing.py`, `models/analysis/prompts.py` → `models/prompts.py`, `models/analysis/skills.py` → `models/skill/skills.py`. Imports unchanged via re-exports.
+- **Tests reorganized**: Friction tests moved to `tests/friction/` subdirectory. Expanded session batcher tests covering affinity packing, chain preservation, and step-boundary splitting.
+
+### UI
+- **Mitigation tags enlarged and highlighted**: Bigger tags (`text-sm font-semibold`) with vivid colors — violet for CLAUDE.md, emerald for tests, cyan for skills, amber for linting, rose for workflows, teal default.
+- **First friction event auto-expanded**: The highest-severity event in the first project group starts expanded, matching the skill panel pattern.
+- **Resizable history sidebar**: Drag-to-resize (180–400px range) with collapse/expand toggle buttons.
+- **Cost confirmation dialog**: Modal with session count, batch count, token breakdown, model name, and estimated cost range before analysis runs.
+- **Event cards**: Inline session ID badge, "Jump" button to open step in new tab, project-grouped layout sorted by max severity.
+
 ## [0.9.5] - 2026-03-26
 
 ### Added
