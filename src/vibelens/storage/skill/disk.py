@@ -1,7 +1,7 @@
-"""Claude Code skill storage backend (~/.claude/skills/).
+"""Disk-based skill storage for agents using SKILL.md format.
 
-Directory layout:
-    ~/.claude/skills/
+Directory layout (shared across all agents):
+    <skills_dir>/
     ├── my-skill/
     │   ├── SKILL.md         (YAML frontmatter + markdown body)
     │   ├── scripts/         (optional)
@@ -9,6 +9,11 @@ Directory layout:
     │   └── agents/          (optional)
     └── another-skill/
         └── SKILL.md
+
+Used directly for Claude Code, Cursor, Gemini CLI, and all other agents
+that follow the standard skills/<name>/SKILL.md layout. Subclassed by
+CodexSkillStore (adds .system/ scanning) and CentralSkillStore (adds
+source metadata injection).
 """
 
 import shutil
@@ -32,25 +37,26 @@ KNOWN_SUBDIRS = ("scripts", "references", "agents", "assets")
 FRONTMATTER_DELIMITER = "---"
 
 
-class ClaudeCodeSkillStore(SkillStore):
-    """Skill storage for Claude Code (~/.claude/skills/).
+class DiskSkillStore(SkillStore):
+    """Concrete skill store backed by a directory of SKILL.md files.
 
-    Scans skill directories, parses YAML frontmatter from SKILL.md,
-    and detects optional subdirectories (scripts, references, agents, assets).
+    Constructor takes both skills_dir and source_type so any agent
+    can be represented by a plain DiskSkillStore instance.
     """
 
-    def __init__(self, skills_dir: Path) -> None:
+    def __init__(self, skills_dir: Path, source_type: SkillSourceType) -> None:
         super().__init__()
         self._skills_dir = skills_dir.expanduser().resolve()
+        self._source_type = source_type
 
     @property
     def source_type(self) -> SkillSourceType:
-        """Unified source/store type for Claude Code."""
-        return SkillSourceType.CLAUDE_CODE
+        """Return the agent-specific source type."""
+        return self._source_type
 
     @property
     def skills_dir(self) -> Path:
-        """Return the root directory for Claude Code skills."""
+        """Return the root directory for this store's skills."""
         return self._skills_dir
 
     def list_skills(self) -> list[SkillInfo]:
@@ -63,16 +69,13 @@ class ClaudeCodeSkillStore(SkillStore):
         for entry in sorted(self._skills_dir.iterdir()):
             if not entry.is_dir():
                 continue
-
-            skill_file = entry / SKILL_FILENAME
-            if not skill_file.is_file():
-                continue
-
             name = entry.name
             if not VALID_SKILL_NAME.match(name):
                 logger.debug("Skipping non-kebab-case skill dir: %s", name)
                 continue
-
+            skill_file = entry / SKILL_FILENAME
+            if not skill_file.is_file():
+                continue
             info = self._build_skill_info(name, entry, skill_file)
             if info:
                 skills.append(info)
@@ -81,7 +84,9 @@ class ClaudeCodeSkillStore(SkillStore):
         return skills
 
     def get_skill(self, name: str) -> SkillInfo | None:
-        """Look up a single skill by name."""
+        """Look up a single skill by directory name."""
+        if not VALID_SKILL_NAME.match(name):
+            return None
         skill_dir = self._skills_dir / name
         skill_file = skill_dir / SKILL_FILENAME
         if not skill_file.is_file():
@@ -89,7 +94,7 @@ class ClaudeCodeSkillStore(SkillStore):
         return self._build_skill_info(name, skill_dir, skill_file)
 
     def read_content(self, name: str) -> str | None:
-        """Read the full SKILL.md content."""
+        """Read the full SKILL.md content for a named skill."""
         skill_file = self._skills_dir / name / SKILL_FILENAME
         if not skill_file.is_file():
             return None
@@ -141,11 +146,10 @@ class ClaudeCodeSkillStore(SkillStore):
             logger.warning("Cannot read %s: %s", skill_file, exc)
             return None
 
-        frontmatter = _parse_frontmatter(text)
+        frontmatter = parse_frontmatter(text)
 
-        # Extract known fields, put the rest in metadata
         description = str(frontmatter.pop("description", ""))
-        allowed_tools = _parse_allowed_tools(frontmatter.pop("allowed-tools", None))
+        allowed_tools = parse_allowed_tools(frontmatter.pop("allowed-tools", None))
         frontmatter.pop("name", None)  # already using directory name
 
         return SkillInfo(
@@ -157,7 +161,7 @@ class ClaudeCodeSkillStore(SkillStore):
             metadata={
                 **frontmatter,
                 "allowed_tools": allowed_tools,
-                "subdirs": _detect_subdirs(skill_dir),
+                "subdirs": detect_subdirs(skill_dir),
                 "store_path": str(skill_dir),
                 "line_count": text.count("\n") + 1,
             },
@@ -165,7 +169,7 @@ class ClaudeCodeSkillStore(SkillStore):
         )
 
 
-def _parse_frontmatter(text: str) -> dict:
+def parse_frontmatter(text: str) -> dict:
     """Extract YAML frontmatter from a SKILL.md file.
 
     Expects the file to start with '---' followed by YAML, closed by '---'.
@@ -193,10 +197,10 @@ def _parse_frontmatter(text: str) -> dict:
         return {}
 
 
-def _parse_allowed_tools(raw: str | list | None) -> list[str]:
+def parse_allowed_tools(raw: str | list | None) -> list[str]:
     """Normalize allowed-tools from frontmatter into a list of tool names.
 
-    Handles both comma-separated strings and lists.
+    Handles both comma-separated strings and YAML lists.
     """
     if raw is None:
         return []
@@ -205,6 +209,16 @@ def _parse_allowed_tools(raw: str | list | None) -> list[str]:
     return [t.strip() for t in str(raw).split(",") if t.strip()]
 
 
-def _detect_subdirs(skill_dir: Path) -> list[str]:
+def detect_subdirs(skill_dir: Path) -> list[str]:
     """Return which KNOWN_SUBDIRS exist in the skill directory."""
     return [name for name in KNOWN_SUBDIRS if (skill_dir / name).is_dir()]
+
+
+def extract_body(text: str) -> str:
+    """Extract the markdown body after the YAML frontmatter."""
+    if not text.startswith(FRONTMATTER_DELIMITER):
+        return text
+    end_idx = text.find(FRONTMATTER_DELIMITER, len(FRONTMATTER_DELIMITER))
+    if end_idx < 0:
+        return text
+    return text[end_idx + len(FRONTMATTER_DELIMITER) :]

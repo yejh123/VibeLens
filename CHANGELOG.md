@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.8] - 2026-03-28
+
+### Added
+- **Multi-agent skill stores**: Added 9 new agent interfaces (Cursor, OpenCode, Antigravity, Kimi CLI, OpenClaw, OpenHands, Qwen Code, Gemini CLI, GitHub Copilot) with skill directory scanning and auto-import into the central store on startup.
+- **Agent skill registry**: `AGENT_SKILL_REGISTRY` maps each agent to its default skills directory. Only agents installed on disk are activated.
+
+### Changed
+- **Skill storage refactored**: Replaced `ClaudeCodeSkillStore` hierarchy with `DiskSkillStore` as the shared concrete base. All agent stores are now parallel peers — Claude Code and third-party agents are plain `DiskSkillStore` instances, `CodexSkillStore` and `CentralSkillStore` extend it for agent-specific behavior.
+- **AgentType expanded**: Added 9 skill-only agent types. `SkillSourceType` mirrors all `AgentType` values, keeping a single source of truth.
+
+### Removed
+- `claude_code.py` — logic moved to `disk.py`.
+- `AgentSkillStore` class — replaced by plain `DiskSkillStore` instances.
+
 ## [0.9.7] - 2026-03-27
 
 ### Changed

@@ -8,13 +8,26 @@ from vibelens.models.enums import AgentType
 
 
 class SkillSourceType(StrEnum):
-    """Unified source/store type for skills."""
+    """Unified source/store type for skills.
+
+    Every AgentType member is mirrored here, plus CENTRAL and URL.
+    When adding a new agent to AgentType, add a matching line here.
+    """
 
     CLAUDE_CODE = AgentType.CLAUDE_CODE
     CODEX = AgentType.CODEX
     GEMINI = AgentType.GEMINI
     DATACLAW = AgentType.DATACLAW
     PARSED = AgentType.PARSED
+    CURSOR = AgentType.CURSOR
+    OPENCODE = AgentType.OPENCODE
+    ANTIGRAVITY = AgentType.ANTIGRAVITY
+    KIMI_CLI = AgentType.KIMI_CLI
+    OPENCLAW = AgentType.OPENCLAW
+    OPENHANDS = AgentType.OPENHANDS
+    QWEN_CODE = AgentType.QWEN_CODE
+    GEMINI_CLI = AgentType.GEMINI_CLI
+    GITHUB_COPILOT = AgentType.GITHUB_COPILOT
     CENTRAL = "central"
     URL = "url"
 

@@ -24,6 +24,7 @@ _friction_store = None
 _skill_store = None
 _central_skill_store = None
 _codex_skill_store = None
+_agent_skill_stores = None
 _skill_analysis_store = None
 _inference_backend: InferenceBackend | None = None
 _inference_checked = False
@@ -70,12 +71,13 @@ def get_friction_store():
 
 
 def get_skill_store():
-    """Return cached ClaudeCodeSkillStore singleton."""
-    from vibelens.storage.skill.claude_code import ClaudeCodeSkillStore
+    """Return cached Claude Code skill store singleton."""
+    from vibelens.models.skill import SkillSourceType
+    from vibelens.storage.skill.disk import DiskSkillStore
 
     global _skill_store
     if _skill_store is None:
-        _skill_store = ClaudeCodeSkillStore(get_settings().skills_dir)
+        _skill_store = DiskSkillStore(get_settings().skills_dir, SkillSourceType.CLAUDE_CODE)
     return _skill_store
 
 
@@ -97,6 +99,19 @@ def get_central_skill_store():
     if _central_skill_store is None:
         _central_skill_store = CentralSkillStore(get_settings().managed_skills_dir)
     return _central_skill_store
+
+
+def get_agent_skill_stores() -> list:
+    """Return cached list of third-party agent skill stores.
+
+    Only includes agents whose skills directories exist on disk.
+    """
+    from vibelens.storage.skill.agent import create_agent_skill_stores
+
+    global _agent_skill_stores
+    if _agent_skill_stores is None:
+        _agent_skill_stores = create_agent_skill_stores()
+    return _agent_skill_stores
 
 
 def get_skill_analysis_store():

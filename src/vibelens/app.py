@@ -13,6 +13,7 @@ from vibelens import __version__
 from vibelens.api import build_router
 from vibelens.config import load_settings
 from vibelens.deps import (
+    get_agent_skill_stores,
     get_central_skill_store,
     get_codex_skill_store,
     get_skill_analysis_store,
@@ -92,12 +93,16 @@ def _lightweight_startup(settings) -> None:
 def _load_agent_skills_into_central_store() -> None:
     """Import skills from all agent interfaces into the central store on startup.
 
-    Scans Claude Code (~/.claude/skills/) and Codex (~/.codex/skills/) stores,
+    Scans Claude Code, Codex, and all third-party agent skill directories,
     copying any skills not already present in the central repository (~/.vibelens/skills/).
     Existing central skills are never overwritten to preserve user edits.
     """
     central = get_central_skill_store()
-    agent_stores = [("claude_code", get_skill_store()), ("codex", get_codex_skill_store())]
+    agent_stores = [
+        ("claude_code", get_skill_store()),
+        ("codex", get_codex_skill_store()),
+        *((s.source_type.value, s) for s in get_agent_skill_stores()),
+    ]
     total_imported = 0
     for label, store in agent_stores:
         try:

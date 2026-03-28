@@ -4,13 +4,26 @@ from enum import StrEnum
 
 
 class AgentType(StrEnum):
-    """Supported agent CLI types."""
+    """Known agent CLI types.
+
+    Includes both trajectory-parsed agents (claude_code, codex, gemini, dataclaw)
+    and skill-only agents (cursor, opencode, etc.) that we scan for installed skills.
+    """
 
     CLAUDE_CODE = "claude_code"
     CODEX = "codex"
     GEMINI = "gemini"
     DATACLAW = "dataclaw"
     PARSED = "parsed"
+    CURSOR = "cursor"
+    OPENCODE = "opencode"
+    ANTIGRAVITY = "antigravity"
+    KIMI_CLI = "kimi_cli"
+    OPENCLAW = "openclaw"
+    OPENHANDS = "openhands"
+    QWEN_CODE = "qwen_code"
+    GEMINI_CLI = "gemini_cli"
+    GITHUB_COPILOT = "github_copilot"
 
 
 class StepSource(StrEnum):

@@ -91,10 +91,7 @@ async def analyze_retrieval(
 
 
 def _render_retrieval_prompt(
-    prompt: AnalysisPrompt,
-    digest: str,
-    session_count: int,
-    installed_skills: list[dict],
+    prompt: AnalysisPrompt, digest: str, session_count: int, installed_skills: list[dict]
 ) -> str:
     """Render retrieval-specific user prompt with skill candidates."""
     output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)

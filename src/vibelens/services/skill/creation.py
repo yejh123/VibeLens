@@ -73,10 +73,7 @@ async def analyze_creation(
 
 
 def _render_creation_prompt(
-    prompt: AnalysisPrompt,
-    digest: str,
-    session_count: int,
-    installed_skills: list[dict],
+    prompt: AnalysisPrompt, digest: str, session_count: int, installed_skills: list[dict]
 ) -> str:
     """Render creation-specific user prompt."""
     output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)
