@@ -32,9 +32,10 @@ const AUTO_EXPAND_LINE_THRESHOLD = 20;
 
 interface StepBlockProps {
   step: Step;
+  concise?: boolean;
 }
 
-export function StepBlock({ step }: StepBlockProps) {
+export function StepBlock({ step, concise }: StepBlockProps) {
   if (step.source === "system") {
     return <SystemStep step={step} />;
   }
@@ -48,7 +49,7 @@ export function StepBlock({ step }: StepBlockProps) {
     return <UserStep step={step} />;
   }
   if (step.source === "agent") {
-    return <AgentStep step={step} />;
+    return <AgentStep step={step} concise={concise} />;
   }
   return null;
 }
@@ -142,18 +143,18 @@ function AutoPromptStep({ step }: { step: Step }) {
     <div className="max-w-[85%]">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors bg-violet-500/10 hover:bg-violet-500/15 text-violet-300 border-violet-500/25"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm border transition-colors bg-teal-500/15 hover:bg-teal-500/20 text-teal-200 border-teal-400/30"
       >
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <ScrollText className="w-4 h-4" />
-        <span className="font-medium">Auto</span>
+        <span className="font-medium">Plan</span>
         {!open && (
-          <span className="text-violet-400/80 truncate max-w-[250px] ml-0.5">{firstLine}</span>
+          <span className="text-teal-300/80 truncate max-w-[250px] ml-0.5">{firstLine}</span>
         )}
       </button>
       {open && (
-        <div className="mt-1 bg-violet-500/5 border border-violet-500/20 rounded-lg p-3">
-          <pre className="text-xs text-violet-200/70 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+        <div className="mt-1 bg-teal-950/40 border border-teal-500/25 rounded-lg p-3">
+          <pre className="text-xs text-teal-100/80 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
             {text}
           </pre>
         </div>
@@ -162,7 +163,19 @@ function AutoPromptStep({ step }: { step: Step }) {
   );
 }
 
-function AgentStep({ step }: { step: Step }) {
+function AgentStep({ step, concise }: { step: Step; concise?: boolean }) {
+  // Concise mode: render only the text message, skip thinking/tools
+  if (concise) {
+    if (!step.message || (typeof step.message === "string" && !step.message.trim())) {
+      return null;
+    }
+    return (
+      <div className="space-y-1">
+        <TextBlock content={step.message} />
+      </div>
+    );
+  }
+
   // Build observation results indexed by source_call_id for pairing
   const obsMap = new Map<string, ObservationResult>();
   if (step.observation) {

@@ -226,11 +226,7 @@ def test_extra_flag_required_for_compaction():
 def test_summarize_tool_args():
     """Tool args are summarized per tool-specific rules."""
     # Edit: show file_path only
-    edit_args = {
-        "file_path": "src/foo.py",
-        "old_string": "xxx",
-        "new_string": "yyy",
-    }
+    edit_args = {"file_path": "src/foo.py", "old_string": "xxx", "new_string": "yyy"}
     assert "file_path=src/foo.py" in _summarize_tool_args("Edit", edit_args)
 
     # Bash: show command (truncated)

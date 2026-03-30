@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.11] - 2026-03-29
+
+### Added
+- **Anonymize test suite**: 97 tests in `tests/ingest/anonymize/` covering patterns, path hasher, redactor, traversal, rule anonymizer, and stubs. Full coverage of credential/PII detection, camelCase name variant derivation, path hashing, and deep trajectory tree walking.
+- **Batch anonymization script**: `scripts/anonymize_sessions.py` CLI for batch-anonymizing all local Claude Code sessions with dry-run and output modes, per-file error handling, and summary reporting.
+- **Anonymization report**: `docs/reports/anonymization-report.md` documenting two-round batch testing across 309 sessions with zero-leak verification.
+- **Concise view mode**: New "Concise" toggle in session viewer strips tool calls and thinking blocks, showing only user prompts and agent text responses for quick conversation overview.
+- **Plan step navigation**: Auto-prompt steps (plan mode) now appear in the prompt nav panel with teal-colored Plan badges and previews instead of being hidden.
+
+### Fixed
+- **camelCase name variant anonymization**: `PathHasher` now splits camelCase usernames (e.g. `JohnDoe`) into name parts and derives space/underscore/hyphen-separated variants with case variations. Eliminates username leaks in author fields, filenames, and free text. Path anonymization coverage increased 38% in batch testing.
+- **Partial parse failure handling**: `scripts/anonymize_sessions.py` now handles file-level parse failures independently — sub-agent files are still processed when the main session file fails.
+
+### Changed
+- **Test directory reorganized**: Moved misplaced test files to mirror `src/` structure — `tests/llm/` for cost estimator and pricing, `tests/services/` for context extraction and session batcher. Added missing `tests/friction/__init__.py`.
+- **Sidebar redesigned**: Donate button promoted to top of session list with full-width styling. Download button moved to footer alongside pagination. View mode toggle (Project/Time) compacted into a single switch button. Upload toolbar only renders in demo mode.
+- **Tab styling refreshed**: Main navigation tabs use distinct accent colors with inner shadow — indigo for Browse, cyan for Analyze, amber for Pain Points, teal for Personalization. "Friction" tab renamed to "Pain Points", "Skills" tab renamed to "Personalization".
+- **Auto-prompt styling**: Auto-prompt steps restyled from violet to teal with "Plan" label replacing "Auto".
+
 ## [0.9.10] - 2026-03-29
 
 ### Added

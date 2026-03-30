@@ -1,9 +1,7 @@
 import {
   Menu,
   PanelLeftClose,
-  Download,
   FileUp,
-  Heart,
   Settings,
   Share2,
 } from "lucide-react";
@@ -56,6 +54,7 @@ export function useAppContext(): AppContextValue {
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sessions, setSessions] = useState<Trajectory[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const [projects, setProjects] = useState<string[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -150,6 +149,7 @@ export function App() {
   }, [fetchWithToken, refreshKey]);
 
   useEffect(() => {
+    setSessionsLoading(true);
     fetchWithToken(`/api/sessions`)
       .then((r) => r.json())
       .then((data: Trajectory[]) => {
@@ -158,7 +158,8 @@ export function App() {
           setSelectedSessionId(data[0].session_id);
         }
       })
-      .catch((err) => console.error("Failed to load sessions:", err));
+      .catch((err) => console.error("Failed to load sessions:", err))
+      .finally(() => setSessionsLoading(false));
   }, [refreshKey, fetchWithToken]);
 
   // Derive unique agent names from loaded sessions, filtered by config
@@ -381,37 +382,19 @@ export function App() {
               </button>
             </div>
 
-            {/* Toolbar */}
-            <div className={`shrink-0 border-b border-zinc-800 px-3 py-2.5 grid gap-2 text-xs text-zinc-400 ${appMode === "demo" ? "grid-cols-3" : "grid-cols-2"}`}>
-              {appMode === "demo" && (
+            {/* Upload toolbar (demo mode only) */}
+            {appMode === "demo" && (
+              <div className="shrink-0 border-b border-zinc-800 px-3 py-2.5">
                 <button
                   onClick={() => setShowUploadDialog(true)}
-                  className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded transition"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded transition"
                   title="Upload conversation files"
                 >
                   <FileUp className="w-3.5 h-3.5" />
                   Upload
                 </button>
-              )}
-              <button
-                onClick={handleDownloadClick}
-                disabled={checkedIds.size === 0}
-                className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded transition disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download selected sessions as zip"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download
-              </button>
-              <button
-                onClick={handleDonateClick}
-                disabled={checkedIds.size === 0}
-                className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white rounded transition disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Donate selected sessions for research"
-              >
-                <Heart className="w-3.5 h-3.5" />
-                Donate
-              </button>
-            </div>
+              </div>
+            )}
 
             <SessionList
               sessions={sessions}
@@ -424,8 +407,13 @@ export function App() {
               agentFilter={agentFilter}
               onAgentFilterChange={setAgentFilter}
               availableAgents={availableAgents}
+              onDonate={handleDonateClick}
+              donateDisabled={checkedIds.size === 0}
+              onDownload={handleDownloadClick}
+              downloadDisabled={checkedIds.size === 0}
+              checkedCount={checkedIds.size}
+              loading={sessionsLoading}
             />
-
           </aside>
         )}
 
@@ -448,7 +436,7 @@ export function App() {
                 title="Browse individual agent sessions — view step-by-step conversation flow, tool calls, and observations"
                 className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                   mainView === "browse"
-                    ? "bg-cyan-600/20 text-cyan-300 border border-cyan-500/30"
+                    ? "bg-indigo-600/30 text-indigo-200 border border-indigo-400/40 shadow-sm shadow-indigo-900/40"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                 }`}
               >
@@ -459,7 +447,7 @@ export function App() {
                 title="Aggregate analytics dashboard — session stats, tool usage patterns, cost breakdown, and timeline charts"
                 className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                   mainView === "analyze"
-                    ? "bg-cyan-600/20 text-cyan-300 border border-cyan-500/30"
+                    ? "bg-cyan-600/30 text-cyan-200 border border-cyan-400/40 shadow-sm shadow-cyan-900/40"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                 }`}
               >
@@ -467,25 +455,25 @@ export function App() {
               </button>
               <button
                 onClick={() => setMainView("friction")}
-                title="LLM-powered friction analysis — identify wasted effort, root causes, and CLAUDE.md suggestions across sessions"
+                title="Identify wasted effort, root causes, and CLAUDE.md suggestions across sessions"
                 className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                   mainView === "friction"
-                    ? "bg-amber-600/20 text-amber-300 border border-amber-500/30"
+                    ? "bg-amber-600/30 text-amber-200 border border-amber-400/40 shadow-sm shadow-amber-900/40"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                 }`}
               >
-                Friction
+                Pain Points
               </button>
               <button
                 onClick={() => setMainView("skills")}
-                title="View and manage installed Claude Code skills"
+                title="View and manage personalized skills extracted from your sessions"
                 className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                   mainView === "skills"
-                    ? "bg-teal-600/20 text-teal-300 border border-teal-500/30"
+                    ? "bg-teal-600/30 text-teal-200 border border-teal-400/40 shadow-sm shadow-teal-900/40"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                 }`}
               >
-                Skills
+                Personalization
               </button>
             </div>
             <button

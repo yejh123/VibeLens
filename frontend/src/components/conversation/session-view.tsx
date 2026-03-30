@@ -16,6 +16,7 @@ import {
   Zap,
   GitBranch,
   List,
+  AlignLeft,
   ChevronUp,
   ChevronDown,
   ArrowUpRight,
@@ -37,7 +38,7 @@ import { computeFlow } from "./flow-layout";
 import { formatTokens, formatDuration, formatCost, extractUserText, baseProjectName } from "../../utils";
 import { LoadingSpinner } from "../loading-spinner";
 import {
-  TOGGLE_ACTIVE, TOGGLE_INACTIVE, METRIC_LABEL,
+  METRIC_LABEL,
   SESSION_ID_SHORT, PREVIEW_SHORT, SHARE_STATUS_RESET_MS, SCROLL_SUPPRESS_MS,
 } from "../../styles";
 
@@ -60,7 +61,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
   const [promptNavWidth, setPromptNavWidth] = useState(224);
   const [sessionCost, setSessionCost] = useState<number | null>(null);
   const [shareStatus, setShareStatus] = useState<"idle" | "sharing" | "copied">("idle");
-  const [viewMode, setViewMode] = useState<"timeline" | "flow">("timeline");
+  const [viewMode, setViewMode] = useState<"timeline" | "concise" | "flow">("timeline");
   const [flowData, setFlowData] = useState<FlowData | null>(null);
   const [flowLoading, setFlowLoading] = useState(false);
   const [headerExpanded, setHeaderExpanded] = useState(true);
@@ -365,10 +366,17 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
     (metrics?.total_prompt_tokens || 0) +
     (metrics?.total_completion_tokens || 0);
 
+  const isConcise = viewMode === "concise";
+
   const isVisibleStep = (s: Step): boolean => {
     if (s.source === "user") {
       if (typeof s.message === "string") return !!s.message.trim();
       return s.message.length > 0;
+    }
+    // In concise mode, hide agent steps that have no text message
+    if (isConcise && s.source === "agent") {
+      const text = typeof s.message === "string" ? s.message.trim() : "";
+      return !!text;
     }
     return s.source === "agent" || s.source === "system";
   };
@@ -396,20 +404,35 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-3">
               {/* View mode toggle */}
-              <div className="flex rounded-md border border-zinc-700 mr-2">
+              <div className="flex rounded-md border border-blue-500/40 bg-zinc-800/60 mr-2 w-[240px]">
                 <button
                   onClick={() => setViewMode("timeline")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-l-md transition ${
-                    viewMode === "timeline" ? TOGGLE_ACTIVE : TOGGLE_INACTIVE
+                  className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs rounded-l-md transition ${
+                    viewMode === "timeline"
+                      ? "bg-blue-600/40 text-blue-100 font-semibold shadow-inner shadow-blue-900/30"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/40"
                   }`}
                 >
                   <List className="w-3 h-3" />
                   Timeline
                 </button>
                 <button
+                  onClick={() => setViewMode("concise")}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs transition ${
+                    viewMode === "concise"
+                      ? "bg-blue-600/40 text-blue-100 font-semibold shadow-inner shadow-blue-900/30"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/40"
+                  }`}
+                >
+                  <AlignLeft className="w-3 h-3" />
+                  Concise
+                </button>
+                <button
                   onClick={() => setViewMode("flow")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-r-md transition ${
-                    viewMode === "flow" ? TOGGLE_ACTIVE : TOGGLE_INACTIVE
+                  className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs rounded-r-md transition ${
+                    viewMode === "flow"
+                      ? "bg-blue-600/40 text-blue-100 font-semibold shadow-inner shadow-blue-900/30"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/40"
                   }`}
                 >
                   <GitBranch className="w-3 h-3" />
@@ -606,7 +629,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
       <div className="flex-1 flex min-h-0">
         {/* Steps / Flow */}
         <div ref={stepsRef} className="flex-1 overflow-y-auto">
-          {viewMode === "timeline" ? (
+          {viewMode === "timeline" || viewMode === "concise" ? (
             <div className="max-w-5xl mx-auto px-4 py-6 space-y-3">
               {steps.length === 0 ? (
                 <div className="text-center text-zinc-500 text-sm py-8">
@@ -629,7 +652,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
                           step,
                           content: (
                             <div id={`step-${step.step_id}`} style={{ scrollMarginTop: "1rem" }}>
-                              {visible && <StepBlock step={step} />}
+                              {visible && <StepBlock step={step} concise={isConcise} />}
                               {spawnedSubs?.map((sub) => (
                                 <div key={sub.session_id} id={`subagent-${sub.session_id}`} className="mt-2">
                                   <SubAgentBlock

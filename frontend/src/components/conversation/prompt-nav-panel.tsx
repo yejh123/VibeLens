@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Bot, MessageSquare, User } from "lucide-react";
-import { extractUserText, truncate } from "../../utils";
+import { Bot, MessageSquare, ScrollText, User } from "lucide-react";
+import { extractMessageText, extractUserText, truncate } from "../../utils";
 import { ResizeHandle } from "../resize-handle";
 import type { Step, Trajectory } from "../../types";
 import type { FlowPhaseGroup, FlowSection } from "./flow-layout";
@@ -17,6 +17,7 @@ interface PromptEntry {
   turnNumber: number;
   stepId: string;
   preview: string;
+  isPlan: boolean;
 }
 
 interface PromptNavPanelProps {
@@ -26,7 +27,7 @@ interface PromptNavPanelProps {
   onNavigate: (stepId: string) => void;
   width: number;
   onResize: (delta: number) => void;
-  viewMode: "timeline" | "flow";
+  viewMode: "timeline" | "concise" | "flow";
   flowPhases?: FlowPhaseGroup[];
   flowSections?: FlowSection[];
   activePhaseIdx?: number | null;
@@ -36,21 +37,34 @@ interface PromptNavPanelProps {
 function buildPromptEntries(steps: Step[]): PromptEntry[] {
   const entries: PromptEntry[] = [];
   let turnNumber = 0;
+  let planNumber = 0;
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     if (step.source !== "user") continue;
-    if (step.extra?.is_skill_output || step.extra?.is_auto_prompt) continue;
+    if (step.extra?.is_skill_output) continue;
+
+    if (step.extra?.is_auto_prompt) {
+      const text = extractMessageText(step.message);
+      if (!text) continue;
+      planNumber++;
+      entries.push({
+        turnNumber: planNumber,
+        stepId: step.step_id,
+        preview: truncate(text.replace(/\n/g, " "), PREVIEW_LONG),
+        isPlan: true,
+      });
+      continue;
+    }
 
     const text = extractUserText(step);
     if (!text) continue;
-
     turnNumber++;
-
     entries.push({
       turnNumber,
       stepId: step.step_id,
       preview: truncate(text.replace(/\n/g, " "), PREVIEW_LONG),
+      isPlan: false,
     });
   }
 
@@ -240,6 +254,41 @@ export function PromptNavPanel({
             <div className="space-y-1">
               {entries.map((entry) => {
                 const isActive = entry.stepId === activeStepId;
+                if (entry.isPlan) {
+                  return (
+                    <button
+                      key={entry.stepId}
+                      onClick={() => onNavigate(entry.stepId)}
+                      className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm group ${
+                        isActive
+                          ? "bg-teal-500/15 border border-teal-500/30"
+                          : "hover:bg-teal-900/20 border border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <ScrollText
+                          className={`w-3.5 h-3.5 ${
+                            isActive ? "text-teal-400" : "text-teal-500 group-hover:text-teal-400"
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-semibold ${
+                            isActive ? "text-teal-300" : "text-teal-400/70 group-hover:text-teal-300"
+                          }`}
+                        >
+                          Plan
+                        </span>
+                      </div>
+                      <p
+                        className={`line-clamp-2 leading-snug pl-5 ${
+                          isActive ? "text-teal-200/80" : "text-zinc-500 group-hover:text-zinc-400"
+                        }`}
+                      >
+                        {entry.preview}
+                      </p>
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={entry.stepId}

@@ -12,16 +12,16 @@ import {
   SlidersHorizontal,
   Loader2,
   Link2,
+  Heart,
+  Download,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "../app";
 import type { Trajectory } from "../types";
 import { formatTime, truncate, baseProjectName } from "../utils";
 import { SearchOptionsDialog } from "./search-options-dialog";
-import {
-  TOGGLE_CONTAINER, TOGGLE_BUTTON_BASE, TOGGLE_ACTIVE, TOGGLE_INACTIVE,
-  SESSIONS_PER_PAGE, SEARCH_DEBOUNCE_MS,
-} from "../styles";
+import { SESSIONS_PER_PAGE, SEARCH_DEBOUNCE_MS } from "../styles";
 
 export type ViewMode = "time" | "project";
 
@@ -36,6 +36,12 @@ interface SessionListProps {
   agentFilter: string;
   onAgentFilterChange: (agent: string) => void;
   availableAgents: string[];
+  onDonate?: () => void;
+  donateDisabled?: boolean;
+  onDownload?: () => void;
+  downloadDisabled?: boolean;
+  checkedCount?: number;
+  loading?: boolean;
 }
 
 export function SessionList({
@@ -49,6 +55,12 @@ export function SessionList({
   agentFilter,
   onAgentFilterChange,
   availableAgents,
+  onDonate,
+  donateDisabled,
+  onDownload,
+  downloadDisabled,
+  checkedCount = 0,
+  loading,
 }: SessionListProps) {
   const { fetchWithToken } = useAppContext();
   const [search, setSearch] = useState("");
@@ -185,27 +197,10 @@ export function SessionList({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="p-3 space-y-2 border-b border-zinc-800">
-        {/* View Mode Toggle */}
-        <div className={TOGGLE_CONTAINER}>
-          <button
-            onClick={() => handleSetViewMode("project")}
-            className={`${TOGGLE_BUTTON_BASE} ${
-              viewMode === "project" ? TOGGLE_ACTIVE : TOGGLE_INACTIVE
-            }`}
-          >
-            <FolderOpen className="w-3.5 h-3.5" />
-            By Project
-          </button>
-          <button
-            onClick={() => handleSetViewMode("time")}
-            className={`${TOGGLE_BUTTON_BASE} ${
-              viewMode === "time" ? TOGGLE_ACTIVE : TOGGLE_INACTIVE
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            By Time
-          </button>
-        </div>
+        {/* Donate for Research */}
+        {onDonate && (
+          <DonateButton onClick={onDonate} disabled={!!donateDisabled} />
+        )}
 
         <div className="relative">
           {searchLoading ? (
@@ -261,24 +256,44 @@ export function SessionList({
           </div>
         )}
 
-        {/* Select All */}
-        <button
-          onClick={handleToggleAll}
-          className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-zinc-100 transition"
-        >
-          {allChecked ? (
-            <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
-          ) : someChecked ? (
-            <MinusSquare className="w-3.5 h-3.5 text-cyan-400" />
-          ) : (
-            <Square className="w-3.5 h-3.5" />
-          )}
-          Select all ({filtered.length})
-        </button>
+        {/* Select All + View Mode Switch */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handleToggleAll}
+            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-zinc-100 transition"
+          >
+            {allChecked ? (
+              <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
+            ) : someChecked ? (
+              <MinusSquare className="w-3.5 h-3.5 text-cyan-400" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
+            Select all ({filtered.length})
+          </button>
+          <button
+            onClick={() => handleSetViewMode(viewMode === "project" ? "time" : "project")}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 rounded-md transition"
+            title={viewMode === "project" ? "Switch to time view" : "Switch to project view"}
+          >
+            {viewMode === "project" ? (
+              <FolderOpen className="w-3 h-3" />
+            ) : (
+              <Clock className="w-3 h-3" />
+            )}
+            {viewMode === "project" ? "Project" : "Time"}
+            <ArrowLeftRight className="w-3 h-3 text-zinc-500" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {viewMode === "time" ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-500">
+            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+            <span className="text-sm">Loading sessions…</span>
+          </div>
+        ) : viewMode === "time" ? (
           paginatedFiltered.map((session) => (
             <SessionRow
               key={session.session_id}
@@ -362,30 +377,43 @@ export function SessionList({
         )}
       </div>
 
-      {/* Footer: filtered count + pagination */}
+      {/* Footer: filtered count + pagination + download */}
       <div className="shrink-0 border-t border-zinc-800 px-3 py-2 flex items-center justify-between text-xs text-zinc-400">
         <span>{filtered.length} sessions</span>
-        {viewMode === "time" && filtered.length > SESSIONS_PER_PAGE && (
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {viewMode === "time" && filtered.length > SESSIONS_PER_PAGE && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                className="p-1 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed rounded transition"
+                title="Previous page"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <span className="px-1 text-xs">{page + 1}</span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={(page + 1) * SESSIONS_PER_PAGE >= filtered.length}
+                className="p-1 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed rounded transition"
+                title="Next page"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {onDownload && (
             <button
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-              className="p-1 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed rounded transition"
-              title="Previous page"
+              onClick={onDownload}
+              disabled={downloadDisabled}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-emerald-600/80 hover:bg-emerald-500 text-white rounded transition disabled:opacity-40 disabled:cursor-not-allowed"
+              title={downloadDisabled ? "Select sessions to download" : `Download ${checkedCount} session${checkedCount !== 1 ? "s" : ""}`}
             >
-              <ChevronUp className="w-4 h-4" />
+              <Download className="w-3 h-3" />
+              {checkedCount > 0 ? checkedCount : "Download"}
             </button>
-            <span className="px-1 text-xs">{page + 1}</span>
-            <button
-              onClick={() => setPage(page + 1)}
-              disabled={(page + 1) * SESSIONS_PER_PAGE >= filtered.length}
-              className="p-1 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed rounded transition"
-              title="Next page"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -467,6 +495,35 @@ function SessionRow({
           </div>
         </div>
       </button>
+    </div>
+  );
+}
+
+function DonateButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => disabled && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <button
+        onClick={disabled ? undefined : onClick}
+        className={`w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold rounded-md border transition ${
+          disabled
+            ? "bg-rose-600/40 text-rose-200 border-rose-500/30 cursor-not-allowed opacity-60"
+            : "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-900/40"
+        }`}
+      >
+        <Heart className="w-4 h-4" />
+        Donate for Research
+      </button>
+      {showTooltip && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-700 text-[11px] text-zinc-300 whitespace-nowrap shadow-lg pointer-events-none">
+          Select sessions first to donate
+        </div>
+      )}
     </div>
   );
 }
