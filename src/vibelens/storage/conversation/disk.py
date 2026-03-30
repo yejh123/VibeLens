@@ -76,6 +76,11 @@ class DiskStore(TrajectoryStore):
         with open(index_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(summary, default=str, ensure_ascii=False) + "\n")
 
+        logger.info(
+            "DiskStore.save: session=%s file=%s index=%s tags=%s",
+            session_id, full_path, index_path, self._default_tags,
+        )
+
         # Incremental cache update (skip full rebuild)
         if self._metadata_cache is not None:
             self._metadata_cache[session_id] = summary
@@ -104,16 +109,24 @@ class DiskStore(TrajectoryStore):
         self._metadata_cache = {}
 
         if not self._root.exists():
+            logger.info("DiskStore._build_index: root does not exist: %s", self._root)
             return
 
-        for index_path in self._root.rglob(INDEX_FILENAME):
+        index_files = list(self._root.rglob(INDEX_FILENAME))
+        logger.info("DiskStore._build_index: root=%s found %d index files", self._root, len(index_files))
+
+        for index_path in index_files:
             parent_dir = index_path.parent
-            for line in _iter_jsonl(index_path):
+            entries = _iter_jsonl(index_path)
+            logger.info("DiskStore._build_index: %s has %d entries", index_path, len(entries))
+            for line in entries:
                 sid = line.get("session_id")
                 if not sid:
                     continue
                 self._metadata_cache[sid] = line
                 self._index[sid] = (parent_dir / f"{sid}.json", self._parser)
+
+        logger.info("DiskStore._build_index: total sessions indexed: %d", len(self._index))
 
 
 def _iter_jsonl(path: Path) -> list[dict]:

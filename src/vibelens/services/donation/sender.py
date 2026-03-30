@@ -4,6 +4,9 @@ Packages raw session files and parsed trajectories into a ZIP archive
 and POSTs it to the configured donation server endpoint. Works with
 both LocalStore (raw JSONL files available) and DiskStore (only parsed
 JSON files available).
+
+When sessions were uploaded (DiskStore with _upload_id tag), the original
+upload ZIP is included in raw/ instead of the parsed JSON duplicate.
 """
 
 import json
@@ -19,6 +22,7 @@ from vibelens.deps import get_settings, get_store
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.schemas.session import DonateResult
 from vibelens.services.session.store_resolver import load_from_stores
+from vibelens.services.upload.processor import generate_upload_id
 from vibelens.storage.conversation.base import TrajectoryStore
 from vibelens.storage.conversation.local import LocalStore
 from vibelens.utils.log import get_logger
@@ -51,10 +55,11 @@ async def send_donation(session_ids: list[str], session_token: str | None = None
     if not sessions_data.valid_sessions:
         return DonateResult(total=len(session_ids), donated=0, errors=sessions_data.errors)
 
-    zip_path = _create_donation_zip(sessions_data)
+    donation_id = generate_upload_id()
+    zip_path = _create_donation_zip(sessions_data, donation_id)
     try:
         donation_url = f"{settings.donation_url.rstrip('/')}{DONATION_RECEIVE_PATH}"
-        await _send_zip(zip_path, donation_url)
+        await _send_zip(zip_path, donation_url, donation_id)
         donated = len(sessions_data.valid_sessions)
     except httpx.HTTPError as exc:
         logger.warning("Donation upload failed: %s", exc)
@@ -85,6 +90,7 @@ class _SessionData:
         parsed_json: str,
         trajectory_count: int,
         step_count: int,
+        source_upload_id: str | None = None,
     ) -> None:
         self.session_id = session_id
         self.agent_type = agent_type
@@ -93,6 +99,8 @@ class _SessionData:
         self.parsed_json = parsed_json
         self.trajectory_count = trajectory_count
         self.step_count = step_count
+        # Set when session was uploaded — points to the original upload ZIP
+        self.source_upload_id = source_upload_id
 
 
 def _active_stores() -> list[TrajectoryStore]:
@@ -146,7 +154,12 @@ def _collect_sessions(
 
         store, source = found
         filepath, parser = source
-        raw_files = _resolve_raw_files(store, filepath, parser)
+
+        # Check if this session came from an upload (DiskStore with _upload_id tag)
+        meta = store.get_metadata(session_id)
+        source_upload_id = meta.get("_upload_id") if meta else None
+
+        raw_files = _resolve_raw_files(store, filepath, parser, source_upload_id)
 
         trajectories = load_from_stores(session_id)
         if not trajectories:
@@ -169,6 +182,7 @@ def _collect_sessions(
                 parsed_json=parsed_json,
                 trajectory_count=len(trajectories),
                 step_count=step_count,
+                source_upload_id=source_upload_id,
             )
         )
 
@@ -176,22 +190,36 @@ def _collect_sessions(
 
 
 def _resolve_raw_files(
-    store: TrajectoryStore, filepath: Path, parser: BaseParser
+    store: TrajectoryStore,
+    filepath: Path,
+    parser: BaseParser,
+    source_upload_id: str | None = None,
 ) -> list[tuple[Path, str]]:
     """Resolve raw session files and compute their relative ZIP paths.
 
-    For LocalStore, uses get_data_dir() to compute paths relative to
-    the agent data directory (e.g. ~/.claude). For other stores, uses
-    the filename only.
+    For uploaded sessions (source_upload_id set), returns the original
+    upload ZIP instead of parsed JSON duplicates. For LocalStore, uses
+    get_data_dir() to compute paths relative to the agent data directory.
 
     Args:
         store: Active trajectory store.
         filepath: Absolute path to the main session file.
         parser: Parser that owns this session.
+        source_upload_id: Upload ID if this session came from an upload.
 
     Returns:
         List of (absolute_path, zip_relative_path) tuples.
     """
+    # Uploaded sessions: include the original upload ZIP in raw/
+    if source_upload_id:
+        upload_zip = _locate_upload_zip(source_upload_id)
+        if upload_zip:
+            zip_path = f"raw/{source_upload_id}.zip"
+            return [(upload_zip, zip_path)]
+        logger.warning(
+            "Upload ZIP not found for %s, falling back to session files", source_upload_id
+        )
+
     session_files = parser.get_session_files(filepath)
 
     # LocalStore has agent data dirs for computing relative paths
@@ -210,16 +238,32 @@ def _resolve_raw_files(
     return raw_files
 
 
-def _create_donation_zip(sessions_data: _SessionCollectionResult) -> Path:
+def _locate_upload_zip(upload_id: str) -> Path | None:
+    """Find the original upload ZIP on disk.
+
+    Args:
+        upload_id: Upload identifier (e.g. "20260329143012_a1b2").
+
+    Returns:
+        Path to the upload ZIP, or None if not found.
+    """
+    settings = get_settings()
+    zip_path = settings.upload_dir / upload_id / f"{upload_id}.zip"
+    if zip_path.exists():
+        return zip_path
+    return None
+
+
+def _create_donation_zip(sessions_data: _SessionCollectionResult, donation_id: str) -> Path:
     """Create a ZIP archive containing raw files, parsed JSON, and a manifest.
 
-    ZIP structure:
-        raw/{agent_type}/{relative_path}  — original session files
-        parsed/{session_id}.json          — parsed trajectory groups
-        manifest.json                     — metadata about all sessions
+    All entries are prefixed with ``{donation_id}/`` so unzipping creates
+    a single wrapping directory. Upload ZIPs shared by multiple sessions
+    are deduplicated (written once).
 
     Args:
         sessions_data: Collected session data to package.
+        donation_id: Unique donation identifier used as wrapping directory.
 
     Returns:
         Path to the created temporary ZIP file.
@@ -228,51 +272,62 @@ def _create_donation_zip(sessions_data: _SessionCollectionResult) -> Path:
         zip_path = Path(tmp.name)
 
     manifest_sessions = []
+    # Track written raw files to deduplicate upload ZIPs shared across sessions
+    written_raw_paths: set[str] = set()
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for session in sessions_data.valid_sessions:
             raw_zip_paths = []
             for abs_path, rel_zip_path in session.raw_files:
-                zf.write(abs_path, rel_zip_path)
-                raw_zip_paths.append(rel_zip_path)
+                prefixed_path = f"{donation_id}/{rel_zip_path}"
+                # Deduplicate: multiple sessions from the same upload share one ZIP
+                if prefixed_path not in written_raw_paths:
+                    zf.write(abs_path, prefixed_path)
+                    written_raw_paths.add(prefixed_path)
+                raw_zip_paths.append(prefixed_path)
 
-            parsed_path = f"parsed/{session.session_id}.json"
+            parsed_path = f"{donation_id}/parsed/{session.session_id}.json"
             zf.writestr(parsed_path, session.parsed_json)
 
-            manifest_sessions.append(
-                {
-                    "session_id": session.session_id,
-                    "agent_type": session.agent_type,
-                    "trajectory_count": session.trajectory_count,
-                    "step_count": session.step_count,
-                    "raw_files": raw_zip_paths,
-                }
-            )
+            session_entry: dict = {
+                "session_id": session.session_id,
+                "agent_type": session.agent_type,
+                "trajectory_count": session.trajectory_count,
+                "step_count": session.step_count,
+                "raw_files": raw_zip_paths,
+            }
+            if session.source_upload_id:
+                session_entry["source_upload_id"] = session.source_upload_id
+            manifest_sessions.append(session_entry)
 
         manifest = {
+            "donation_id": donation_id,
             "timestamp": datetime.now(UTC).isoformat(),
             "vibelens_version": __version__,
             "sessions": manifest_sessions,
         }
-        zf.writestr(MANIFEST_FILENAME, json.dumps(manifest, indent=2, ensure_ascii=False))
+        manifest_path = f"{donation_id}/{MANIFEST_FILENAME}"
+        zf.writestr(manifest_path, json.dumps(manifest, indent=2, ensure_ascii=False))
 
     return zip_path
 
 
-async def _send_zip(zip_path: Path, url: str) -> None:
+async def _send_zip(zip_path: Path, url: str, donation_id: str) -> None:
     """POST the donation ZIP to the donation server.
 
     Args:
         zip_path: Path to the ZIP file to upload.
         url: Full URL of the donation receive endpoint.
+        donation_id: Used as the upload filename.
 
     Raises:
         httpx.HTTPError: If the request fails.
     """
+    filename = f"{donation_id}.zip"
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
         with open(zip_path, "rb") as f:
             response = await client.post(
-                url, files={"file": ("donation.zip", f, "application/zip")}
+                url, files={"file": (filename, f, "application/zip")}
             )
             response.raise_for_status()
     logger.info("Donation uploaded successfully to %s", url)

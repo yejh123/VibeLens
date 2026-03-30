@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.12] - 2026-03-30
+
+### Changed
+- **Donation ZIP wrapping directory**: Donation ZIPs now unzip to a single `{donation_id}/` directory containing `manifest.json`, `raw/`, and `parsed/`. Previously files were at the ZIP root.
+- **Upload-then-donate raw files**: When donating uploaded sessions, `raw/` now contains the original upload ZIP instead of parsed JSON duplicates. Multiple sessions from the same upload share a single deduplicated ZIP entry.
+- **Donation manifest**: Includes `donation_id` field and optional `source_upload_id` per session entry. Raw file paths include the wrapping directory prefix.
+- **Donation receiver**: Reads `donation_id` from manifest for ZIP filename (falls back to generated ID for legacy ZIPs). Manifest discovery searches both root and one-level deep for backward compatibility.
+- **Donation index**: Uses `donation_id` field instead of `upload_id` in index entries.
+
 ## [0.9.11] - 2026-03-29
 
 ### Added

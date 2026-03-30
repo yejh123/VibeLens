@@ -28,7 +28,12 @@ def list_sessions(
         List of trajectory summary dicts (no steps).
     """
     summaries = list_all_metadata()
+    logger.info(
+        "list_sessions: all_metadata=%d token=%s",
+        len(summaries), session_token[:8] if session_token else "none",
+    )
     summaries = filter_visible(summaries, session_token)
+    logger.info("list_sessions: after visibility filter=%d", len(summaries))
     summaries.sort(key=lambda s: s.get("timestamp") or "", reverse=True)
     if project_name:
         summaries = [s for s in summaries if s.get("project_path") == project_name]

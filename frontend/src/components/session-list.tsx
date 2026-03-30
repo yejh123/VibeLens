@@ -212,7 +212,7 @@ export function SessionList({
               Upload
             </button>
             <div className="flex-1 min-w-0">
-              <DonateButton onClick={onDonate} disabled={!!donateDisabled} compact />
+              <DonateButton onClick={onDonate} disabled={!!donateDisabled} />
             </div>
           </div>
         ) : onDonate ? (
@@ -522,7 +522,7 @@ function SessionRow({
   );
 }
 
-function DonateButton({ onClick, disabled, compact }: { onClick: () => void; disabled: boolean; compact?: boolean }) {
+function DonateButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
@@ -533,13 +533,13 @@ function DonateButton({ onClick, disabled, compact }: { onClick: () => void; dis
     >
       <button
         onClick={disabled ? undefined : onClick}
-        className={`w-full flex items-center justify-center gap-1.5 ${compact ? "py-1.5 text-xs" : "py-2.5 text-sm"} font-semibold rounded-md border transition ${
+        className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md border transition ${
           disabled
             ? "bg-rose-600/40 text-rose-200 border-rose-500/30 cursor-not-allowed opacity-60"
             : "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-900/40"
         }`}
       >
-        <Heart className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <Heart className="w-3.5 h-3.5" />
         Donate for Research
       </button>
       {showTooltip && (

@@ -15,6 +15,18 @@ ALLOWED_EXTENSIONS = {".json", ".jsonl", ".project_root", ".txt"}
 UNIX_FILE_TYPE_MASK = 0o170000
 UNIX_SYMLINK_TYPE = 0o120000
 
+# macOS resource fork paths to skip during extraction
+MACOS_JUNK_PREFIX = "__MACOSX/"
+MACOS_RESOURCE_FORK_PREFIX = "._"
+
+
+def _is_macos_junk(filename: str) -> bool:
+    """Check if a zip entry is a macOS resource fork or metadata file."""
+    if filename.startswith(MACOS_JUNK_PREFIX):
+        return True
+    basename = Path(filename).name
+    return basename.startswith(MACOS_RESOURCE_FORK_PREFIX)
+
 
 def validate_zip(
     zip_path: Path, max_zip_bytes: int, max_extracted_bytes: int, max_file_count: int
@@ -72,6 +84,9 @@ def _check_zip_entries(zf: zipfile.ZipFile, max_extracted_bytes: int, max_file_c
         if info.is_dir():
             continue
 
+        if _is_macos_junk(info.filename):
+            continue
+
         # Only count files with parseable extensions toward the budget
         suffix = Path(info.filename).suffix.lower()
         if suffix not in ALLOWED_EXTENSIONS:
@@ -106,6 +121,8 @@ def extract_zip(zip_path: Path, dest_dir: Path) -> Path:
     with zipfile.ZipFile(zip_path, "r") as zf:
         for info in zf.infolist():
             if info.is_dir():
+                continue
+            if _is_macos_junk(info.filename):
                 continue
             suffix = Path(info.filename).suffix.lower()
             if suffix not in ALLOWED_EXTENSIONS:

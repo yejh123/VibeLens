@@ -6,6 +6,9 @@ search, dashboard, and analysis services.
 """
 
 from vibelens.deps import get_example_store, get_store, is_demo_mode
+from vibelens.utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def list_all_metadata() -> list[dict]:
@@ -18,12 +21,20 @@ def list_all_metadata() -> list[dict]:
     Returns:
         Combined metadata list from all active stores.
     """
-    metadata = list(get_store().list_metadata())
+    store = get_store()
+    metadata = list(store.list_metadata())
+    logger.info(
+        "list_all_metadata: primary store=%s returned %d sessions (demo=%s)",
+        type(store).__name__, len(metadata), is_demo_mode(),
+    )
     if is_demo_mode():
         seen_ids = {m.get("session_id") for m in metadata}
+        example_count = 0
         for m in get_example_store().list_metadata():
             if m.get("session_id") not in seen_ids:
                 metadata.append(m)
+                example_count += 1
+        logger.info("list_all_metadata: added %d example sessions, total=%d", example_count, len(metadata))
     return metadata
 
 

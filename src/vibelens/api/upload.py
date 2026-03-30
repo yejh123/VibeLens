@@ -5,6 +5,9 @@ from fastapi import APIRouter, Form, Header, HTTPException, UploadFile
 from vibelens.models.enums import AgentType
 from vibelens.schemas.upload import UploadResult
 from vibelens.services.upload.processor import get_upload_command, process_zip
+from vibelens.utils import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["upload"])
 
@@ -46,4 +49,10 @@ async def upload_zip(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unknown agent_type: {agent_type}") from None
 
+    logger.info(
+        "upload_zip: file=%s agent=%s token=%s",
+        filename,
+        agent_type,
+        x_session_token[:8] if x_session_token else "none",
+    )
     return await process_zip(file, agent_type, session_token=x_session_token)

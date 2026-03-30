@@ -2,6 +2,9 @@
 
 Used in demo mode to accept donation ZIPs from self-use VibeLens instances,
 persist them on disk, and record metadata in an append-only index.
+
+Supports both new-format ZIPs (wrapping directory with manifest inside)
+and legacy ZIPs (root-level manifest.json) for backward compatibility.
 """
 
 import json
@@ -24,14 +27,15 @@ MANIFEST_FILENAME = "manifest.json"
 async def receive_donation(file: UploadFile) -> dict:
     """Receive and store a donated ZIP archive from a self-use instance.
 
-    Streams the ZIP to the donation directory, reads its manifest,
-    and appends an entry to the donation index.
+    Streams the ZIP to a temp path, reads the manifest to extract the
+    donation_id (falling back to a generated ID for legacy ZIPs), renames
+    to ``{donation_id}.zip``, and appends an entry to the donation index.
 
     Args:
         file: Uploaded ZIP file from the sender.
 
     Returns:
-        Dict with upload_id and session count on success.
+        Dict with donation_id and session count on success.
 
     Raises:
         HTTPException: If the file is not a valid ZIP or exceeds limits.
@@ -40,19 +44,24 @@ async def receive_donation(file: UploadFile) -> dict:
     donation_dir = settings.donation_dir
     donation_dir.mkdir(parents=True, exist_ok=True)
 
-    upload_id = generate_upload_id()
-    zip_filename = f"{upload_id}.zip"
+    # Stream to a temp path first, then rename after reading manifest
+    temp_id = generate_upload_id()
+    temp_path = donation_dir / f"_tmp_{temp_id}.zip"
+
+    total_written = await _stream_to_disk(file, temp_path, settings.max_zip_bytes)
+
+    manifest = _read_manifest(temp_path)
+
+    # Use donation_id from manifest if present (new format), else generate one
+    donation_id = manifest.get("donation_id") or generate_upload_id()
+    zip_filename = f"{donation_id}.zip"
     zip_path = donation_dir / zip_filename
 
-    # Stream ZIP to disk with bounded memory usage
-    total_written = await _stream_to_disk(file, zip_path, settings.max_zip_bytes)
+    # Rename temp file to final path
+    temp_path.rename(zip_path)
 
-    # Read manifest from the ZIP without full extraction
-    manifest = _read_manifest(zip_path)
-
-    # Append entry to the donation index
     index_entry = {
-        "upload_id": upload_id,
+        "donation_id": donation_id,
         "timestamp": datetime.now(UTC).isoformat(),
         "zip_filename": zip_filename,
         "zip_size_bytes": total_written,
@@ -63,9 +72,13 @@ async def receive_donation(file: UploadFile) -> dict:
 
     session_count = len(manifest.get("sessions", []))
     logger.info(
-        "Received donation %s: %d sessions, %d bytes", upload_id, session_count, total_written
+        "Received donation %s: %d sessions, %d bytes", donation_id, session_count, total_written
     )
-    return {"upload_id": upload_id, "session_count": session_count, "zip_size_bytes": total_written}
+    return {
+        "donation_id": donation_id,
+        "session_count": session_count,
+        "zip_size_bytes": total_written,
+    }
 
 
 async def _stream_to_disk(file: UploadFile, dest: Path, max_bytes: int) -> int:
@@ -102,8 +115,36 @@ async def _stream_to_disk(file: UploadFile, dest: Path, max_bytes: int) -> int:
     return total_written
 
 
+def _find_manifest_in_zip(names: list[str]) -> str | None:
+    """Find manifest.json in a ZIP, checking both root and one-level deep.
+
+    Supports new-format ZIPs (``{donation_id}/manifest.json``) and
+    legacy ZIPs (root ``manifest.json``).
+
+    Args:
+        names: List of file names in the ZIP archive.
+
+    Returns:
+        The manifest path within the ZIP, or None if not found.
+    """
+    # Root-level manifest (legacy format)
+    if MANIFEST_FILENAME in names:
+        return MANIFEST_FILENAME
+
+    # One-level deep manifest (new wrapping directory format)
+    for name in names:
+        parts = name.split("/")
+        if len(parts) == 2 and parts[1] == MANIFEST_FILENAME:
+            return name
+
+    return None
+
+
 def _read_manifest(zip_path: Path) -> dict:
     """Read manifest.json from a donation ZIP without full extraction.
+
+    Searches for manifest at both root level and one directory deep
+    for backward compatibility with legacy donation ZIPs.
 
     Args:
         zip_path: Path to the ZIP file.
@@ -116,10 +157,11 @@ def _read_manifest(zip_path: Path) -> dict:
     """
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
-            if MANIFEST_FILENAME not in zf.namelist():
+            manifest_path = _find_manifest_in_zip(zf.namelist())
+            if not manifest_path:
                 logger.warning("Donation ZIP %s has no manifest", zip_path.name)
                 return {}
-            manifest_bytes = zf.read(MANIFEST_FILENAME)
+            manifest_bytes = zf.read(manifest_path)
             return json.loads(manifest_bytes.decode("utf-8"))
     except zipfile.BadZipFile:
         zip_path.unlink(missing_ok=True)

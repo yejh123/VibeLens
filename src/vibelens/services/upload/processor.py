@@ -46,7 +46,7 @@ logger = get_logger(__name__)
 UPLOAD_COMMANDS: dict[str, dict[str, dict[str, str]]] = {
     AgentType.CLAUDE_CODE: {
         "macos": {
-            "command": "cd ~/.claude && zip -r claude-data.zip projects/ -i '*.jsonl'",
+            "command": "cd ~/.claude && zip -r claude-data.zip projects/ -i '*.jsonl' -x '**/._*' '**/__MACOSX/*'",
             "description": "Output: ~/.claude/claude-data.zip",
         },
         "linux": {
@@ -297,6 +297,16 @@ async def process_zip(
     filename = file.filename or "upload.zip"
     result = UploadResult(files_received=1)
     upload_id = generate_upload_id()
+    token_short = session_token[:8] if session_token else "none"
+
+    logger.info(
+        "process_zip START: file=%s agent=%s token=%s upload_id=%s upload_dir=%s",
+        filename,
+        agent_type,
+        token_short,
+        upload_id,
+        settings.upload_dir,
+    )
 
     try:
         # 1. Stream zip to settings.upload_dir/{upload_id}/{upload_id}.zip
@@ -307,6 +317,7 @@ async def process_zip(
             max_bytes=settings.max_zip_bytes,
             chunk_size=settings.stream_chunk_size,
         )
+        logger.info("Received zip: %s (%d bytes)", zip_path, zip_path.stat().st_size)
 
         # 2. Validate, extract, and discover session files
         session_files = await asyncio.to_thread(
@@ -317,7 +328,12 @@ async def process_zip(
             max_extracted_bytes=settings.max_extracted_bytes,
             max_file_count=settings.max_file_count,
         )
-        logger.info("Discovered %d session files in %s", len(session_files), filename)
+        logger.info(
+            "Discovered %d session files in %s: %s",
+            len(session_files),
+            filename,
+            [f.name for f in session_files[:10]],
+        )
 
         # 3. Parse files and store trajectories under {upload_dir}/{upload_id}/
         #    The _upload_id tag lets the main store enforce visibility filtering.
@@ -337,6 +353,14 @@ async def process_zip(
             anonymizer=anonymizer,
         )
 
+        logger.info(
+            "Parse complete: sessions_parsed=%d steps_stored=%d skipped=%d errors=%d",
+            result.sessions_parsed,
+            result.steps_stored,
+            result.skipped,
+            len(result.errors),
+        )
+
         # 4. Append metadata to the global metadata.jsonl
         metadata = _build_upload_metadata(
             upload_id=upload_id,
@@ -348,20 +372,38 @@ async def process_zip(
         append_upload_metadata(upload_dir=settings.upload_dir, metadata=metadata)
 
         # 5. Register ownership so only this browser tab sees the uploaded sessions
-        if session_token:
+        if session_token and result.sessions_parsed > 0:
             register_upload(session_token=session_token, upload_id=upload_id)
+            logger.info(
+                "Registered upload visibility: token=%s -> upload_id=%s", token_short, upload_id
+            )
+        else:
+            logger.info(
+                "Skipped register_upload: token=%s sessions_parsed=%d",
+                token_short,
+                result.sessions_parsed,
+            )
 
         # 6. Invalidate caches so the main store picks up new sessions
         main_store.invalidate_index()
         invalidate_search_index()
         invalidate_dashboard_cache()
+        logger.info("Invalidated caches for main store at %s", main_store.root)
     except Exception as exc:
-        logger.warning("Upload processing failed for %s: %s", filename, exc)
+        logger.warning("Upload processing failed for %s: %s", filename, exc, exc_info=True)
         result.errors.append({"filename": filename, "error": str(exc)})
     finally:
         # Clean up extraction dir; keep the zip as a permanent archive
         cleanup_extraction(upload_dir=settings.upload_dir, upload_id=upload_id)
 
+    logger.info(
+        "process_zip END: upload_id=%s result=parsed=%d stored=%d skipped=%d errors=%d",
+        upload_id,
+        result.sessions_parsed,
+        result.steps_stored,
+        result.skipped,
+        len(result.errors),
+    )
     return result
 
 

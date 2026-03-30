@@ -37,6 +37,6 @@ async def receive_donation_endpoint(file: UploadFile) -> dict:
         file: Uploaded ZIP containing raw session files and parsed trajectories.
 
     Returns:
-        Dict with upload_id, session_count, and zip_size_bytes.
+        Dict with donation_id, session_count, and zip_size_bytes.
     """
     return await receive_donation(file)

@@ -27,6 +27,9 @@ CATEGORY_LOG_FILES: dict[str, str] = {
     "vibelens.ingest.parsers.": "parsers.log",
     "vibelens.services.friction.": "analysis-friction.log",
     "vibelens.services.skill.": "analysis-skill.log",
+    "vibelens.services.upload.": "upload.log",
+    "vibelens.api.upload": "upload.log",
+    "vibelens.storage.conversation.disk": "upload.log",
 }
 
 _root_configured = False
