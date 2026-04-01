@@ -25,10 +25,10 @@
 ---
 
 <p align="center">
-  <img src="figures/comic-blurb.png" alt="VibeLens Comic — Understand your agent. Teach it. Master it." width="680">
+  <img src="figures/comic-blurb.png" alt="VibeLens Comic" width="680">
 </p>
 
-<p align="center"><em>Understand your agent. Teach it. Master it.</em> &mdash; <a href="docs/blurb.md">full blurb</a></p>
+<p align="center"><em>Analyze and understand your agent. Evolve it.</p>
 
 Your AI coding agents run hundreds of tool calls, burn thousands of tokens, and you have no idea what happened. VibeLens changes that.
 
@@ -50,7 +50,7 @@ pip install vibelens && vibelens serve
   <tr>
     <td width="50%">
       <kbd><img src="figures/01-conversation.png" alt="Session Viewer" width="100%" /></kbd>
-      <p align="center"><b>Session Viewer</b><br>Step-by-step timeline with tool calls, token counts, and sub-agent spawns.</p>
+      <p align="center"><b>Session Viewer</b><br>Step-by-step timeline with messages and sub-agent spawns.</p>
     </td>
     <td width="50%">
       <kbd><img src="figures/02-dashboard.png" alt="Analytics Dashboard" width="100%" /></kbd>
@@ -89,7 +89,7 @@ pip install vibelens && vibelens serve
 | Feature | Description |
 |---------|-------------|
 | **Multi-agent parsing** | Claude Code, Codex CLI, Gemini CLI, OpenClaw with auto-detection |
-| **Conversation Visualization** | Tool calls, sub-agent spawns, elapsed time, image content |
+| **Session Visualization** | Tool calls, sub-agent spawns, elapsed time, image content |
 | **Dashboard Analytics** | Cost breakdowns by model, peak-hour histograms, and per-project drill-downs. |
 | **Productivity tips** | Friction detection, cross-session patterns, actionable mitigations |
 | **Skill personalization** | Retrieve, create, and evolve reusable agent skills |
@@ -144,7 +144,7 @@ vibelens serve --host 0.0.0.0 --port 8080
 
 ## Data Donation
 
-VibeLens supports donating your agent conversation data to advance research on coding agent behavior. Donated sessions are collected by [CHATS-Lab](https://github.com/CHATS-lab) (Conversation, Human-AI Technology, and Safety Lab) at Northeastern University.
+VibeLens supports donating your agent session data to advance research on coding agent behavior. Donated sessions are collected by [CHATS-Lab](https://github.com/CHATS-lab) (Conversation, Human-AI Technology, and Safety Lab) at Northeastern University.
 
 To donate, upload your data, select the sessions you want to share, and click the **Donate** button.
 
