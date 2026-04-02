@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 
 from vibelens.deps import get_inference_backend
 from vibelens.llm.backend import InferenceBackend, InferenceError
+from vibelens.llm.backends import CLI_BACKENDS
 from vibelens.llm.digest import digest_trajectory, select_depth
 from vibelens.llm.prompts import PROMPT_REGISTRY
 from vibelens.llm.tokenizer import count_tokens
@@ -21,6 +22,7 @@ from vibelens.models.inference import BackendType, InferenceRequest
 from vibelens.models.prompts import AnalysisPrompt
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.session.store_resolver import get_metadata_from_stores, load_from_stores
+from vibelens.utils.json_extract import extract_json as _extract_json
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -83,6 +85,7 @@ async def analyze_session(
     request = InferenceRequest(
         system=prompt.render_system(),
         user=user_prompt,
+        json_schema=prompt.output_model.model_json_schema(),
     )
     result = await backend.generate(request)
     parsed = _parse_result(result.text, prompt.output_model)
@@ -141,7 +144,7 @@ async def estimate_cost(session_id: str, session_token: str | None = None) -> fl
         return None
 
     # CLI backends are free
-    if backend.backend_id in (BackendType.CLAUDE_CLI, BackendType.CODEX_CLI):
+    if backend.backend_id in CLI_BACKENDS:
         return None
 
     trajectories = _load_session(session_id, session_token)
@@ -215,19 +218,6 @@ def _parse_result(text: str, output_model: type[BaseModel]) -> BaseModel:
         raise InferenceError(
             f"Failed to parse LLM output as {output_model.__name__}: {exc}"
         ) from exc
-
-
-def _extract_json(text: str) -> str:
-    """Extract JSON from LLM output, handling markdown code blocks."""
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        start = 1
-        end = len(lines) - 1
-        while end > start and not lines[end].strip().startswith("```"):
-            end -= 1
-        return "\n".join(lines[start:end])
-    return stripped
 
 
 def _get_cached(cache_key: str) -> BaseModel | None:

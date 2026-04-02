@@ -24,7 +24,9 @@ from vibelens.deps import (
 )
 from vibelens.models.enums import AppMode
 from vibelens.services.dashboard.loader import warm_cache
+from vibelens.services.job_tracker import cleanup_stale as cleanup_stale_jobs
 from vibelens.services.session.demo import load_demo_examples
+from vibelens.services.session.search import build_search_index
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)
@@ -61,11 +63,42 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, _lightweight_startup, settings)
 
+    # Build search index eagerly so first search is instant
+    asyncio.create_task(_async_build_search_index())
+
     # Dashboard cache warming as an async background task so it yields
     # the event loop between session batches instead of holding the GIL
     asyncio.create_task(_async_warm_cache())
 
+    # Periodic cleanup of finished job tracker entries to prevent memory leak
+    cleanup_task = asyncio.create_task(_periodic_job_cleanup())
+
     yield
+
+    cleanup_task.cancel()
+
+
+JOB_CLEANUP_INTERVAL_SECONDS = 600
+
+
+async def _periodic_job_cleanup() -> None:
+    """Evict finished jobs from the in-memory tracker every 10 minutes."""
+    while True:
+        await asyncio.sleep(JOB_CLEANUP_INTERVAL_SECONDS)
+        try:
+            cleanup_stale_jobs()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("Job cleanup failed", exc_info=True)
+
+
+async def _async_build_search_index() -> None:
+    """Pre-build the search index at startup so the first query is instant."""
+    try:
+        await asyncio.to_thread(build_search_index)
+    except Exception:
+        logger.warning("Search index pre-build failed", exc_info=True)
 
 
 async def _async_warm_cache() -> None:

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.18] - 2026-04-02
+
+### Added
+- **Background job system**: Friction and skill analyses now run as background async jobs with polling, cancellation, and a periodic cleanup task. New `job_tracker` service and `/jobs/{id}` + `/jobs/{id}/cancel` endpoints for both pipelines.
+- **Skill proposals + deep creation**: Two-phase skill creation workflow. `POST /skills/analysis/proposals` generates lightweight proposals; `POST /skills/analysis/create` produces full SKILL.md content for an approved proposal.
+- **CLI backend expansion**: Added Gemini, Cursor, Kimi, OpenClaw, OpenCode, Aider, and Amp CLI backends via a lazy-import registry (`_CLI_BACKEND_REGISTRY`), replacing the monolithic `SubprocessBackend`.
+- **Skill evolution diff view**: PR-review-style unified diff UI for evolution suggestions with two-column line number gutters, red/green diff lines, hunk separators, and conflict type badges.
+
+### Changed
+- **Analysis endpoints return jobs**: `POST /friction` and `POST /skills/analysis` now return `AnalysisJobResponse` instead of blocking until completion. Frontend polls for results.
+- **Frontend job-aware panels**: Friction and skill panels accept `activeJobId`, poll for completion, and show a cancellable "running in background" spinner.
+- **LLM config form**: CLI backends hide API key, model, and advanced settings. Shows a "uses local installation" hint instead.
+- **Text readability**: Brightened and enlarged body text across skill analysis views and friction panel for better contrast on dark backgrounds.
+
 ## [0.9.17] - 2026-04-01
 
 ### Fixed

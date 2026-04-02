@@ -1,7 +1,7 @@
-import { History, PanelRightClose, PanelRightOpen, Search, Sparkles, TrendingUp } from "lucide-react";
+import { History, PanelRightClose, PanelRightOpen, Search, Sparkles, Square, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppContext } from "../../app";
-import type { LLMStatus, SkillAnalysisResult, SkillMode } from "../../types";
+import type { AnalysisJobResponse, AnalysisJobStatus, LLMStatus, SkillAnalysisResult, SkillMode } from "../../types";
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH } from "../../styles";
 import { AnalysisWelcomePage } from "../analysis-welcome";
 import { ExploreSkillsTab } from "./explore-skills-tab";
@@ -48,12 +48,16 @@ const MODE_DESCRIPTIONS: Record<SkillMode, { title: string; desc: string; icon: 
   },
 };
 
+const POLL_INTERVAL_MS = 3000;
+
 interface SkillsPanelProps {
   checkedIds: Set<string>;
+  activeJobId: string | null;
+  onJobIdChange: (id: string | null) => void;
 }
 
-export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
-  const { fetchWithToken } = useAppContext();
+export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPanelProps) {
+  const { fetchWithToken, appMode } = useAppContext();
   const [activeTab, setActiveTab] = useState<SkillTab>("local");
   const [analysisResult, setAnalysisResult] = useState<SkillAnalysisResult | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -121,16 +125,23 @@ export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
           const body = await res.json().catch(() => null);
           throw new Error(body?.detail || `HTTP ${res.status}`);
         }
-        const data: SkillAnalysisResult = await res.json();
-        setAnalysisResult(data);
-        setHistoryRefresh((n) => n + 1);
+        const data: AnalysisJobResponse = await res.json();
+        if (data.status === "completed" && data.analysis_id) {
+          const loadRes = await fetchWithToken(`/api/skills/analysis/${data.analysis_id}`);
+          if (loadRes.ok) {
+            setAnalysisResult(await loadRes.json());
+            setHistoryRefresh((n) => n + 1);
+          }
+          setAnalysisLoading(false);
+        } else {
+          onJobIdChange(data.job_id);
+        }
       } catch (err) {
         setAnalysisError(err instanceof Error ? err.message : String(err));
-      } finally {
         setAnalysisLoading(false);
       }
     },
-    [checkedIds, fetchWithToken],
+    [checkedIds, fetchWithToken, onJobIdChange],
   );
 
   const handleHistorySelect = useCallback((loaded: SkillAnalysisResult) => {
@@ -147,6 +158,51 @@ export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
     setAnalysisResult(null);
     setAnalysisError(null);
   }, []);
+
+  // Poll for job completion when activeJobId is set
+  useEffect(() => {
+    if (!activeJobId) return;
+    setAnalysisLoading(true);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithToken(`/api/skills/analysis/jobs/${activeJobId}`);
+        if (!res.ok) return;
+        const status: AnalysisJobStatus = await res.json();
+        if (status.status === "completed" && status.analysis_id) {
+          onJobIdChange(null);
+          setAnalysisLoading(false);
+          const loadRes = await fetchWithToken(`/api/skills/analysis/${status.analysis_id}`);
+          if (loadRes.ok) {
+            setAnalysisResult(await loadRes.json());
+            setHistoryRefresh((n) => n + 1);
+          }
+        } else if (status.status === "failed") {
+          onJobIdChange(null);
+          setAnalysisLoading(false);
+          setAnalysisError(status.error_message || "Analysis failed");
+        } else if (status.status === "cancelled") {
+          onJobIdChange(null);
+          setAnalysisLoading(false);
+        }
+      } catch {
+        /* polling is best-effort */
+      }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [activeJobId, fetchWithToken, onJobIdChange]);
+
+  const handleStopAnalysis = useCallback(async () => {
+    if (!activeJobId) return;
+    try {
+      await fetchWithToken(`/api/skills/analysis/jobs/${activeJobId}/cancel`, {
+        method: "POST",
+      });
+    } catch {
+      /* best-effort */
+    }
+    onJobIdChange(null);
+    setAnalysisLoading(false);
+  }, [activeJobId, fetchWithToken, onJobIdChange]);
 
   const isAnalysisTab = activeTab !== "local" && activeTab !== "explore";
   const currentMode = MODE_MAP[activeTab];
@@ -181,7 +237,23 @@ export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
           {activeTab === "local" && <LocalSkillsTab />}
           {activeTab === "explore" && <ExploreSkillsTab />}
           {isAnalysisTab && analysisLoading && (
-            <AnalysisLoadingState mode={currentMode} sessionCount={checkedIds.size} />
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-5">
+                <AnalysisLoadingState mode={currentMode} sessionCount={checkedIds.size} />
+                {activeJobId && (
+                  <div className="flex flex-col items-center gap-2 mt-2">
+                    <p className="text-xs text-zinc-500">Running in background — you can switch tabs</p>
+                    <button
+                      onClick={handleStopAnalysis}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs text-zinc-300 hover:text-white bg-zinc-700 hover:bg-zinc-600 border border-zinc-600 rounded-md transition"
+                    >
+                      <Square className="w-3 h-3" />
+                      Stop
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
           {isAnalysisTab && !analysisLoading && !analysisResult && (
             <AnalysisWelcomePage
@@ -195,6 +267,7 @@ export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
               checkedCount={checkedIds.size}
               error={analysisError}
               onRun={() => handleRunAnalysis(currentMode)}
+              isDemo={appMode === "demo"}
             />
           )}
           {isAnalysisTab && !analysisLoading && analysisResult && (
@@ -232,7 +305,7 @@ export function SkillsPanel({ checkedIds }: SkillsPanelProps) {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 pt-1">
-                <SkillsHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} filterMode={currentMode} />
+                <SkillsHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} filterMode={currentMode} activeJobId={activeJobId} />
               </div>
             </div>
           </>

@@ -273,6 +273,7 @@ export interface FrictionAnalysisResult {
   cross_batch_patterns?: string[];
   session_ids: string[];
   sessions_skipped: string[];
+  warnings?: string[];
   batch_count: number;
   backend_id: string;
   model: string;
@@ -377,11 +378,19 @@ export interface SkillCreation {
   rationale: string;
 }
 
+export type SkillConflictType =
+  | "skipped_step"
+  | "added_step"
+  | "wrong_tool"
+  | "bad_trigger"
+  | "outdated_instruction";
+
 export interface SkillEdit {
   kind: string;
   target: string;
   replacement: string | null;
   rationale: string;
+  conflict_type: SkillConflictType | null;
 }
 
 export interface SkillEvolutionSuggestion {
@@ -401,9 +410,32 @@ export interface SkillAnalysisResult {
   user_profile: string;
   session_ids: string[];
   sessions_skipped: string[];
+  warnings?: string[];
   backend_id: string;
   model: string;
   cost_usd: number | null;
+  created_at: string;
+}
+
+export interface SkillProposal {
+  name: string;
+  description: string;
+  rationale: string;
+  addressed_patterns: string[];
+}
+
+export interface SkillProposalResult {
+  proposal_id: string | null;
+  session_ids: string[];
+  workflow_patterns: WorkflowPattern[];
+  proposals: SkillProposal[];
+  summary: string;
+  user_profile: string;
+  sessions_skipped: string[];
+  backend_id: string;
+  model: string;
+  cost_usd: number | null;
+  batch_count: number;
   created_at: string;
 }
 
@@ -416,6 +448,19 @@ export interface SkillAnalysisMeta {
   created_at: string;
   model: string;
   cost_usd: number | null;
+}
+
+export interface AnalysisJobResponse {
+  job_id: string;
+  status: "running" | "completed";
+  analysis_id?: string | null;
+}
+
+export interface AnalysisJobStatus {
+  job_id: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  analysis_id?: string | null;
+  error_message?: string | null;
 }
 
 export type ToolType =

@@ -74,6 +74,16 @@ class SkillEditKind(StrEnum):
     REMOVE_TOOL = "remove_tool"
 
 
+class SkillConflictType(StrEnum):
+    """Root cause classification for evolution edits."""
+
+    SKIPPED_STEP = "skipped_step"
+    ADDED_STEP = "added_step"
+    WRONG_TOOL = "wrong_tool"
+    BAD_TRIGGER = "bad_trigger"
+    OUTDATED_INSTRUCTION = "outdated_instruction"
+
+
 class SkillEdit(BaseModel):
     """A single granular edit to an existing skill definition."""
 
@@ -83,6 +93,9 @@ class SkillEdit(BaseModel):
         default=None, description="New content for replace operations. None for removals."
     )
     rationale: str = Field(description="Why this edit improves the skill.")
+    conflict_type: SkillConflictType | None = Field(
+        default=None, description="Root cause classification. Set for evolution mode edits."
+    )
 
 
 class SkillEvolutionSuggestion(BaseModel):
@@ -118,6 +131,83 @@ class SkillLLMOutput(BaseModel):
     )
 
 
+class SkillProposal(BaseModel):
+    """A lightweight skill proposal from the proposal pipeline."""
+
+    name: str = Field(description="Proposed skill name in kebab-case.")
+    description: str = Field(description="One-line trigger description.")
+    rationale: str = Field(description="Why this skill would improve the user's workflow.")
+    addressed_patterns: list[str] = Field(
+        default_factory=list,
+        description="Titles of workflow patterns this proposal addresses.",
+    )
+
+
+class SkillProposalOutput(BaseModel):
+    """LLM output from the proposal generation step.
+
+    Contains lightweight proposals (name + description + rationale) without
+    full SKILL.md content. Deep creation produces the full content per proposal.
+    """
+
+    workflow_patterns: list[WorkflowPattern] = Field(
+        default_factory=list, description="Detected workflow patterns from trajectory analysis."
+    )
+    proposals: list[SkillProposal] = Field(
+        default_factory=list, description="Proposed skills (1-8)."
+    )
+    summary: str = Field(description="Overall analysis summary across all sessions.")
+    user_profile: str = Field(
+        default="", description="Brief description of the detected user workflow style."
+    )
+
+
+class SkillDeepCreationOutput(BaseModel):
+    """LLM output from deep creation of a single skill.
+
+    Generates production-ready SKILL.md content for one approved proposal.
+    """
+
+    name: str = Field(description="Skill name in kebab-case.")
+    description: str = Field(description="Trigger description for the YAML frontmatter.")
+    skill_md_content: str = Field(description="Full SKILL.md content including YAML frontmatter.")
+    rationale: str = Field(description="Why this skill improves the user's workflow.")
+    tools_used: list[str] = Field(
+        default_factory=list,
+        description="Tool names referenced in the skill (e.g. Read, Edit, Bash).",
+    )
+
+
+class SkillProposalResult(BaseModel):
+    """Service result wrapping proposals with metadata."""
+
+    proposal_id: str | None = Field(
+        default=None, description="Persistence ID. Set when saved to disk."
+    )
+    session_ids: list[str] = Field(
+        description="Session IDs that were successfully loaded and analyzed."
+    )
+    workflow_patterns: list[WorkflowPattern] = Field(
+        default_factory=list, description="Detected workflow patterns."
+    )
+    proposals: list[SkillProposal] = Field(
+        default_factory=list, description="Proposed skills."
+    )
+    summary: str = Field(description="Overall analysis summary.")
+    user_profile: str = Field(default="", description="Detected user workflow style.")
+    sessions_skipped: list[str] = Field(
+        default_factory=list, description="Session IDs that could not be loaded."
+    )
+    warnings: list[str] = Field(
+        default_factory=list, description="Non-fatal issues encountered during analysis."
+    )
+    backend_id: BackendType = Field(description="Inference backend used.")
+    model: str = Field(description="Model identifier.")
+    cost_usd: float | None = Field(default=None, description="Inference cost in USD.")
+    batch_count: int = Field(default=1, description="Number of LLM batches used.")
+    created_at: str = Field(description="ISO timestamp of analysis completion.")
+
+
 class SkillAnalysisResult(BaseModel):
     """Complete skill analysis result with service metadata.
 
@@ -148,6 +238,9 @@ class SkillAnalysisResult(BaseModel):
     user_profile: str = Field(default="", description="Detected user workflow style.")
     sessions_skipped: list[str] = Field(
         default_factory=list, description="Session IDs that could not be loaded."
+    )
+    warnings: list[str] = Field(
+        default_factory=list, description="Non-fatal issues encountered during analysis."
     )
     backend_id: BackendType = Field(description="Inference backend used.")
     model: str = Field(description="Model identifier.")

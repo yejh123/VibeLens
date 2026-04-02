@@ -49,6 +49,8 @@ from vibelens.services.context_extraction import (
 from vibelens.services.friction.digest import format_batch_digest
 from vibelens.services.session.store_resolver import get_metadata_from_stores, load_from_stores
 from vibelens.services.session_batcher import SessionBatch, build_batches
+from vibelens.utils.json_extract import extract_json as _extract_json
+from vibelens.utils.json_extract import repair_truncated_json as _repair_truncated_json
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -145,7 +147,7 @@ async def analyze_friction(
     project_by_session = _build_project_lookup(contexts)
 
     # Pipeline: concurrent LLM inference → resolve IDs → merge → type summary → synthesize
-    batch_results = await _run_all_batches(backend, batches, log_dir)
+    batch_results, batch_warnings = await _run_all_batches(backend, batches, log_dir)
 
     # Resolve synthetic 0-indexed IDs back to real UUIDs before merging
     for batch_output, _ in batch_results:
@@ -191,6 +193,7 @@ async def analyze_friction(
         cross_batch_patterns=cross_batch_patterns,
         session_ids=loaded_ids,
         sessions_skipped=skipped_ids,
+        warnings=batch_warnings,
         batch_count=len(batches),
         backend_id=backend.backend_id,
         model=_get_backend_model(backend),
@@ -225,7 +228,7 @@ def _extract_all_contexts(
             continue
         try:
             trajectories = load_from_stores(sid, session_token)
-        except Exception as exc:
+        except (OSError, ValueError, KeyError) as exc:
             logger.warning("Failed to load session %s, skipping: %s", sid, exc)
             skipped_ids.append(sid)
             continue
@@ -268,6 +271,7 @@ async def _infer_batch(
         user=user_prompt,
         max_tokens=FRICTION_OUTPUT_TOKENS,
         timeout=FRICTION_TIMEOUT_SECONDS,
+        json_schema=FRICTION_ANALYSIS_PROMPT.output_model.model_json_schema(),
     )
 
     # Save system prompt only once (shared across batches)
@@ -291,8 +295,8 @@ async def _infer_batch(
 
 async def _run_all_batches(
     backend: InferenceBackend, batches: list[SessionBatch], log_dir: Path
-) -> list[tuple[FrictionLLMBatchOutput, float]]:
-    """Run all batches concurrently.
+) -> tuple[list[tuple[FrictionLLMBatchOutput, float]], list[str]]:
+    """Run all batches concurrently, tolerating individual failures.
 
     Args:
         backend: Configured inference backend.
@@ -300,10 +304,29 @@ async def _run_all_batches(
         log_dir: Timestamped directory for saving prompts and outputs.
 
     Returns:
-        List of (batch_output, cost_usd) tuples.
+        Tuple of (successful results, warning messages).
+
+    Raises:
+        InferenceError: If every batch fails.
     """
     tasks = [_infer_batch(backend, batch, log_dir, idx) for idx, batch in enumerate(batches)]
-    return await asyncio.gather(*tasks)
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    successes: list[tuple[FrictionLLMBatchOutput, float]] = []
+    warnings: list[str] = []
+    for idx, result in enumerate(raw_results):
+        if isinstance(result, BaseException):
+            warnings.append(f"Batch {idx + 1}/{len(batches)} failed: {result}")
+            logger.warning("Friction batch %d failed: %s", idx, result)
+        else:
+            successes.append(result)
+
+    if not successes:
+        raise InferenceError(
+            f"All {len(batches)} friction batch(es) failed. Last error: {raw_results[-1]}"
+        )
+
+    return successes, warnings
 
 
 async def _synthesize_results(
@@ -368,6 +391,7 @@ async def _synthesize_results(
         user=user_prompt,
         max_tokens=SYNTHESIS_OUTPUT_TOKENS,
         timeout=SYNTHESIS_TIMEOUT_SECONDS,
+        json_schema=FRICTION_SYNTHESIS_PROMPT.output_model.model_json_schema(),
     )
 
     _save_friction_log(log_dir, "synthesis_system.txt", system_prompt)
@@ -842,80 +866,6 @@ def _parse_llm_output(text: str) -> FrictionLLMBatchOutput:
         raise InferenceError(
             f"LLM JSON does not match FrictionLLMBatchOutput schema: {exc}"
         ) from exc
-
-
-def _extract_json(text: str) -> str:
-    """Extract JSON from LLM output, handling markdown code blocks."""
-    stripped = text.strip()
-    if not stripped.startswith("```"):
-        return stripped
-
-    lines = stripped.split("\n")
-    start = 1
-    end = len(lines) - 1
-
-    while end > start and not lines[end].strip().startswith("```"):
-        end -= 1
-
-    if end <= start:
-        return "\n".join(lines[1:])
-    return "\n".join(lines[start:end])
-
-
-def _repair_truncated_json(text: str) -> str:
-    """Attempt to repair JSON truncated by max_tokens.
-
-    Args:
-        text: Truncated JSON string.
-
-    Returns:
-        Best-effort repaired JSON string.
-    """
-    # Repair strategy: strip trailing incomplete tokens, fix unbalanced quotes,
-    # then count unclosed braces/brackets and append closing characters.
-    # This handles the common case where max_tokens cuts off mid-object.
-    trimmed = text.rstrip()
-
-    # Step 1: Strip trailing JSON noise (dangling commas, colons, whitespace)
-    while trimmed and trimmed[-1] in (",", ":", " ", "\n", "\r", "\t"):
-        trimmed = trimmed[:-1]
-
-    # Step 2: Fix unbalanced quotes by truncating to last complete string
-    if trimmed.count('"') % 2 != 0:
-        last_quote = trimmed.rfind('"')
-        if last_quote > 0:
-            trimmed = trimmed[: last_quote + 1]
-
-    # Step 3: Count unclosed braces/brackets (respecting string boundaries)
-    open_braces = 0
-    open_brackets = 0
-    in_string = False
-    escape_next = False
-
-    for char in trimmed:
-        if escape_next:
-            escape_next = False
-            continue
-        if char == "\\":
-            escape_next = True
-            continue
-        if char == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if char == "{":
-            open_braces += 1
-        elif char == "}":
-            open_braces -= 1
-        elif char == "[":
-            open_brackets += 1
-        elif char == "]":
-            open_brackets -= 1
-
-    # Step 4: Append closing characters (brackets before braces for valid nesting)
-    suffix = "]" * max(open_brackets, 0) + "}" * max(open_braces, 0)
-    return trimmed + suffix
 
 
 def _save_friction_log(log_dir: Path, filename: str, content: str) -> None:

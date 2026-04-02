@@ -1,6 +1,7 @@
 import { ArrowLeft, Play, Settings } from "lucide-react";
 import { useState } from "react";
 import type { LLMStatus } from "../types";
+import { DemoBanner } from "./demo-banner";
 import { LLMConfigForm } from "./llm-config";
 import { Tooltip } from "./tooltip";
 
@@ -29,6 +30,7 @@ interface AnalysisWelcomePageProps {
   checkedCount: number;
   error: string | null;
   onRun: () => void;
+  isDemo?: boolean;
 }
 
 export function AnalysisWelcomePage({
@@ -42,6 +44,7 @@ export function AnalysisWelcomePage({
   checkedCount,
   error,
   onRun,
+  isDemo,
 }: AnalysisWelcomePageProps) {
   const [view, setView] = useState<"intro" | "config">("intro");
 
@@ -111,6 +114,12 @@ export function AnalysisWelcomePage({
                 Configure LLM
               </button>
             )}
+          </div>
+        )}
+
+        {isDemo && isMock && (
+          <div className="mb-6 text-left">
+            <DemoBanner />
           </div>
         )}
 

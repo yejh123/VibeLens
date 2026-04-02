@@ -24,13 +24,11 @@ from vibelens.models.analysis.friction import FrictionLLMBatchOutput
 from vibelens.models.inference import InferenceRequest
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.context_extraction import extract_session_context
-from vibelens.services.friction.analysis import (
-    FRICTION_OUTPUT_TOKENS,
-    _extract_json,
-    _repair_truncated_json,
-)
+from vibelens.services.friction.analysis import FRICTION_OUTPUT_TOKENS
 from vibelens.services.friction.digest import format_batch_digest
 from vibelens.services.session_batcher import build_batches
+from vibelens.utils.json_extract import extract_json as _extract_json
+from vibelens.utils.json_extract import repair_truncated_json as _repair_truncated_json
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "claude-codex-example" / "parsed"
 LOGS_DIR = Path(__file__).parent.parent / "logs" / "friction"

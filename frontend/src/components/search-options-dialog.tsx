@@ -13,9 +13,14 @@ const SEARCH_SOURCES: SearchSource[] = [
     description: "All messages typed by the user",
   },
   {
-    key: "agent_content",
-    label: "Agent responses & tool calls",
-    description: "Agent messages, tool names, and arguments",
+    key: "agent_messages",
+    label: "Agent messages",
+    description: "Text responses from the agent",
+  },
+  {
+    key: "tool_calls",
+    label: "Tool calls",
+    description: "Tool names, arguments, and results",
   },
   {
     key: "session_id",

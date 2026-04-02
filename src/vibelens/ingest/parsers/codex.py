@@ -244,10 +244,7 @@ class CodexParser(BaseParser):
             return None
 
         timestamp = normalize_timestamp(row["created_at"])
-        agent = self.build_agent(
-            version=row["cli_version"],
-            model=row["model"],
-        )
+        agent = self.build_agent(version=row["cli_version"], model=row["model"])
 
         first_message = row["first_user_message"]
         if first_message:
@@ -550,11 +547,7 @@ def _handle_response_item(
                 content = mark_error_content(content)
             obs_extra = result.get("metadata")
             state.pending_obs_results.append(
-                ObservationResult(
-                    source_call_id=call_id,
-                    content=content,
-                    extra=obs_extra,
-                )
+                ObservationResult(source_call_id=call_id, content=content, extra=obs_extra)
             )
 
     elif payload_type == "reasoning":

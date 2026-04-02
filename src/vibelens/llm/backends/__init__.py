@@ -2,6 +2,7 @@
 
 The create_backend_from_llm_config() factory reads LLMConfig and
 instantiates the configured backend, or returns None if inference is disabled.
+CLI backends are registered in _CLI_BACKEND_REGISTRY and lazy-imported.
 """
 
 from vibelens.config.llm_config import LLMConfig
@@ -11,7 +12,20 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
-CLI_BACKENDS = {BackendType.CLAUDE_CLI, BackendType.CODEX_CLI}
+# Registry mapping BackendType → (module_path, class_name)
+_CLI_BACKEND_REGISTRY: dict[BackendType, tuple[str, str]] = {
+    BackendType.CLAUDE_CLI: ("vibelens.llm.backends.claude_cli", "ClaudeCliBackend"),
+    BackendType.CODEX_CLI: ("vibelens.llm.backends.codex_cli", "CodexCliBackend"),
+    BackendType.GEMINI_CLI: ("vibelens.llm.backends.gemini_cli", "GeminiCliBackend"),
+    BackendType.CURSOR_CLI: ("vibelens.llm.backends.cursor_cli", "CursorCliBackend"),
+    BackendType.KIMI_CLI: ("vibelens.llm.backends.kimi_cli", "KimiCliBackend"),
+    BackendType.OPENCLAW_CLI: ("vibelens.llm.backends.openclaw_cli", "OpenClawCliBackend"),
+    BackendType.OPENCODE_CLI: ("vibelens.llm.backends.opencode_cli", "OpenCodeCliBackend"),
+    BackendType.AIDER_CLI: ("vibelens.llm.backends.aider_cli", "AiderCliBackend"),
+    BackendType.AMP_CLI: ("vibelens.llm.backends.amp_cli", "AmpCliBackend"),
+}
+
+CLI_BACKENDS = frozenset(_CLI_BACKEND_REGISTRY.keys())
 KNOWN_BACKENDS = CLI_BACKENDS | {BackendType.LITELLM, BackendType.DISABLED, BackendType.MOCK}
 
 
@@ -38,7 +52,10 @@ def create_backend_from_llm_config(config: LLMConfig) -> InferenceBackend | None
     if backend_id == BackendType.LITELLM:
         return _create_litellm_backend(config.model, config)
 
-    return _create_subprocess_backend(backend_id, config)
+    if backend_id in _CLI_BACKEND_REGISTRY:
+        return _create_cli_backend(backend_id, config)
+
+    return None
 
 
 def _create_litellm_backend(model: str, config: LLMConfig) -> InferenceBackend:
@@ -58,22 +75,19 @@ def _create_litellm_backend(model: str, config: LLMConfig) -> InferenceBackend:
     return LiteLLMBackend(config=config, model_override=override)
 
 
-def _create_subprocess_backend(backend_id: BackendType, config: LLMConfig) -> InferenceBackend:
-    """Create a subprocess CLI backend instance.
+def _create_cli_backend(backend_id: BackendType, config: LLMConfig) -> InferenceBackend:
+    """Create a CLI backend instance via registry lookup and lazy import.
 
     Args:
-        backend_id: One of BackendType.CLAUDE_CLI or BackendType.CODEX_CLI.
+        backend_id: CLI backend type from _CLI_BACKEND_REGISTRY.
         config: LLM configuration.
 
     Returns:
-        Configured SubprocessBackend instance.
+        Configured CliBackend subclass instance.
     """
-    from vibelens.llm.backends.subprocess import SubprocessBackend
+    import importlib
 
-    cli_name = "claude" if backend_id == BackendType.CLAUDE_CLI else "codex"
-    return SubprocessBackend(
-        cli_name=cli_name,
-        backend_type=backend_id,
-        model=config.model or None,
-        timeout=config.timeout,
-    )
+    module_path, class_name = _CLI_BACKEND_REGISTRY[backend_id]
+    module = importlib.import_module(module_path)
+    backend_cls = getattr(module, class_name)
+    return backend_cls(timeout=config.timeout)

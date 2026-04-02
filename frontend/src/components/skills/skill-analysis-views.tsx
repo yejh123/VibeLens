@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   ArrowUpRight,
   BarChart3,
   BookOpen,
@@ -21,7 +20,6 @@ import {
   Sparkles,
   Target,
   TrendingUp,
-  Wrench,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -35,27 +33,34 @@ import type {
   StepRef,
   WorkflowPattern,
 } from "../../types";
+import { DemoBanner } from "../demo-banner";
 import { Tooltip } from "../tooltip";
+import { WarningsBanner } from "../warnings-banner";
 import { InstallTargetDialog } from "./install-target-dialog";
+import { EvolutionDiffView } from "./skill-evolution-diff";
 
 export type SkillTab = "local" | "explore" | "retrieve" | "create" | "evolve";
 
 const CONFIDENCE_THRESHOLDS = { HIGH: 0.75, MEDIUM: 0.5 } as const;
 
+const MODE_SUBLABELS: Record<SkillMode, string> = {
+  retrieval: "Finding skills that match your coding patterns",
+  creation: "Generating custom skills from your workflow",
+  evolution: "Checking installed skills against your usage",
+};
+
 export function AnalysisLoadingState({ mode, sessionCount }: { mode: SkillMode; sessionCount: number }) {
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="flex flex-col items-center gap-5">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-teal-500/20 animate-ping" />
-          <Loader2 className="w-12 h-12 text-teal-400 animate-spin relative" />
-        </div>
-        <div className="text-center">
-          <p className="text-base font-semibold text-zinc-100">
-            Analyzing {sessionCount} session{sessionCount !== 1 ? "s" : ""}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1.5">Mode: {mode} — detecting workflow patterns</p>
-        </div>
+    <div className="flex flex-col items-center gap-5">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-teal-500/20 animate-ping" />
+        <Loader2 className="w-12 h-12 text-teal-400 animate-spin relative" />
+      </div>
+      <div className="text-center">
+        <p className="text-base font-semibold text-zinc-100">
+          Analyzing {sessionCount} session{sessionCount !== 1 ? "s" : ""}
+        </p>
+        <p className="text-sm text-zinc-500 mt-1.5">{MODE_SUBLABELS[mode]}</p>
       </div>
     </div>
   );
@@ -89,8 +94,12 @@ export function AnalysisResultView({
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-6 space-y-8">
+      {result.backend_id === "mock" && <DemoBanner />}
       {/* Header */}
       <ResultHeader result={result} onRerun={onRerun} onNew={onNew} />
+      {result.warnings && result.warnings.length > 0 && (
+        <WarningsBanner warnings={result.warnings} />
+      )}
 
       {/* Summary card */}
       <SummaryCard summary={result.summary} userProfile={result.user_profile} />
@@ -177,7 +186,7 @@ function SummaryCard({ summary, userProfile }: { summary: string; userProfile: s
       {userProfile && (
         <div className="flex items-start gap-2 pt-3 border-t border-zinc-700/40">
           <Shield className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-          <p className="text-xs text-zinc-500 italic">{userProfile}</p>
+          <p className="text-sm text-zinc-200 italic leading-relaxed">{userProfile}</p>
         </div>
       )}
     </div>
@@ -266,7 +275,7 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
               </span>
             </Tooltip>
           </div>
-          <p className="text-xs text-zinc-400 leading-relaxed mt-1">{pattern.description}</p>
+          <p className="text-sm text-zinc-300 leading-relaxed mt-1">{pattern.description}</p>
         </div>
         <div className="shrink-0 mt-1">
           {expanded
@@ -495,7 +504,7 @@ function CreatedSkillCard({
         <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{skill.description}</p>
         <div className="flex items-start gap-1.5 mt-2.5 pl-[2.375rem]">
           <Lightbulb className="w-3 h-3 text-emerald-500/60 mt-0.5 shrink-0" />
-          <p className="text-xs text-emerald-400/60 italic">{skill.rationale}</p>
+          <p className="text-sm text-emerald-300/80 italic leading-relaxed">{skill.rationale}</p>
         </div>
       </div>
       {expanded && (
@@ -556,68 +565,14 @@ function EvolutionCard({ suggestion }: { suggestion: SkillEvolutionSuggestion })
             ? <ChevronDown className="w-4 h-4 text-zinc-500" />
             : <ChevronRight className="w-4 h-4 text-zinc-500" />}
         </div>
-        <p className="text-sm text-zinc-400 leading-relaxed pl-[2.375rem]">{suggestion.rationale}</p>
+        <p className="text-sm text-zinc-100 leading-relaxed pl-[2.375rem]">{suggestion.rationale}</p>
       </button>
       {expanded && suggestion.edits.length > 0 && (
-        <div className="border-t border-amber-800/20 px-5 py-4 space-y-3 bg-zinc-900/20">
-          {suggestion.edits.map((edit, i) => (
-            <div key={i} className="flex items-start gap-3 text-sm pl-[2.375rem]">
-              <Tooltip text={EDIT_KIND_DESCRIPTIONS[edit.kind] || "A specific edit to the skill definition"}>
-                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 mt-0.5 cursor-help ${EDIT_KIND_STYLES[edit.kind] || "bg-zinc-700/80 text-zinc-300"}`}>
-                  {EDIT_KIND_ICONS[edit.kind] || <Pencil className="w-2.5 h-2.5" />}
-                  {EDIT_KIND_LABELS[edit.kind] || edit.kind}
-                </span>
-              </Tooltip>
-              <div className="min-w-0">
-                <p className="text-zinc-200">{edit.target}</p>
-                {edit.replacement && (
-                  <div className="flex items-center gap-1.5 mt-1 text-emerald-400">
-                    <ArrowRight className="w-3 h-3 shrink-0" />
-                    <p className="text-sm">{edit.replacement}</p>
-                  </div>
-                )}
-                <p className="text-xs text-zinc-500 italic mt-1">{edit.rationale}</p>
-              </div>
-            </div>
-          ))}
+        <div className="border-t border-amber-800/20 px-5 py-4 bg-zinc-900/20">
+          <EvolutionDiffView skillName={suggestion.skill_name} edits={suggestion.edits} />
         </div>
       )}
     </div>
   );
 }
 
-const EDIT_KIND_DESCRIPTIONS: Record<string, string> = {
-  add_instruction: "Add a new step or instruction to the skill body",
-  remove_instruction: "Remove an outdated or counterproductive instruction",
-  replace_instruction: "Replace an existing instruction with an improved version",
-  update_description: "Change the skill's trigger description for better activation",
-  add_tool: "Add a tool to the skill's allowed tools list",
-  remove_tool: "Remove an unnecessary tool from the allowed tools list",
-};
-
-const EDIT_KIND_LABELS: Record<string, string> = {
-  add_instruction: "Add",
-  remove_instruction: "Remove",
-  replace_instruction: "Replace",
-  update_description: "Update",
-  add_tool: "Add Tool",
-  remove_tool: "Remove Tool",
-};
-
-const EDIT_KIND_STYLES: Record<string, string> = {
-  add_instruction: "bg-emerald-900/30 text-emerald-400 border border-emerald-700/20",
-  remove_instruction: "bg-red-900/30 text-red-400 border border-red-700/20",
-  replace_instruction: "bg-sky-900/30 text-sky-400 border border-sky-700/20",
-  update_description: "bg-amber-900/30 text-amber-400 border border-amber-700/20",
-  add_tool: "bg-teal-900/30 text-teal-400 border border-teal-700/20",
-  remove_tool: "bg-rose-900/30 text-rose-400 border border-rose-700/20",
-};
-
-const EDIT_KIND_ICONS: Record<string, React.ReactNode> = {
-  add_instruction: <Plus className="w-2.5 h-2.5" />,
-  remove_instruction: <Zap className="w-2.5 h-2.5" />,
-  replace_instruction: <ArrowRight className="w-2.5 h-2.5" />,
-  update_description: <Pencil className="w-2.5 h-2.5" />,
-  add_tool: <Wrench className="w-2.5 h-2.5" />,
-  remove_tool: <Wrench className="w-2.5 h-2.5" />,
-};

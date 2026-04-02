@@ -1,8 +1,8 @@
 """In-memory search index for full-text session search.
 
-Builds a lazy text index from cached trajectories on first search call,
-with 5-minute TTL auto-invalidation. Returns matching session IDs for
-the frontend to filter its existing summary list.
+Pre-builds the index eagerly at startup via build_search_index() so the
+first query is instant. Falls back to lazy build with 5-minute TTL
+auto-invalidation if the eager call hasn't run yet.
 """
 
 import time
@@ -27,11 +27,19 @@ class _SearchEntry:
 
     session_id: str
     user_prompts: str
-    agent_content: str
+    agent_messages: str
+    tool_calls: str
 
 
 _search_index: dict[str, _SearchEntry] = {}
 _index_built_at: float | None = None
+
+
+def build_search_index(session_token: str | None = None) -> None:
+    """Eagerly build the search index (call at startup to avoid first-search lag)."""
+    _build_index(session_token)
+    global _index_built_at
+    _index_built_at = time.monotonic()
 
 
 def search_sessions(query: str, sources: list[str], session_token: str | None = None) -> list[str]:
@@ -39,7 +47,8 @@ def search_sessions(query: str, sources: list[str], session_token: str | None = 
 
     Args:
         query: Search string (case-insensitive substring match).
-        sources: List of source names to search (user_prompts, agent_content, session_id).
+        sources: List of source names to search
+            (user_prompts, agent_messages, tool_calls, session_id).
         session_token: Browser tab token for upload scoping.
 
     Returns:
@@ -72,7 +81,9 @@ def _entry_matches(entry: _SearchEntry, query: str, sources: list[str]) -> bool:
     for source in sources:
         if source == "user_prompts" and query in entry.user_prompts:
             return True
-        if source == "agent_content" and query in entry.agent_content:
+        if source == "agent_messages" and query in entry.agent_messages:
+            return True
+        if source == "tool_calls" and query in entry.tool_calls:
             return True
         if source == "session_id" and query in entry.session_id.lower():
             return True
@@ -112,7 +123,8 @@ def _build_index(session_token: str | None) -> None:
         _search_index[session_id] = _SearchEntry(
             session_id=session_id,
             user_prompts=_extract_user_prompts(trajectories),
-            agent_content=_extract_agent_content(trajectories),
+            agent_messages=_extract_agent_messages(trajectories),
+            tool_calls=_extract_tool_calls(trajectories),
         )
 
     logger.info("Search index built with %d entries", len(_search_index))
@@ -131,17 +143,26 @@ def _extract_user_prompts(trajectories: list[Trajectory]) -> str:
     return " ".join(parts).lower()
 
 
-def _extract_agent_content(trajectories: list[Trajectory]) -> str:
-    """Extract agent messages, tool names, readable args, and truncated observations."""
+def _extract_agent_messages(trajectories: list[Trajectory]) -> str:
+    """Extract agent text messages (no tool data)."""
     parts: list[str] = []
     for traj in trajectories:
         for step in traj.steps:
             if step.source != StepSource.AGENT:
                 continue
-
             text = _extract_message_text(step.message)
             if text:
                 parts.append(text)
+    return " ".join(parts).lower()
+
+
+def _extract_tool_calls(trajectories: list[Trajectory]) -> str:
+    """Extract tool names, arguments, and truncated observations."""
+    parts: list[str] = []
+    for traj in trajectories:
+        for step in traj.steps:
+            if step.source != StepSource.AGENT:
+                continue
 
             for tc in step.tool_calls:
                 parts.append(tc.function_name)

@@ -212,6 +212,9 @@ class FrictionAnalysisResult(BaseModel):
     sessions_skipped: list[str] = Field(
         default_factory=list, description="Session IDs from the request that were not found."
     )
+    warnings: list[str] = Field(
+        default_factory=list, description="Non-fatal issues encountered during analysis."
+    )
     cost_usd: float | None = Field(
         default=None, description="Total inference cost in USD across all batches."
     )

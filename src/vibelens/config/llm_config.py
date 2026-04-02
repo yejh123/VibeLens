@@ -64,7 +64,10 @@ class LLMConfig(BaseModel):
 
     backend: BackendType = Field(
         default=BackendType.DISABLED,
-        description="Backend: 'litellm', 'claude-cli', 'codex-cli', 'disabled'.",
+        description=(
+            "Backend: 'litellm', 'claude-cli', 'codex-cli', 'gemini-cli', 'cursor-cli', "
+            "'kimi-cli', 'openclaw-cli', 'opencode-cli', 'aider-cli', 'amp-cli', 'disabled'."
+        ),
     )
     api_key: str = Field(default="", description="API key for the LLM provider.")
     base_url: str | None = Field(

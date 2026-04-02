@@ -35,4 +35,14 @@ Analyze the provided session transcripts alongside the user's installed skills t
 - Every edit must have a `rationale` grounded in observed session behavior.
 - Prefer surgical edits over wholesale rewrites.
 
+## Conflict Taxonomy
+
+Every edit MUST include a `conflict_type` classifying the root cause. Use exactly one of:
+
+- `skipped_step`: The agent skipped a step the skill prescribes, indicating the instruction is unnecessary or poorly ordered.
+- `added_step`: The agent consistently added a step not in the skill, revealing a missing instruction.
+- `wrong_tool`: The agent used a different tool than what the skill specifies, suggesting a better tool choice exists.
+- `bad_trigger`: The skill activates at the wrong time or fails to activate when it should, indicating a trigger description problem.
+- `outdated_instruction`: The skill's instruction references deprecated APIs, old file paths, or stale conventions.
+
 Return valid JSON matching the provided schema.

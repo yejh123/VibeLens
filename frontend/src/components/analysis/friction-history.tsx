@@ -7,9 +7,10 @@ import { formatCost } from "../../utils";
 interface FrictionHistoryProps {
   onSelect: (result: FrictionAnalysisResult) => void;
   refreshTrigger: number;
+  activeJobId?: string | null;
 }
 
-export function FrictionHistory({ onSelect, refreshTrigger }: FrictionHistoryProps) {
+export function FrictionHistory({ onSelect, refreshTrigger, activeJobId }: FrictionHistoryProps) {
   const { fetchWithToken } = useAppContext();
   const [items, setItems] = useState<FrictionMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +74,14 @@ export function FrictionHistory({ onSelect, refreshTrigger }: FrictionHistoryPro
 
   return (
     <div className="space-y-1.5">
+      {activeJobId && (
+        <div className="px-3 py-2.5 rounded-lg bg-amber-900/20 border border-amber-700/30 animate-pulse">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+            <span className="text-xs text-amber-300 font-medium">Analysis running...</span>
+          </div>
+        </div>
+      )}
       {items.map((item) => (
         <HistoryCard
           key={item.analysis_id}

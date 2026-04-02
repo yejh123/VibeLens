@@ -9,7 +9,7 @@ interface DonateConsentDialogProps {
 
 const CONSENT_ITEMS = [
   "Before sharing, please ensure you have the necessary permissions to share this data and that it does not belong to a project with confidentiality restrictions.",
-  "My donated sessions may contain code snippets, file paths, and conversation content from my coding agent interactions.",
+  "My donated sessions may contain code snippets, git bundle, file paths, and conversation content from my coding agent interactions.",
   "Donated data will be used solely for academic research and will not be sold or used for commercial purposes.",
   "Donated data may appear in anonymized or aggregated form in research publications and open datasets.",
   "I may request deletion of my donated data by contacting the research team.",

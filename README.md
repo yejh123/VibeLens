@@ -35,7 +35,7 @@ Your AI coding agents run hundreds of tool calls, burn thousands of tokens, and 
 - **Session visualization.** Step-by-step timeline with every tool call, thinking block, and sub-agent spawn.
 - **Dashboard analytics.** Cost breakdowns by model, peak-hour histograms, and per-project drill-downs.
 - **Productivity tips.** Flags retries, circular debugging, and abandoned approaches -- with suggested fixes.
-- **Skill personalization.** Recommend, create, and evolve reusable agent skills from your session history.
+- **Skill personalization.** Recommend, create, and evolve reusable skills from your session history.
 - **Session sharing.** Share your interactions with your teammates with a link.
 
 Works with **Claude Code**, **Codex CLI**, **Gemini CLI**, and **OpenClaw** out of the box.

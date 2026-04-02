@@ -11,6 +11,13 @@ class BackendType(StrEnum):
     LITELLM = "litellm"
     CLAUDE_CLI = "claude-cli"
     CODEX_CLI = "codex-cli"
+    GEMINI_CLI = "gemini-cli"
+    CURSOR_CLI = "cursor-cli"
+    KIMI_CLI = "kimi-cli"
+    OPENCLAW_CLI = "openclaw-cli"
+    OPENCODE_CLI = "opencode-cli"
+    AIDER_CLI = "aider-cli"
+    AMP_CLI = "amp-cli"
     MOCK = "mock"
     DISABLED = "disabled"
 

@@ -20,10 +20,29 @@ const MODEL_PRESETS = [
 
 const BACKEND_OPTIONS = [
   { value: "litellm", label: "LiteLLM (recommended)" },
-  { value: "claude-cli", label: "Claude CLI" },
-  { value: "codex-cli", label: "Codex CLI" },
+  { value: "claude-cli", label: "Claude Code" },
+  { value: "codex-cli", label: "Codex" },
+  { value: "gemini-cli", label: "Gemini CLI" },
+  { value: "cursor-cli", label: "Cursor" },
+  { value: "kimi-cli", label: "Kimi" },
+  { value: "openclaw-cli", label: "OpenClaw" },
+  { value: "opencode-cli", label: "OpenCode" },
+  { value: "aider-cli", label: "Aider" },
+  { value: "amp-cli", label: "Amp" },
   { value: "disabled", label: "Disabled" },
 ];
+
+const CLI_BACKENDS = new Set([
+  "claude-cli",
+  "codex-cli",
+  "gemini-cli",
+  "cursor-cli",
+  "kimi-cli",
+  "openclaw-cli",
+  "opencode-cli",
+  "aider-cli",
+  "amp-cli",
+]);
 
 type AccentColor = "amber" | "teal" | "cyan";
 
@@ -175,22 +194,22 @@ export function LLMConfigForm({
   const [configError, setConfigError] = useState<string | null>(null);
 
   const accent = ACCENT_STYLES[accentColor];
-  const isCliBackend = backend === "claude-cli" || backend === "codex-cli";
+  const isCliBackend = CLI_BACKENDS.has(backend);
   const hasExistingKey = !!llmStatus?.api_key_masked;
 
   const handleSubmit = useCallback(async () => {
-    if (!isCliBackend && !apiKey.trim() && !hasExistingKey) return;
+    if (!isCliBackend && backend !== "disabled" && !apiKey.trim() && !hasExistingKey) return;
     setSubmitting(true);
     setConfigError(null);
     try {
-      const payload: Record<string, unknown> = {
-        backend: backend.trim(),
-        api_key: apiKey.trim(),
-        model: model.trim(),
-        timeout,
-        max_tokens: maxTokens,
-      };
-      if (baseUrl.trim()) payload.base_url = baseUrl.trim();
+      const payload: Record<string, unknown> = { backend: backend.trim() };
+      if (!isCliBackend && backend !== "disabled") {
+        payload.api_key = apiKey.trim();
+        payload.model = model.trim();
+        payload.timeout = timeout;
+        payload.max_tokens = maxTokens;
+        if (baseUrl.trim()) payload.base_url = baseUrl.trim();
+      }
       const res = await fetchWithToken("/api/llm/configure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -233,14 +252,20 @@ export function LLMConfigForm({
         </div>
       )}
 
-      {backend !== "disabled" && (
+      {!isCliBackend && backend !== "disabled" && (
         <div>
           <label className="block text-xs font-medium text-zinc-400 mb-1">Model</label>
           <ModelCombobox value={model} onChange={setModel} accentColor={accentColor} />
         </div>
       )}
 
-      {backend !== "disabled" && (
+      {isCliBackend && (
+        <p className="text-xs text-zinc-500">
+          Uses your local {BACKEND_OPTIONS.find((o) => o.value === backend)?.label ?? backend} installation. No API key or model configuration needed.
+        </p>
+      )}
+
+      {!isCliBackend && backend !== "disabled" && (
         <button
           type="button"
           onClick={() => setShowAdvanced((v) => !v)}
@@ -251,7 +276,7 @@ export function LLMConfigForm({
         </button>
       )}
 
-      {showAdvanced && backend !== "disabled" && (
+      {showAdvanced && !isCliBackend && backend !== "disabled" && (
         <div className="space-y-3 pl-3 border-l-2 border-zinc-700/50">
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1">

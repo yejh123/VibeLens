@@ -78,6 +78,9 @@ export function App() {
     return params.get("step") || null;
   });
 
+  const [frictionJobId, setFrictionJobId] = useState<string | null>(null);
+  const [skillJobId, setSkillJobId] = useState<string | null>(null);
+
   // Detect ?share={token} in URL for shared session viewing
   const [shareToken] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -490,9 +493,9 @@ export function App() {
           {/* Content Area */}
           <div className="flex-1 min-h-0 relative">
             {mainView === "skills" ? (
-              <SkillsPanel checkedIds={checkedIds} />
+              <SkillsPanel checkedIds={checkedIds} activeJobId={skillJobId} onJobIdChange={setSkillJobId} />
             ) : mainView === "friction" ? (
-              <FrictionPanel checkedIds={checkedIds} />
+              <FrictionPanel checkedIds={checkedIds} activeJobId={frictionJobId} onJobIdChange={setFrictionJobId} />
             ) : mainView === "analyze" ? (
               <DashboardView key={refreshKey} cache={dashboardCache} />
             ) : selectedSessionId ? (

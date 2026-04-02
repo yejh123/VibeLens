@@ -67,3 +67,60 @@ export const CATEGORY_LABELS: Record<string, string> = {
   "ai-assistant": "AI Assistant",
   development: "Development",
 };
+
+/** Human-readable labels for skill edit kinds. */
+export const EDIT_KIND_LABELS: Record<string, string> = {
+  add_instruction: "Add",
+  remove_instruction: "Remove",
+  replace_instruction: "Replace",
+  update_description: "Update",
+  add_tool: "Add Tool",
+  remove_tool: "Remove Tool",
+};
+
+/** Badge color classes for skill edit kinds. */
+export const EDIT_KIND_STYLES: Record<string, string> = {
+  add_instruction: "bg-emerald-900/30 text-emerald-400 border border-emerald-700/20",
+  remove_instruction: "bg-red-900/30 text-red-400 border border-red-700/20",
+  replace_instruction: "bg-sky-900/30 text-sky-400 border border-sky-700/20",
+  update_description: "bg-amber-900/30 text-amber-400 border border-amber-700/20",
+  add_tool: "bg-teal-900/30 text-teal-400 border border-teal-700/20",
+  remove_tool: "bg-rose-900/30 text-rose-400 border border-rose-700/20",
+};
+
+/** Tooltip descriptions for skill edit kinds. */
+export const EDIT_KIND_DESCRIPTIONS: Record<string, string> = {
+  add_instruction: "Add a new step or instruction to the skill body",
+  remove_instruction: "Remove an outdated or counterproductive instruction",
+  replace_instruction: "Replace an existing instruction with an improved version",
+  update_description: "Change the skill's trigger description for better activation",
+  add_tool: "Add a tool to the skill's allowed tools list",
+  remove_tool: "Remove an unnecessary tool from the allowed tools list",
+};
+
+/** Badge color classes for conflict types. */
+export const CONFLICT_TYPE_STYLES: Record<string, string> = {
+  skipped_step: "bg-orange-900/30 text-orange-400 border border-orange-700/20",
+  added_step: "bg-blue-900/30 text-blue-400 border border-blue-700/20",
+  wrong_tool: "bg-rose-900/30 text-rose-400 border border-rose-700/20",
+  bad_trigger: "bg-purple-900/30 text-purple-400 border border-purple-700/20",
+  outdated_instruction: "bg-amber-900/30 text-amber-400 border border-amber-700/20",
+};
+
+/** Human-readable labels for conflict types. */
+export const CONFLICT_TYPE_LABELS: Record<string, string> = {
+  skipped_step: "Skipped Step",
+  added_step: "Added Step",
+  wrong_tool: "Wrong Tool",
+  bad_trigger: "Bad Trigger",
+  outdated_instruction: "Outdated",
+};
+
+/** Tooltip descriptions for conflict types. */
+export const CONFLICT_TYPE_DESCRIPTIONS: Record<string, string> = {
+  skipped_step: "The agent skipped a step the skill prescribes",
+  added_step: "The agent added a step not covered by the skill",
+  wrong_tool: "The agent chose a different tool than the skill recommends",
+  bad_trigger: "The skill's trigger description failed to activate when expected",
+  outdated_instruction: "An instruction no longer matches how the agent behaves",
+};

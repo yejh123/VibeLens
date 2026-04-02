@@ -47,7 +47,11 @@ async def analyze_evolvement(
     user_prompt = _render_evolvement_prompt(prompt, digest, len(loaded_ids), skill_contents)
 
     system_prompt = prompt.render_system()
-    request = InferenceRequest(system=system_prompt, user=user_prompt)
+    request = InferenceRequest(
+        system=system_prompt,
+        user=user_prompt,
+        json_schema=prompt.output_model.model_json_schema(),
+    )
     _log_prompt(system_prompt, user_prompt, loaded_ids, SkillMode.EVOLUTION)
 
     result = await backend.generate(request)

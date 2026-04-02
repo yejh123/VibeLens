@@ -26,6 +26,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAppContext } from "../../app";
 import type {
+  AnalysisJobResponse,
+  AnalysisJobStatus,
   FrictionAnalysisResult,
   FrictionEstimate,
   FrictionEvent,
@@ -36,10 +38,12 @@ import type {
 import { formatCost, formatDuration, formatTokens } from "../../utils";
 import { SEVERITY_COLORS, SESSION_ID_SHORT, SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from "../../styles";
 import { CopyButton } from "../copy-button";
+import { DemoBanner } from "../demo-banner";
 import { AnalysisWelcomePage } from "../analysis-welcome";
-import { LoadingSpinner } from "../loading-spinner";
+import { LoadingSpinner, LoadingSpinnerRings } from "../loading-spinner";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "../modal";
 import { FrictionHistory } from "./friction-history";
+import { WarningsBanner } from "../warnings-banner";
 
 const SEVERITY_LABELS: Record<number, string> = {
   1: "Minor",
@@ -76,12 +80,16 @@ function _actionColor(action: string): string {
   return DEFAULT_ACTION_COLOR;
 }
 
+const POLL_INTERVAL_MS = 3000;
+
 interface FrictionPanelProps {
   checkedIds: Set<string>;
+  activeJobId: string | null;
+  onJobIdChange: (id: string | null) => void;
 }
 
-export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
-  const { fetchWithToken } = useAppContext();
+export function FrictionPanel({ checkedIds, activeJobId, onJobIdChange }: FrictionPanelProps) {
+  const { fetchWithToken, appMode } = useAppContext();
   const [result, setResult] = useState<FrictionAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,15 +180,22 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.detail || `HTTP ${res.status}`);
       }
-      const data: FrictionAnalysisResult = await res.json();
-      setResult(data);
-      setHistoryRefresh((n) => n + 1);
+      const data: AnalysisJobResponse = await res.json();
+      if (data.status === "completed" && data.analysis_id) {
+        const loadRes = await fetchWithToken(`/api/analysis/friction/${data.analysis_id}`);
+        if (loadRes.ok) {
+          setResult(await loadRes.json());
+          setHistoryRefresh((n) => n + 1);
+        }
+        setLoading(false);
+      } else {
+        onJobIdChange(data.job_id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setLoading(false);
     }
-  }, [checkedIds, fetchWithToken]);
+  }, [checkedIds, fetchWithToken, onJobIdChange]);
 
   const handleHistorySelect = useCallback((loaded: FrictionAnalysisResult) => {
     setResult(loaded);
@@ -190,6 +205,51 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
     setResult(null);
     setError(null);
   }, []);
+
+  // Poll for job completion when activeJobId is set
+  useEffect(() => {
+    if (!activeJobId) return;
+    setLoading(true);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithToken(`/api/analysis/friction/jobs/${activeJobId}`);
+        if (!res.ok) return;
+        const status: AnalysisJobStatus = await res.json();
+        if (status.status === "completed" && status.analysis_id) {
+          onJobIdChange(null);
+          setLoading(false);
+          const loadRes = await fetchWithToken(`/api/analysis/friction/${status.analysis_id}`);
+          if (loadRes.ok) {
+            setResult(await loadRes.json());
+            setHistoryRefresh((n) => n + 1);
+          }
+        } else if (status.status === "failed") {
+          onJobIdChange(null);
+          setLoading(false);
+          setError(status.error_message || "Analysis failed");
+        } else if (status.status === "cancelled") {
+          onJobIdChange(null);
+          setLoading(false);
+        }
+      } catch {
+        /* polling is best-effort */
+      }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [activeJobId, fetchWithToken, onJobIdChange]);
+
+  const handleStopAnalysis = useCallback(async () => {
+    if (!activeJobId) return;
+    try {
+      await fetchWithToken(`/api/analysis/friction/jobs/${activeJobId}/cancel`, {
+        method: "POST",
+      });
+    } catch {
+      /* best-effort */
+    }
+    onJobIdChange(null);
+    setLoading(false);
+  }, [activeJobId, fetchWithToken, onJobIdChange]);
 
   const sidebar = useMemo(() => (
     <>
@@ -219,7 +279,7 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 pt-1">
-              <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} />
+              <FrictionHistory onSelect={handleHistorySelect} refreshTrigger={historyRefresh} activeJobId={activeJobId} />
             </div>
           </div>
         </>
@@ -248,6 +308,27 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
   );
 
   if (loading || estimating) {
+    if (activeJobId) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-5">
+            <LoadingSpinnerRings />
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium text-zinc-200">
+                Analyzing {checkedIds.size} session{checkedIds.size !== 1 ? "s" : ""} for friction
+              </p>
+              <p className="text-xs text-zinc-500">Running in background — you can switch tabs</p>
+            </div>
+            <button
+              onClick={handleStopAnalysis}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs text-zinc-300 hover:text-white bg-zinc-700 hover:bg-zinc-600 border border-zinc-600 rounded-md transition"
+            >
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <LoadingSpinner
         label={
@@ -275,6 +356,7 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
             checkedCount={checkedIds.size}
             error={error}
             onRun={handleRequestAnalysis}
+            isDemo={appMode === "demo"}
           />
         </div>
         {sidebar}
@@ -287,7 +369,11 @@ export function FrictionPanel({ checkedIds }: FrictionPanelProps) {
     <div className="h-full flex">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+          {result.backend_id === "mock" && <DemoBanner />}
           <ResultHeader result={result} onNew={handleNewAnalysis} />
+          {result.warnings && result.warnings.length > 0 && (
+            <WarningsBanner warnings={result.warnings} />
+          )}
           <SummarySection
             summary={result.summary}
             topMitigations={result.top_mitigations ?? []}
@@ -417,7 +503,7 @@ function TypeCard({ type, maxCost }: { type: TypeSummary; maxCost: number }) {
       </div>
 
       {type.description && (
-        <p className="text-xs text-zinc-400 leading-relaxed">{type.description}</p>
+        <p className="text-sm text-zinc-200 leading-relaxed">{type.description}</p>
       )}
 
       <div className="flex items-center gap-3">
@@ -587,7 +673,7 @@ function EventCard({ event, defaultExpanded = false }: { event: FrictionEvent; d
             </p>
             {/* Friction detail */}
             {event.friction_detail && (
-              <p className={`text-sm text-zinc-400 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
+              <p className={`text-sm text-zinc-200 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
                 {event.friction_detail}
               </p>
             )}

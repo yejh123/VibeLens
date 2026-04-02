@@ -26,7 +26,7 @@ For every workflow pattern, provide:
 
 For every evolution suggestion, provide:
 - `skill_name`: Name of the existing skill to improve.
-- `edits`: Ordered list of granular edits, each with `kind`, `target`, `replacement` (null for removals), and `rationale`.
+- `edits`: Ordered list of granular edits, each with `kind`, `target`, `replacement` (null for removals), `rationale`, and `conflict_type` (one of: `skipped_step`, `added_step`, `wrong_tool`, `bad_trigger`, `outdated_instruction`).
 - `rationale`: Overall rationale for evolving this skill.
 
 After patterns and suggestions, provide:

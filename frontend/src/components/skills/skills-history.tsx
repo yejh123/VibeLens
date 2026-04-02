@@ -103,10 +103,12 @@ export function SkillsHistory({
   onSelect,
   refreshTrigger,
   filterMode,
+  activeJobId,
 }: {
   onSelect: (result: SkillAnalysisResult) => void;
   refreshTrigger: number;
   filterMode: SkillMode | null;
+  activeJobId?: string | null;
 }) {
   const { fetchWithToken } = useAppContext();
   const [analyses, setAnalyses] = useState<SkillAnalysisMeta[]>([]);
@@ -188,6 +190,14 @@ export function SkillsHistory({
 
   return (
     <div className="space-y-1.5">
+      {activeJobId && (
+        <div className="px-3 py-2.5 rounded-lg bg-teal-900/20 border border-teal-700/30 animate-pulse">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3 h-3 text-teal-400 animate-spin" />
+            <span className="text-xs text-teal-300 font-medium">Analysis running...</span>
+          </div>
+        </div>
+      )}
       {filteredAnalyses.map((meta) => (
         <HistoryCard
           key={meta.analysis_id}

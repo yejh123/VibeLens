@@ -80,12 +80,19 @@ def _format_step(signal: StepSignal, limits: DigestLimits) -> str:
     msg = truncate(extract_text(step.message), limits.max_message_chars)
     lines = [f"[{signal.step_index}] {source}: {msg}"]
 
+    obs_by_call_id: dict[str, str | list] = {}
+    if step.observation:
+        for obs_result in step.observation.results:
+            if obs_result.source_call_id and obs_result.content is not None:
+                obs_by_call_id[obs_result.source_call_id] = obs_result.content
+
     for tc in step.tool_calls:
         args_str = summarize_args(tc.arguments, max_total_chars=limits.max_arg_chars)
         lines.append(f"  TOOL: fn={tc.function_name} {args_str}")
 
-        if tc.observation and tc.observation.result:
-            obs_text = extract_text(tc.observation.result)
+        obs_content = obs_by_call_id.get(tc.tool_call_id)
+        if obs_content is not None:
+            obs_text = extract_text(obs_content)
             if is_error_content(obs_text):
                 lines.append(f"  ERROR: {truncate(obs_text, limits.max_observation_chars)}")
             elif limits.max_observation_chars > 0:

@@ -6,6 +6,7 @@ used by all three skill analysis modes.
 
 import hashlib
 import json
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,12 +32,15 @@ from vibelens.models.trajectories import Trajectory
 from vibelens.services.friction.signals import build_step_signals
 from vibelens.services.session.store_resolver import get_metadata_from_stores, load_from_stores
 from vibelens.services.skill.digest import digest_step_signals_for_skills
+from vibelens.utils.json_extract import extract_json as _extract_json
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
 CACHE_TTL_SECONDS = 3600
-FEATURED_SKILLS_PATH = Path(__file__).resolve().parents[3] / "featured-skills.json"
+FEATURED_SKILLS_PATH = Path(__file__).resolve().parents[4] / "featured-skills.json"
+CANDIDATE_PREFILTER_THRESHOLD = 200
+PREFILTER_TOP_K = 100
 
 _cache: dict[str, tuple[float, BaseModel]] = {}
 
@@ -64,7 +68,11 @@ async def analyze_retrieval(
     user_prompt = _render_retrieval_prompt(prompt, digest, len(loaded_ids), installed_skills)
 
     system_prompt = prompt.render_system()
-    request = InferenceRequest(system=system_prompt, user=user_prompt)
+    request = InferenceRequest(
+        system=system_prompt,
+        user=user_prompt,
+        json_schema=prompt.output_model.model_json_schema(),
+    )
     _log_prompt(system_prompt, user_prompt, loaded_ids, SkillMode.RETRIEVAL)
 
     result = await backend.generate(request)
@@ -94,6 +102,8 @@ def _render_retrieval_prompt(
     """Render retrieval-specific user prompt with skill candidates."""
     output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)
     skill_candidates = _load_skill_candidates()
+    if len(skill_candidates) > CANDIDATE_PREFILTER_THRESHOLD:
+        skill_candidates = _prefilter_candidates(skill_candidates, digest)
     return prompt.render_user(
         session_count=session_count,
         session_digest=digest,
@@ -128,7 +138,70 @@ def _load_skill_candidates() -> list[dict]:
         return []
 
 
-# ── Shared infrastructure used by all modes ──────────────────────────
+def _prefilter_candidates(candidates: list[dict], digest: str) -> list[dict]:
+    """Keyword-based pre-filtering for large skill catalogs.
+
+    Extracts keywords from the digest (tool names, user topics, alpha tokens)
+    and scores each candidate by keyword overlap in name + summary + tags.
+
+    Args:
+        candidates: Full list of skill candidate dicts.
+        digest: Session digest text used for keyword extraction.
+
+    Returns:
+        Top PREFILTER_TOP_K candidates sorted by relevance score.
+    """
+    keywords = _extract_digest_keywords(digest)
+    if not keywords:
+        return candidates[:PREFILTER_TOP_K]
+
+    scored: list[tuple[int, dict]] = []
+    for candidate in candidates:
+        searchable = " ".join([
+            candidate.get("name", ""),
+            candidate.get("summary", ""),
+            " ".join(candidate.get("tags", [])),
+        ]).lower()
+        score = sum(1 for kw in keywords if kw in searchable)
+        scored.append((score, candidate))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [candidate for _, candidate in scored[:PREFILTER_TOP_K]]
+
+
+def _extract_digest_keywords(digest: str) -> set[str]:
+    """Extract keywords from a session digest for candidate matching.
+
+    Pulls tool names from "TOOL FREQUENCY:" blocks, user topics,
+    and alpha tokens longer than 3 characters.
+
+    Args:
+        digest: Session digest text.
+
+    Returns:
+        Set of lowercase keywords.
+    """
+    keywords: set[str] = set()
+
+    # Extract tool names from TOOL FREQUENCY lines (e.g. "  Edit: 15")
+    for match in re.finditer(r"^\s+(\w+):\s+\d+", digest, re.MULTILINE):
+        keywords.add(match.group(1).lower())
+
+    # Extract user topics from USER TOPICS lines
+    topic_match = re.search(r"USER TOPICS:\s*(.+)", digest)
+    if topic_match:
+        topic_text = topic_match.group(1)
+        for token in re.findall(r"[a-zA-Z]{4,}", topic_text):
+            keywords.add(token.lower())
+
+    # Extract general alpha tokens from fn= tool calls
+    for match in re.finditer(r"fn=(\w+)", digest):
+        keywords.add(match.group(1).lower())
+
+    return keywords
+
+
+# Shared infrastructure used by all modes
 
 
 def _skill_cache_key(session_ids: list[str], mode: SkillMode) -> str:
@@ -205,18 +278,6 @@ def _parse_llm_output(text: str) -> SkillLLMOutput:
         ) from exc
     except ValidationError as exc:
         raise InferenceError(f"LLM JSON does not match SkillLLMOutput schema: {exc}") from exc
-
-
-def _extract_json(text: str) -> str:
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        start = 1
-        end = len(lines) - 1
-        while end > start and not lines[end].strip().startswith("```"):
-            end -= 1
-        return "\n".join(lines[start:end])
-    return stripped
 
 
 def _validate_patterns(

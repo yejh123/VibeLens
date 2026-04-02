@@ -1,7 +1,7 @@
 """Mock skill analysis data for demo/test mode.
 
-Builds a realistic SkillAnalysisResult with workflow patterns and
-recommendations, using real step IDs from loaded trajectories.
+Builds realistic SkillAnalysisResult, SkillProposalResult, and SkillCreation
+instances using real step IDs from loaded trajectories.
 """
 
 from datetime import UTC, datetime
@@ -11,11 +11,14 @@ from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.inference import BackendType
 from vibelens.models.skill.skills import (
     SkillAnalysisResult,
+    SkillConflictType,
     SkillCreation,
     SkillEdit,
     SkillEditKind,
     SkillEvolutionSuggestion,
     SkillMode,
+    SkillProposal,
+    SkillProposalResult,
     SkillRecommendation,
     WorkflowPattern,
 )
@@ -73,6 +76,109 @@ def build_mock_skill_result(session_ids: list[str], mode: SkillMode) -> SkillAna
         model="mock/test-model",
         cost_usd=0.035,
         created_at=datetime.now(UTC).isoformat(),
+    )
+
+
+def build_mock_proposal_result(session_ids: list[str]) -> SkillProposalResult:
+    """Build a mock SkillProposalResult for demo/test mode.
+
+    Args:
+        session_ids: Session IDs from the request.
+
+    Returns:
+        Mock SkillProposalResult with sample proposals.
+    """
+    step_pool = _collect_step_ids(session_ids)
+    loaded_ids = list(step_pool.keys())
+    skipped = [sid for sid in session_ids if sid not in step_pool]
+    patterns = _build_mock_patterns(step_pool)
+
+    proposals = [
+        SkillProposal(
+            name="search-and-replace",
+            description="Intelligent multi-file search and replace with context-aware matching.",
+            rationale=(
+                "Your search-read-edit cycle is the most frequent pattern. "
+                "This skill packages it into a single, repeatable workflow."
+            ),
+            addressed_patterns=["Search-Read-Edit Cycle"],
+        ),
+        SkillProposal(
+            name="test-fix-loop",
+            description="Automated test-driven debugging: run, diagnose, fix, verify.",
+            rationale=(
+                "Test-fix loops consumed significant context in multiple sessions. "
+                "Automating the diagnosis step would save ~40% of iterations."
+            ),
+            addressed_patterns=["Test-Fix Loop"],
+        ),
+        SkillProposal(
+            name="project-scaffold",
+            description="Generate project file scaffolding with standard boilerplate and imports.",
+            rationale=(
+                "Detected repeated file creation with identical boilerplate structure "
+                "across 3 sessions. Automating this saves ~2 minutes per new file."
+            ),
+            addressed_patterns=["New File Scaffolding"],
+        ),
+        SkillProposal(
+            name="dep-upgrade",
+            description="Automate dependency version bumps with changelog analysis and testing.",
+            rationale=(
+                "Each dependency upgrade requires 4-5 manual steps. "
+                "A skill could batch-process multiple upgrades safely."
+            ),
+            addressed_patterns=["Dependency Upgrade Workflow"],
+        ),
+    ]
+
+    return SkillProposalResult(
+        session_ids=loaded_ids,
+        workflow_patterns=patterns,
+        proposals=proposals,
+        summary=(
+            f"Analyzed {len(loaded_ids)} sessions and detected {len(patterns)} "
+            f"recurring workflow patterns. Generated 4 skill proposals targeting "
+            f"the most impactful automation opportunities."
+        ),
+        user_profile=(
+            "Developer focused on Python/TypeScript full-stack projects. "
+            "Frequently uses Grep → Read → Edit → Bash workflows for code modifications."
+        ),
+        sessions_skipped=skipped,
+        backend_id=BackendType.MOCK,
+        model="mock/test-model",
+        cost_usd=0.012,
+        batch_count=1,
+        created_at=datetime.now(UTC).isoformat(),
+    )
+
+
+def build_mock_deep_creation(proposal_name: str) -> SkillCreation:
+    """Build a mock SkillCreation for demo/test mode.
+
+    Args:
+        proposal_name: Name of the proposal to create.
+
+    Returns:
+        Mock SkillCreation with full SKILL.md content.
+    """
+    return SkillCreation(
+        name=proposal_name,
+        description=f"Mock skill for {proposal_name} generated in demo mode.",
+        skill_md_content=(
+            f"---\n"
+            f"description: Mock skill for {proposal_name}\n"
+            f"tags: [mock, demo]\n"
+            f"allowed-tools: [Read, Edit, Bash]\n"
+            f"---\n\n"
+            f"# {proposal_name}\n\n"
+            f"1. Analyze the current context\n"
+            f"2. Apply the appropriate transformation\n"
+            f"3. Verify the result with tests\n"
+            f"4. Report completion\n"
+        ),
+        rationale=f"Mock rationale for {proposal_name} in demo/test mode.",
     )
 
 
@@ -209,7 +315,7 @@ def _build_mock_recommendations() -> list[SkillRecommendation]:
             skill_name="dep-updater",
             match_reason=(
                 "Automates dependency version bumps with changelog analysis. "
-                "Low match — your upgrade pattern is infrequent."
+                "Low match -- your upgrade pattern is infrequent."
             ),
             confidence=0.35,
         ),
@@ -306,6 +412,7 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                             "5. Run `ruff check` after every edit to catch lint errors early."
                         ),
                         rationale="User frequently runs linter manually after edits.",
+                        conflict_type=SkillConflictType.ADDED_STEP,
                     ),
                     SkillEdit(
                         kind=SkillEditKind.UPDATE_DESCRIPTION,
@@ -314,12 +421,14 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                             f"{first_skill.name} with automatic linting and error checking"
                         ),
                         rationale="Updated trigger description to reflect new capabilities.",
+                        conflict_type=SkillConflictType.BAD_TRIGGER,
                     ),
                     SkillEdit(
                         kind=SkillEditKind.ADD_TOOL,
                         target="allowed-tools",
                         replacement="Grep",
                         rationale="Skill could benefit from Grep for searching related files.",
+                        conflict_type=SkillConflictType.WRONG_TOOL,
                     ),
                 ],
                 rationale=(
@@ -340,13 +449,15 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                         kind=SkillEditKind.REMOVE_INSTRUCTION,
                         target="Step 3: Manual verification",
                         replacement=None,
-                        rationale="This step is redundant — automated tests already cover it.",
+                        rationale="This step is redundant -- automated tests already cover it.",
+                        conflict_type=SkillConflictType.SKIPPED_STEP,
                     ),
                     SkillEdit(
                         kind=SkillEditKind.REPLACE_INSTRUCTION,
                         target="Step 2: Read all files in directory",
                         replacement="Step 2: Read only modified files (use `git diff --name-only`)",
                         rationale="Reading all files wastes context. Focus on changed files only.",
+                        conflict_type=SkillConflictType.OUTDATED_INSTRUCTION,
                     ),
                 ],
                 rationale=(
@@ -367,6 +478,7 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                         target="end of skill body",
                         replacement="Always verify changes with the linter before completing.",
                         rationale="Consistent linting reduces review cycles.",
+                        conflict_type=SkillConflictType.ADDED_STEP,
                     ),
                 ],
                 rationale=(
