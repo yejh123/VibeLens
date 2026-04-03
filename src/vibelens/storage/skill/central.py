@@ -111,8 +111,8 @@ class CentralSkillStore(DiskSkillStore):
         # Rebuild SKILL.md with updated frontmatter
         body = extract_body(text)
         yaml_block = yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True).rstrip()
-        new_text = f"{FRONTMATTER_DELIMITER}\n{yaml_block}\n{FRONTMATTER_DELIMITER}\n{body}"
-        skill_file.write_text(new_text, encoding="utf-8")
+        new_text = f"{FRONTMATTER_DELIMITER}\n{yaml_block}\n{FRONTMATTER_DELIMITER}\n\n{body}"
+        skill_file.write_text(new_text.rstrip() + "\n", encoding="utf-8")
 
 
 def _parse_sources(raw: object) -> list[SkillSource]:

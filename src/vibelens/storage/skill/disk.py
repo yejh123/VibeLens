@@ -120,7 +120,9 @@ class DiskSkillStore(SkillStore):
         skill_dir.mkdir(parents=True, exist_ok=True)
 
         skill_file = skill_dir / SKILL_FILENAME
-        skill_file.write_text(content, encoding="utf-8")
+        # LLM-generated content often has excessive trailing newlines
+        normalized = content.rstrip() + "\n"
+        skill_file.write_text(normalized, encoding="utf-8")
         self.invalidate_cache()
 
         logger.info("Wrote skill %r to %s", name, skill_file)
@@ -215,10 +217,14 @@ def detect_subdirs(skill_dir: Path) -> list[str]:
 
 
 def extract_body(text: str) -> str:
-    """Extract the markdown body after the YAML frontmatter."""
+    """Extract the markdown body after the YAML frontmatter.
+
+    Leading blank lines between the closing ``---`` and the body content
+    are stripped to prevent accumulation across repeated metadata injections.
+    """
     if not text.startswith(FRONTMATTER_DELIMITER):
         return text
     end_idx = text.find(FRONTMATTER_DELIMITER, len(FRONTMATTER_DELIMITER))
     if end_idx < 0:
         return text
-    return text[end_idx + len(FRONTMATTER_DELIMITER) :]
+    return text[end_idx + len(FRONTMATTER_DELIMITER) :].lstrip("\n")
