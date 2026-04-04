@@ -25,7 +25,7 @@
 ---
 
 <p align="center">
-  <img src="figures/comic-blurb.png" alt="VibeLens Comic">
+  <img src="figures/comic-blurb.jpg" alt="VibeLens Comic">
 </p>
 
 <p align="center"><em>Analyze and understand your agent. Evolve it.</em></p>
