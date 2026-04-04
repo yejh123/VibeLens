@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, ValidationError
 
 from vibelens.deps import get_inference_backend
-from vibelens.llm.backend import InferenceBackend, InferenceError
+from vibelens.llm.backend import InferenceError
 from vibelens.llm.backends import CLI_BACKENDS
 from vibelens.llm.digest import digest_trajectory, select_depth
 from vibelens.llm.prompts import PROMPT_REGISTRY
@@ -21,6 +21,7 @@ from vibelens.models.analysis.insights import InsightReport
 from vibelens.models.inference import BackendType, InferenceRequest
 from vibelens.models.prompts import AnalysisPrompt
 from vibelens.models.trajectories import Trajectory
+from vibelens.services.analysis_shared import build_system_kwargs, require_backend
 from vibelens.services.session.store_resolver import (
     get_metadata_from_stores,
     load_from_stores,
@@ -80,13 +81,14 @@ async def analyze_session(
     if cached:
         return cached
 
-    backend = _require_backend()
+    backend = require_backend()
     trajectories = _load_session(session_id, session_token)
     digest = _prepare_digest(trajectories)
     user_prompt = _format_user_prompt(prompt, digest)
 
+    system_kwargs = build_system_kwargs(prompt.output_model, backend)
     request = InferenceRequest(
-        system=prompt.render_system(),
+        system=prompt.render_system(**system_kwargs),
         user=user_prompt,
         json_schema=prompt.output_model.model_json_schema(),
     )
@@ -107,7 +109,7 @@ async def get_session_report(session_id: str, session_token: str | None = None) 
     Returns:
         Combined InsightReport.
     """
-    backend = _require_backend()
+    backend = require_backend()
 
     highlights = None
     friction = None
@@ -169,14 +171,6 @@ async def estimate_cost(session_id: str, session_token: str | None = None) -> fl
     return round((input_cost + output_cost) * 2, 6)
 
 
-def _require_backend() -> InferenceBackend:
-    """Get the inference backend or raise if unavailable."""
-    backend = get_inference_backend()
-    if not backend:
-        raise ValueError("No inference backend configured. Set llm.backend in config.")
-    return backend
-
-
 def _load_session(session_id: str, session_token: str | None) -> list[Trajectory]:
     """Load trajectories for a session or raise if not found."""
     if get_metadata_from_stores(session_id, session_token) is None:
@@ -195,9 +189,8 @@ def _prepare_digest(trajectories: list[Trajectory]) -> str:
 
 
 def _format_user_prompt(prompt: AnalysisPrompt, digest: str) -> str:
-    """Format the user prompt template with digest and output schema."""
-    output_schema = json.dumps(prompt.output_model.model_json_schema(), indent=2)
-    return prompt.render_user(trajectory_digest=digest, output_schema=output_schema)
+    """Format the user prompt template with digest."""
+    return prompt.render_user(trajectory_digest=digest)
 
 
 def _parse_result(text: str, output_model: type[BaseModel]) -> BaseModel:

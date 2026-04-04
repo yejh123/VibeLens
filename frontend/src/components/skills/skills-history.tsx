@@ -9,11 +9,6 @@ const MODE_LABELS: Record<SkillMode, string> = {
   evolution: "Evolve",
 };
 
-const MODE_COLORS: Record<SkillMode, string> = {
-  retrieval: "bg-teal-900/30 border-teal-700/30 text-teal-400",
-  creation: "bg-emerald-900/30 border-emerald-700/30 text-emerald-400",
-  evolution: "bg-amber-900/30 border-amber-700/30 text-amber-400",
-};
 
 function HistoryCard({
   meta,
@@ -54,13 +49,7 @@ function HistoryCard({
             {meta.summary_preview || "No summary"}
           </p>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${MODE_COLORS[meta.mode]}`}>
-              {MODE_LABELS[meta.mode]}
-            </span>
-            <span className="text-[10px] text-zinc-400">
-              {meta.pattern_count} pattern{meta.pattern_count !== 1 ? "s" : ""}
-            </span>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-900/30 border border-violet-700/30 text-[10px] font-medium text-violet-300">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium bg-teal-900/30 border-teal-700/30 text-teal-400">
               <Layers className="w-2.5 h-2.5" />
               {meta.session_ids.length} session{meta.session_ids.length !== 1 ? "s" : ""}
             </span>

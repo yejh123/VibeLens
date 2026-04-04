@@ -5,8 +5,9 @@ import {
   List,
   LayoutGrid,
   BarChart3,
-  Sparkles,
+  Lightbulb,
   Upload,
+  Wand2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -22,7 +23,8 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   list: <List className="w-5 h-5 text-cyan-400" />,
   layout: <LayoutGrid className="w-5 h-5 text-cyan-400" />,
   "bar-chart": <BarChart3 className="w-5 h-5 text-cyan-400" />,
-  sparkles: <Sparkles className="w-5 h-5 text-cyan-400" />,
+  lightbulb: <Lightbulb className="w-5 h-5 text-amber-400" />,
+  wand: <Wand2 className="w-5 h-5 text-teal-400" />,
   upload: <Upload className="w-5 h-5 text-violet-400" />,
 };
 

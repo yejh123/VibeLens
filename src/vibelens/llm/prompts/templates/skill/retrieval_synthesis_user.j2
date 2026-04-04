@@ -1,0 +1,28 @@
+Merge retrieval results from {{ batch_count }} batches analyzing {{ session_count }} total sessions.
+
+{% for batch in batch_results %}
+## Batch {{ loop.index }}
+
+### Summary
+{{ batch.summary }}
+
+### User Profile
+{{ batch.user_profile }}
+
+### Workflow Patterns
+{% for pattern in batch.workflow_patterns %}
+- **{{ pattern.title }}**: {{ pattern.description }} (gap: {{ pattern.gap }})
+{% endfor %}
+
+### Recommendations
+{% for rec in batch.recommendations %}
+- **{{ rec.skill_name }}**: {{ rec.match_reason }} (confidence: {{ rec.confidence }})
+{% endfor %}
+
+{% endfor %}
+
+Produce a single merged result with:
+- `workflow_patterns`: Deduplicated patterns with merged example_refs.
+- `recommendations`: Top 1-10 recommendations ranked by confidence and frequency.
+- `summary`: Unified narrative overview.
+- `user_profile`: Merged user profile.

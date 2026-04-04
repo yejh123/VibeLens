@@ -5,8 +5,8 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
-import { useCallback, useState } from "react";
-import type { LLMStatus } from "../types";
+import { useCallback, useEffect, useState } from "react";
+import type { CliBackendModels, LLMStatus } from "../types";
 
 const MODEL_PRESETS = [
   "anthropic/claude-haiku-4-5",
@@ -64,6 +64,18 @@ const ACCENT_STYLES: Record<AccentColor, { focus: string; button: string; select
   },
 };
 
+function formatPrice(price: number): string {
+  return price < 0.01 ? price.toFixed(3) : price.toFixed(2);
+}
+
+function PricingLine({ inputPrice, outputPrice }: { inputPrice: number; outputPrice: number }) {
+  return (
+    <p className="text-xs text-zinc-500 mt-1">
+      ${formatPrice(inputPrice)} / ${formatPrice(outputPrice)} per MTok (in / out)
+    </p>
+  );
+}
+
 function ModelCombobox({
   value,
   onChange,
@@ -117,6 +129,127 @@ function ModelCombobox({
             ))}
           </ul>
         </>
+      )}
+    </div>
+  );
+}
+
+function CliModelSelector({
+  backendId,
+  value,
+  onChange,
+  cliModels,
+  accentColor = "cyan",
+}: {
+  backendId: string;
+  value: string;
+  onChange: (v: string) => void;
+  cliModels: Record<string, CliBackendModels>;
+  accentColor?: AccentColor;
+}) {
+  const [open, setOpen] = useState(false);
+  const accent = ACCENT_STYLES[accentColor];
+  const meta = cliModels[backendId];
+
+  if (!meta || meta.models.length === 0) {
+    return (
+      <p className="text-xs text-zinc-500">
+        No model selection available for this backend.
+      </p>
+    );
+  }
+
+  const selectedModel = meta.models.find((m) => m.name === value);
+
+  if (meta.supports_freeform) {
+    return (
+      <div>
+        <div className="relative">
+          <div className="flex">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onFocus={() => setOpen(true)}
+              placeholder={meta.default_model ?? "model name"}
+              className={`w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none ${accent.focus} pr-8`}
+            />
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="absolute right-0 inset-y-0 px-2 flex items-center text-zinc-500 hover:text-zinc-300"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+              <ul className="absolute z-20 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+                {meta.models.map((m) => (
+                  <li key={m.name}>
+                    <button
+                      type="button"
+                      onClick={() => { onChange(m.name); setOpen(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-700 transition flex justify-between ${
+                        value === m.name ? accent.selected : "text-zinc-200"
+                      }`}
+                    >
+                      <span>{m.name}</span>
+                      {m.input_per_mtok != null && (
+                        <span className="text-zinc-500 text-xs">${formatPrice(m.input_per_mtok)} / ${formatPrice(m.output_per_mtok!)}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+        {selectedModel?.input_per_mtok != null && (
+          <PricingLine inputPrice={selectedModel.input_per_mtok} outputPrice={selectedModel.output_per_mtok!} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={`w-full flex items-center justify-between px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none ${accent.focus} transition`}
+        >
+          <span>{value || meta.default_model || "Select model"}</span>
+          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <ul className="absolute z-20 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+              {meta.models.map((m) => (
+                <li key={m.name}>
+                  <button
+                    type="button"
+                    onClick={() => { onChange(m.name); setOpen(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-700 transition flex justify-between ${
+                      value === m.name ? accent.selected : "text-zinc-200"
+                    }`}
+                  >
+                    <span>{m.name}</span>
+                    {m.input_per_mtok != null && (
+                      <span className="text-zinc-500 text-xs">${formatPrice(m.input_per_mtok)} / ${formatPrice(m.output_per_mtok!)}</span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      {selectedModel?.input_per_mtok != null && (
+        <PricingLine inputPrice={selectedModel.input_per_mtok} outputPrice={selectedModel.output_per_mtok!} />
       )}
     </div>
   );
@@ -186,16 +319,38 @@ export function LLMConfigForm({
   const [backend, setBackend] = useState(llmStatus?.backend_id === "mock" ? "litellm" : llmStatus?.backend_id ?? "litellm");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(llmStatus?.model ?? "anthropic/claude-haiku-4-5");
+  const [cliModel, setCliModel] = useState("");
   const [baseUrl, setBaseUrl] = useState(llmStatus?.base_url ?? "");
   const [timeout, setTimeout_] = useState(llmStatus?.timeout ?? 120);
   const [maxTokens, setMaxTokens] = useState(llmStatus?.max_tokens ?? 4096);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [cliModels, setCliModels] = useState<Record<string, CliBackendModels>>({});
 
   const accent = ACCENT_STYLES[accentColor];
   const isCliBackend = CLI_BACKENDS.has(backend);
   const hasExistingKey = !!llmStatus?.api_key_masked;
+
+  useEffect(() => {
+    fetchWithToken("/api/llm/cli-models")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) setCliModels(data);
+      })
+      .catch(() => {});
+  }, [fetchWithToken]);
+
+  // Auto-select default model when switching to a CLI backend
+  useEffect(() => {
+    if (!isCliBackend) return;
+    const meta = cliModels[backend];
+    if (meta?.default_model) {
+      setCliModel(meta.default_model);
+    } else {
+      setCliModel("");
+    }
+  }, [backend, cliModels, isCliBackend]);
 
   const handleSubmit = useCallback(async () => {
     if (!isCliBackend && backend !== "disabled" && !apiKey.trim() && !hasExistingKey) return;
@@ -203,7 +358,11 @@ export function LLMConfigForm({
     setConfigError(null);
     try {
       const payload: Record<string, unknown> = { backend: backend.trim() };
-      if (!isCliBackend && backend !== "disabled") {
+      if (isCliBackend) {
+        if (cliModel.trim()) {
+          payload.model = cliModel.trim();
+        }
+      } else if (backend !== "disabled") {
         payload.api_key = apiKey.trim();
         payload.model = model.trim();
         payload.timeout = timeout;
@@ -225,7 +384,10 @@ export function LLMConfigForm({
     } finally {
       setSubmitting(false);
     }
-  }, [backend, apiKey, model, baseUrl, timeout, maxTokens, isCliBackend, hasExistingKey, fetchWithToken, onConfigured]);
+  }, [backend, apiKey, model, cliModel, baseUrl, timeout, maxTokens, isCliBackend, hasExistingKey, fetchWithToken, onConfigured]);
+
+  const cliMeta = cliModels[backend];
+  const hasCliModels = cliMeta && cliMeta.models.length > 0;
 
   return (
     <div className="space-y-3">
@@ -259,9 +421,22 @@ export function LLMConfigForm({
         </div>
       )}
 
-      {isCliBackend && (
+      {isCliBackend && hasCliModels && (
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1">Model</label>
+          <CliModelSelector
+            backendId={backend}
+            value={cliModel}
+            onChange={setCliModel}
+            cliModels={cliModels}
+            accentColor={accentColor}
+          />
+        </div>
+      )}
+
+      {isCliBackend && !hasCliModels && (
         <p className="text-xs text-zinc-500">
-          Uses your local {BACKEND_OPTIONS.find((o) => o.value === backend)?.label ?? backend} installation. No API key or model configuration needed.
+          Uses your local {BACKEND_OPTIONS.find((o) => o.value === backend)?.label ?? backend} installation. No model selection available.
         </p>
       )}
 
@@ -352,12 +527,20 @@ export function LLMConfigSection({
   if (isMock) return null;
 
   if (isConnected && !showForm) {
+    const pricing = llmStatus.pricing;
     return (
       <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-800/60 border border-zinc-700/50 rounded-lg mb-6">
-        <span className="text-xs text-zinc-400">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 align-middle" />
-          {llmStatus.backend_id} / {llmStatus.model}
-        </span>
+        <div>
+          <span className="text-xs text-zinc-400">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 align-middle" />
+            {llmStatus.backend_id} / {llmStatus.model}
+          </span>
+          {pricing && (
+            <span className="text-xs text-zinc-500 ml-2">
+              (${formatPrice(pricing.input_per_mtok)} / ${formatPrice(pricing.output_per_mtok)} per MTok)
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setShowForm(true)}
           className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition"

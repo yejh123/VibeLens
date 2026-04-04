@@ -51,7 +51,7 @@ export function TagPill({ tag }: { tag: string }) {
 /** Mono-spaced pill showing an allowed tool name. */
 export function ToolBadge({ tool }: { tool: string }) {
   return (
-    <Tooltip text={`This skill can use the ${tool} tool`}>
+    <Tooltip text={`Allowed tool: ${tool}`}>
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/20 text-cyan-400/70 font-mono cursor-default">
         {tool}
       </span>

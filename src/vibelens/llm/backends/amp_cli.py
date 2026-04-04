@@ -3,6 +3,14 @@
 Invokes ``amp --headless --stream-json`` as a subprocess. Prompt is piped
 via stdin. ``--headless`` enables non-interactive mode, and ``--stream-json``
 produces structured NDJSON event output (one JSON object per line).
+
+System prompt: Amp has no CLI flag for system prompts. The
+``amp.systemPrompt`` config key is documented as "SDK use only", and
+``AGENTS.md`` files provide project-level context but require persistent
+files. System and user prompts are combined in stdin.
+
+References:
+    - Owner's manual: https://ampcode.com/manual
 """
 
 import json

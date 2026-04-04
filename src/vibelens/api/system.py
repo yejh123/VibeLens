@@ -1,5 +1,7 @@
 """System endpoints for settings, status, and LLM configuration."""
 
+import importlib
+
 from fastapi import APIRouter, HTTPException
 
 from vibelens import __version__
@@ -12,6 +14,8 @@ from vibelens.deps import (
     is_test_mode,
     set_llm_config,
 )
+from vibelens.llm.backends import _CLI_BACKEND_REGISTRY
+from vibelens.llm.pricing import lookup_pricing
 from vibelens.models.inference import BackendType
 from vibelens.schemas.llm import LLMConfigureRequest
 from vibelens.utils.log import get_logger
@@ -71,15 +75,20 @@ async def llm_status() -> dict:
             "base_url": config.base_url,
             "timeout": config.timeout,
             "max_tokens": config.max_tokens,
+            "pricing": None,
         }
+
+    model_name = getattr(backend, "_model", None) or "unknown"
+    pricing = _format_pricing(model_name)
     return {
         "available": True,
         "backend_id": backend.backend_id,
-        "model": getattr(backend, "_model", "unknown"),
+        "model": model_name,
         "api_key_masked": masked_key,
         "base_url": config.base_url,
         "timeout": config.timeout,
         "max_tokens": config.max_tokens,
+        "pricing": pricing,
     }
 
 
@@ -115,11 +124,62 @@ async def configure_llm(body: LLMConfigureRequest) -> dict:
     logger.info("LLM backend hot-swapped: backend=%s model=%s", config.backend, config.model)
 
     backend = get_inference_backend()
+    model_name = config.model
+    pricing = _format_pricing(model_name)
     return {
         "available": backend is not None,
         "backend_id": config.backend,
-        "model": config.model,
+        "model": model_name,
         "base_url": config.base_url,
         "timeout": config.timeout,
         "max_tokens": config.max_tokens,
+        "pricing": pricing,
+    }
+
+
+@router.get("/llm/cli-models")
+async def list_cli_models() -> dict:
+    """Return model metadata and pricing for all CLI backends.
+
+    Returns:
+        Dict mapping backend_id to models, default, freeform flag, and pricing.
+    """
+    result: dict[str, dict] = {}
+    for backend_type, (module_path, class_name) in _CLI_BACKEND_REGISTRY.items():
+        module = importlib.import_module(module_path)
+        backend_cls = getattr(module, class_name)
+        backend = backend_cls()
+
+        models_with_pricing = []
+        for model_name in backend.available_models:
+            entry: dict = {"name": model_name}
+            pricing = lookup_pricing(model_name)
+            if pricing:
+                entry["input_per_mtok"] = pricing.input_per_mtok
+                entry["output_per_mtok"] = pricing.output_per_mtok
+            models_with_pricing.append(entry)
+
+        result[str(backend_type)] = {
+            "models": models_with_pricing,
+            "default_model": backend.default_model,
+            "supports_freeform": backend.supports_freeform_model,
+        }
+    return result
+
+
+def _format_pricing(model_name: str) -> dict | None:
+    """Look up pricing for a model and return a compact dict.
+
+    Args:
+        model_name: Model name to look up.
+
+    Returns:
+        Dict with input/output per-MTok prices, or None if not found.
+    """
+    pricing = lookup_pricing(model_name)
+    if not pricing:
+        return None
+    return {
+        "input_per_mtok": pricing.input_per_mtok,
+        "output_per_mtok": pricing.output_per_mtok,
     }

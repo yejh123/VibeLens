@@ -46,13 +46,22 @@ export const TOUR_STEPS: TourStep[] = [
     icon: "bar-chart",
   },
   {
-    id: "ai-tabs",
-    target: "ai-tabs",
-    title: "AI-Powered Insights",
+    id: "productivity-tips",
+    target: "productivity-tips-tab",
+    title: "Productivity Tips",
     content:
-      "Productivity Tips spots friction and wasted effort. Personalization finds reusable skills. Both need an API key, which you can set up later.",
+      "Analyzes your sessions to find wasted effort and recurring mistakes. You get concrete suggestions on how to work more effectively with your agent. Requires LLM call.",
     placement: "bottom",
-    icon: "sparkles",
+    icon: "lightbulb",
+  },
+  {
+    id: "personalization",
+    target: "personalization-tab",
+    title: "Personalization",
+    content:
+      "Learns your coding patterns and creates reusable skills — instruction files that teach your agent how you prefer to work. Requires LLM call.",
+    placement: "bottom",
+    icon: "wand",
   },
   {
     id: "upload",

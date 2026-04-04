@@ -5,12 +5,37 @@ Supports native JSON output and schema validation via ``--output-schema``.
 
 Safety flags: ``--ephemeral`` skips session persistence, ``--sandbox read-only``
 prevents writes, and ``--skip-git-repo-check`` allows running outside repos.
+
+System prompt: Codex supports ``-c model_instructions_file=<path>`` and
+``-c developer_instructions="..."`` as global config overrides, but these
+are top-level flags for the interactive ``codex`` command — the ``exec``
+subcommand does not accept them. System and user prompts are combined
+in stdin as a workaround.
+
+References:
+    - Config reference: https://developers.openai.com/codex/config-reference
+    - CLI options: https://developers.openai.com/codex/cli/reference
+    - Feature request for --system-prompt: https://github.com/openai/codex/issues/11588
 """
 
 import json
 
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.inference import BackendType, InferenceRequest
+
+CODEX_CLI_MODELS = [
+    "gpt-4.1-nano",
+    "gpt-5.4-nano",
+    "gpt-4.1-mini",
+    "gpt-5.4-mini",
+    "o4-mini",
+    "gpt-4.1",
+    "o3",
+    "gpt-5.4",
+    "o3-pro",
+    "gpt-5.4-pro",
+]
+CODEX_CLI_DEFAULT_MODEL = "gpt-5.4-mini"
 
 
 class CodexCliBackend(CliBackend):
@@ -23,6 +48,14 @@ class CodexCliBackend(CliBackend):
     @property
     def backend_id(self) -> BackendType:
         return BackendType.CODEX_CLI
+
+    @property
+    def available_models(self) -> list[str]:
+        return CODEX_CLI_MODELS
+
+    @property
+    def default_model(self) -> str | None:
+        return CODEX_CLI_DEFAULT_MODEL
 
     @property
     def supports_native_json(self) -> bool:

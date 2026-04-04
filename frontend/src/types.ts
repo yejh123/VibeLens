@@ -1,4 +1,4 @@
-export type AgentType = "claude_code" | "codex" | "gemini";
+export type AgentType = "claude_code" | "claude_code_web" | "codex" | "gemini";
 export type OSPlatform = "macos" | "linux" | "windows";
 
 export interface Agent {
@@ -313,6 +313,19 @@ export interface LLMStatus {
   base_url: string | null;
   timeout: number;
   max_tokens: number;
+  pricing: { input_per_mtok: number; output_per_mtok: number } | null;
+}
+
+export interface CliModelInfo {
+  name: string;
+  input_per_mtok?: number;
+  output_per_mtok?: number;
+}
+
+export interface CliBackendModels {
+  models: CliModelInfo[];
+  default_model: string | null;
+  supports_freeform: boolean;
 }
 
 export interface SkillSource {
@@ -361,7 +374,7 @@ export type SkillMode = "retrieval" | "creation" | "evolution";
 export interface WorkflowPattern {
   title: string;
   description: string;
-  pain_point: string;
+  gap: string;
   example_refs: StepRef[];
   frequency: number;
 }
@@ -377,21 +390,13 @@ export interface SkillCreation {
   description: string;
   skill_md_content: string;
   rationale: string;
+  confidence: number;
 }
 
-export type SkillConflictType =
-  | "skipped_step"
-  | "added_step"
-  | "wrong_tool"
-  | "bad_trigger"
-  | "outdated_instruction";
-
 export interface SkillEdit {
-  kind: string;
-  target: string;
-  replacement: string | null;
-  rationale: string;
-  conflict_type: SkillConflictType | null;
+  old_string: string;
+  new_string: string;
+  replace_all: boolean;
 }
 
 export interface SkillEvolutionSuggestion {

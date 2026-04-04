@@ -16,6 +16,7 @@ import { DashboardView } from "./components/analysis/dashboard-view";
 import { FrictionPanel } from "./components/analysis/friction-panel";
 import { SkillsPanel } from "./components/skills/skills-panel";
 import { SettingsDialog } from "./components/settings-dialog";
+import { Tooltip } from "./components/tooltip";
 import { SpotlightTour } from "./components/tutorial/spotlight-tour";
 import { hasSeenTour } from "./components/tutorial/tour-steps";
 import type { DashboardStats, DonateResult, ToolUsageStat, Trajectory } from "./types";
@@ -432,33 +433,35 @@ export function App() {
                   <Menu className="w-4 h-4" />
                 </button>
               )}
-              <button
-                onClick={() => setMainView("browse")}
-                title="Browse individual agent sessions — view step-by-step conversation flow, tool calls, and observations"
-                className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
-                  mainView === "browse"
-                    ? "bg-indigo-600/30 text-indigo-200 border border-indigo-400/40 shadow-sm shadow-indigo-900/40"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                }`}
-              >
-                Conversation
-              </button>
-              <button
-                data-tour="dashboard-tab"
-                onClick={() => setMainView("analyze")}
-                title="Aggregate analytics dashboard — session stats, tool usage patterns, cost breakdown, and timeline charts"
-                className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
-                  mainView === "analyze"
-                    ? "bg-cyan-600/30 text-cyan-200 border border-cyan-400/40 shadow-sm shadow-cyan-900/40"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                }`}
-              >
-                Dashboard
-              </button>
-              <div data-tour="ai-tabs" className="flex items-center gap-2">
+              <Tooltip text="Browse individual agent sessions step by step.">
                 <button
+                  onClick={() => setMainView("browse")}
+                  className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
+                    mainView === "browse"
+                      ? "bg-indigo-600/30 text-indigo-200 border border-indigo-400/40 shadow-sm shadow-indigo-900/40"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                  }`}
+                >
+                  Conversation
+                </button>
+              </Tooltip>
+              <Tooltip text="Stats across all sessions: usage, tools, and costs.">
+                <button
+                  data-tour="dashboard-tab"
+                  onClick={() => setMainView("analyze")}
+                  className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
+                    mainView === "analyze"
+                      ? "bg-cyan-600/30 text-cyan-200 border border-cyan-400/40 shadow-sm shadow-cyan-900/40"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                  }`}
+                >
+                  Dashboard
+                </button>
+              </Tooltip>
+              <Tooltip text="Spot wasted effort and get improvement tips. Requires LLM call.">
+                <button
+                  data-tour="productivity-tips-tab"
                   onClick={() => setMainView("friction")}
-                  title="Analyze sessions to find wasted effort, recurring mistakes, and actionable tips to improve your workflow"
                   className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                     mainView === "friction"
                       ? "bg-amber-600/30 text-amber-200 border border-amber-400/40 shadow-sm shadow-amber-900/40"
@@ -467,9 +470,11 @@ export function App() {
                 >
                   Productivity Tips
                 </button>
+              </Tooltip>
+              <Tooltip text="Create reusable skills from your coding patterns. Requires LLM call.">
                 <button
+                  data-tour="personalization-tab"
                   onClick={() => setMainView("skills")}
-                  title="View and manage personalized skills extracted from your sessions"
                   className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                     mainView === "skills"
                       ? "bg-teal-600/30 text-teal-200 border border-teal-400/40 shadow-sm shadow-teal-900/40"
@@ -478,7 +483,7 @@ export function App() {
                 >
                   Personalization
                 </button>
-              </div>
+              </Tooltip>
             </div>
             <button
               data-tour="settings-button"

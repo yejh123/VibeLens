@@ -71,6 +71,21 @@ class CliBackend(InferenceBackend):
         return self._model or self.cli_executable
 
     @property
+    def available_models(self) -> list[str]:
+        """Models this CLI supports, ordered cheapest first."""
+        return []
+
+    @property
+    def default_model(self) -> str | None:
+        """Cheapest recommended model for this CLI, or None if no selection."""
+        return None
+
+    @property
+    def supports_freeform_model(self) -> bool:
+        """Whether the CLI accepts arbitrary model names beyond the preset list."""
+        return False
+
+    @property
     def supports_native_json(self) -> bool:
         """Whether the CLI natively supports JSON output mode."""
         return False

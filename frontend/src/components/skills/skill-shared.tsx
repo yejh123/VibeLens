@@ -64,7 +64,7 @@ export function SourceFilterBar({
         className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition ${
           activeKey === null
             ? "bg-zinc-700 text-zinc-200 border-zinc-600"
-            : "text-zinc-500 border-zinc-700/50 hover:text-zinc-300 hover:border-zinc-600"
+            : "text-zinc-300 border-zinc-700/50 hover:text-zinc-100 hover:border-zinc-600"
         }`}
       >
         All ({totalCount})
@@ -79,7 +79,7 @@ export function SourceFilterBar({
             className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition ${
               activeKey === key
                 ? colorClass
-                : "text-zinc-500 border-zinc-700/50 hover:text-zinc-300 hover:border-zinc-600"
+                : "text-zinc-300 border-zinc-700/50 hover:text-zinc-100 hover:border-zinc-600"
             }`}
           >
             {labelMap[key] || key} ({count})
@@ -148,7 +148,7 @@ export function NoResultsState() {
 /** Small counter showing "X of Y skills". */
 export function SkillCount({ filtered, total }: { filtered: number; total: number }) {
   return (
-    <div className="text-xs text-zinc-500 mb-3">
+    <div className="text-xs text-zinc-300 mb-3">
       {filtered} of {total} skill{total !== 1 ? "s" : ""}
     </div>
   );

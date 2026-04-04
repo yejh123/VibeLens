@@ -4,9 +4,12 @@ import { TOOL_COLORS } from "./chart-constants";
 
 const MAX_TOOLS = 12;
 
+export function totalToolCalls(data: ToolUsageStat[]): number {
+  return data.reduce((s, t) => s + t.call_count, 0);
+}
+
 interface ToolDistributionProps {
   data: ToolUsageStat[];
-  totalCalls: number;
   onHover: (e: React.MouseEvent, text: string) => void;
   onMove: (e: React.MouseEvent) => void;
   onLeave: () => void;
@@ -14,7 +17,6 @@ interface ToolDistributionProps {
 
 export function ToolDistribution({
   data,
-  totalCalls,
   onHover,
   onMove,
   onLeave,
@@ -25,7 +27,8 @@ export function ToolDistribution({
     return { visible: top, otherCount: rest };
   }, [data]);
 
-  const total = totalCalls || data.reduce((s, t) => s + t.call_count, 0);
+  // Always derive total from actual data to ensure percentages sum to 100%
+  const total = data.reduce((s, t) => s + t.call_count, 0);
 
   const segments = useMemo(() => {
     const segs = visible.map((tool, i) => ({

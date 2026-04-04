@@ -21,7 +21,7 @@ import { BarRow } from "./bar-row";
 import { ModelDistribution } from "./model-distribution-chart";
 import { PeakHoursChart } from "./peak-hours-chart";
 import { StatCard } from "./stat-card";
-import { ToolDistribution } from "./tool-distribution-chart";
+import { ToolDistribution, totalToolCalls } from "./tool-distribution-chart";
 import { Tooltip, useTooltip } from "./tooltip";
 import { UsageOverTimeChart } from "./usage-over-time-chart";
 
@@ -36,6 +36,7 @@ export function DashboardView({ cache }: DashboardViewProps) {
   const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [exporting, setExporting] = useState<"csv" | "json" | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const { tip, show, move, hide } = useTooltip();
@@ -51,7 +52,7 @@ export function DashboardView({ cache }: DashboardViewProps) {
 
   // Fallback: fetch directly if cache hasn't arrived after mount
   useEffect(() => {
-    if (cache || stats || selectedProject) return;
+    if (cache || stats || selectedProject || selectedAgent) return;
     Promise.all([
       fetchWithToken("/api/analysis/dashboard")
         .then((r) => (r.ok ? r.json() : null)),
@@ -71,14 +72,15 @@ export function DashboardView({ cache }: DashboardViewProps) {
       .finally(() => setLoading(false));
   }, [cache, stats, fetchWithToken, selectedProject]);
 
-  // Fetch on-demand only when filtering by project
+  // Fetch on-demand when filtering by project or agent
   useEffect(() => {
-    if (!selectedProject) return;
+    if (!selectedProject && !selectedAgent) return;
 
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    params.set("project_path", selectedProject);
+    if (selectedProject) params.set("project_path", selectedProject);
+    if (selectedAgent) params.set("agent_name", selectedAgent);
 
     Promise.all([
       fetchWithToken(`/api/analysis/dashboard?${params}`)
@@ -96,21 +98,24 @@ export function DashboardView({ cache }: DashboardViewProps) {
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
-  }, [fetchWithToken, selectedProject]);
+  }, [fetchWithToken, selectedProject, selectedAgent]);
 
-  // Restore cached global data when clearing the project filter
-  const handleClearProject = useCallback(() => {
+  // Restore cached global data when clearing filters
+  const handleClearFilters = useCallback(() => {
     setSelectedProject(null);
+    setSelectedAgent(null);
     if (cache) {
       setStats(cache.stats);
       setToolUsage(cache.toolUsage);
     }
   }, [cache]);
 
+
   const handleExport = async (format: "csv" | "json") => {
     setExporting(format);
     const params = new URLSearchParams({ format });
     if (selectedProject) params.set("project_path", selectedProject);
+    if (selectedAgent) params.set("agent_name", selectedAgent);
     try {
       const res = await fetchWithToken(
         `/api/analysis/dashboard/export?${params}`
@@ -163,18 +168,39 @@ export function DashboardView({ cache }: DashboardViewProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {selectedProject ? (
+            {selectedProject || selectedAgent ? (
               <>
                 <button
-                  onClick={handleClearProject}
+                  onClick={handleClearFilters}
                   className="text-sm text-cyan-400 hover:text-cyan-300 transition font-medium"
                 >
                   All Sessions
                 </button>
-                <span className="text-zinc-600">/</span>
-                <span className="text-sm text-zinc-200 font-medium">
-                  {baseProjectName(selectedProject)}
-                </span>
+                {selectedAgent && (
+                  <>
+                    <span className="text-zinc-600">/</span>
+                    {selectedProject ? (
+                      <button
+                        onClick={() => setSelectedProject(null)}
+                        className="text-sm text-cyan-400 hover:text-cyan-300 transition font-medium"
+                      >
+                        {selectedAgent}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-zinc-200 font-medium">
+                        {selectedAgent}
+                      </span>
+                    )}
+                  </>
+                )}
+                {selectedProject && (
+                  <>
+                    <span className="text-zinc-600">/</span>
+                    <span className="text-sm text-zinc-200 font-medium">
+                      {baseProjectName(selectedProject)}
+                    </span>
+                  </>
+                )}
               </>
             ) : (
               <h2 className="text-xl font-semibold text-zinc-100">
@@ -519,16 +545,21 @@ export function DashboardView({ cache }: DashboardViewProps) {
               <div className="rounded-xl border border-zinc-700/60 bg-zinc-900/80 p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Bot className="w-4 h-4 text-cyan-400" />
-                  <h3
-                    className="text-base font-medium text-zinc-200 cursor-default"
-                    onMouseEnter={(e) =>
-                      show(e, "Session count breakdown by agent (Claude Code, Codex, Gemini)")
-                    }
-                    onMouseMove={move}
-                    onMouseLeave={hide}
-                  >
-                    Agent Distribution
-                  </h3>
+                  <div>
+                    <h3
+                      className="text-base font-medium text-zinc-200 cursor-default"
+                      onMouseEnter={(e) =>
+                        show(e, "Session count breakdown by agent. Click to filter.")
+                      }
+                      onMouseMove={move}
+                      onMouseLeave={hide}
+                    >
+                      Agent Distribution
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Click an agent to view its dedicated dashboard analysis
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   {agentEntries.map(([agent, count]) => (
@@ -542,6 +573,7 @@ export function DashboardView({ cache }: DashboardViewProps) {
                         `${count} session${count !== 1 ? "s" : ""}`,
                         `${((count / stats.total_sessions) * 100).toFixed(1)}% of total`,
                       ].join("\n")}
+                      onClick={() => setSelectedAgent(agent)}
                       onHover={show}
                       onMove={move}
                       onLeave={hide}
@@ -581,7 +613,7 @@ export function DashboardView({ cache }: DashboardViewProps) {
                     <h3
                       className="text-base font-medium text-zinc-200 cursor-default"
                       onMouseEnter={(e) =>
-                        show(e, `Tool call distribution (${stats.total_tool_calls.toLocaleString()} total, avg ${stats.avg_tool_calls_per_session.toFixed(1)}/session)`)
+                        show(e, `Tool call distribution (${totalToolCalls(toolUsage).toLocaleString()} total, avg ${stats.avg_tool_calls_per_session.toFixed(1)}/session)`)
                       }
                       onMouseMove={move}
                       onMouseLeave={hide}
@@ -590,12 +622,11 @@ export function DashboardView({ cache }: DashboardViewProps) {
                     </h3>
                   </div>
                   <span className="text-xs text-zinc-500">
-                    {stats.total_tool_calls.toLocaleString()} total
+                    {totalToolCalls(toolUsage).toLocaleString()} total
                   </span>
                 </div>
                 <ToolDistribution
                   data={toolUsage}
-                  totalCalls={stats.total_tool_calls}
                   onHover={show}
                   onMove={move}
                   onLeave={hide}

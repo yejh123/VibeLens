@@ -5,12 +5,22 @@ and user prompts. The ``--output-format json`` flag wraps the response in a
 JSON envelope with ``result``, ``usage``, and ``modelUsage`` fields.
 
 Safety flags prevent agentic behavior during scripted inference:
-``--no-session-persistence`` avoids polluting history, ``--tools ""``
-disables all tool use for pure text inference.
+  --no-session-persistence: avoids polluting history
+  --tools "": disables all tool use for pure text inference.
 """
 
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.inference import BackendType, InferenceRequest
+
+CLAUDE_CLI_MODELS = [
+    "claude-haiku-4-5",
+    "claude-3-5-haiku",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+    "claude-opus-4-1",
+]
+CLAUDE_CLI_DEFAULT_MODEL = "claude-haiku-4-5"
 
 
 class ClaudeCliBackend(CliBackend):
@@ -23,6 +33,14 @@ class ClaudeCliBackend(CliBackend):
     @property
     def backend_id(self) -> BackendType:
         return BackendType.CLAUDE_CLI
+
+    @property
+    def available_models(self) -> list[str]:
+        return CLAUDE_CLI_MODELS
+
+    @property
+    def default_model(self) -> str | None:
+        return CLAUDE_CLI_DEFAULT_MODEL
 
     @property
     def supports_native_json(self) -> bool:
@@ -48,7 +66,7 @@ class ClaudeCliBackend(CliBackend):
             "json",
             "--system-prompt",
             request.system,
-            "--no-session-persistence",
+            # "--no-session-persistence",
             "--tools",
             "",
         ]

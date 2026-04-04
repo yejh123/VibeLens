@@ -81,8 +81,14 @@ def _create_litellm_backend(model: str, config: LLMConfig) -> InferenceBackend:
     return LiteLLMBackend(config=config, model_override=override)
 
 
+LITELLM_DEFAULT_MODEL = "anthropic/claude-haiku-4-5"
+
+
 def _create_cli_backend(backend_id: BackendType, config: LLMConfig) -> InferenceBackend:
     """Create a CLI backend instance via registry lookup and lazy import.
+
+    Resolves the model: uses config.model if explicitly set by the user,
+    otherwise falls back to the backend's cheapest default.
 
     Args:
         backend_id: CLI backend type from _CLI_BACKEND_REGISTRY.
@@ -94,4 +100,26 @@ def _create_cli_backend(backend_id: BackendType, config: LLMConfig) -> Inference
     module_path, class_name = _CLI_BACKEND_REGISTRY[backend_id]
     module = importlib.import_module(module_path)
     backend_cls = getattr(module, class_name)
-    return backend_cls(timeout=config.timeout)
+    backend = backend_cls(timeout=config.timeout)
+    resolved_model = _resolve_cli_model(config.model, backend)
+    backend._model = resolved_model
+    return backend
+
+
+def _resolve_cli_model(config_model: str, backend: InferenceBackend) -> str | None:
+    """Pick the right model for a CLI backend.
+
+    If the user left the model at the litellm default or empty, use the
+    backend's own default. Otherwise pass the user's choice through.
+
+    Args:
+        config_model: Model string from LLMConfig.
+        backend: Instantiated CLI backend with model metadata.
+
+    Returns:
+        Resolved model name, or None for backends without model support.
+    """
+    is_default = not config_model or config_model == LITELLM_DEFAULT_MODEL
+    if is_default:
+        return backend.default_model
+    return config_model

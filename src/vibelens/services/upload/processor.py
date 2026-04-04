@@ -32,7 +32,7 @@ from vibelens.schemas.upload import UploadResult
 from vibelens.services.dashboard.loader import (
     invalidate_cache as invalidate_dashboard_cache,
 )
-from vibelens.services.session.search import invalidate_search_index
+from vibelens.services.session.search import add_sessions_to_index
 from vibelens.storage.conversation.disk import DiskStore
 from vibelens.utils import get_logger
 from vibelens.utils.json_helpers import locked_jsonl_append
@@ -96,6 +96,20 @@ UPLOAD_COMMANDS: dict[str, dict[str, dict[str, str]]] = {
                 " -DestinationPath gemini-data.zip"
             ),
             "description": "Output: ~\\.gemini\\gemini-data.zip",
+        },
+    },
+    AgentType.CLAUDE_CODE_WEB: {
+        "macos": {
+            "command": "# Export from claude.ai > Settings > Export Data",
+            "description": "Upload the zip downloaded from claude.ai",
+        },
+        "linux": {
+            "command": "# Export from claude.ai > Settings > Export Data",
+            "description": "Upload the zip downloaded from claude.ai",
+        },
+        "windows": {
+            "command": "# Export from claude.ai > Settings > Export Data",
+            "description": "Upload the zip downloaded from claude.ai",
         },
     },
 }
@@ -345,7 +359,8 @@ async def process_zip(
         # 5. Register the upload store and invalidate downstream caches
         if session_token:
             register_upload_store(session_token, upload_store)
-        invalidate_search_index()
+        new_session_ids = [d["session_id"] for d in session_details if "session_id" in d]
+        add_sessions_to_index(new_session_ids, session_token)
         invalidate_dashboard_cache()
         logger.info("Registered upload store %s for token=%s", upload_store.root, token_short)
     except Exception as exc:
@@ -407,46 +422,125 @@ def _parse_and_store_files(
             result.skipped += 1
             continue
 
-        # Find the main trajectory (no parent ref). Skip sub-agent-only files
-        # since sub-agents are already included when parsing the main session.
-        main = next((t for t in trajectories if not t.parent_trajectory_ref), None)
-        if main is None:
+        # Separate main trajectories (no parent ref) from sub-agents
+        mains = [t for t in trajectories if not t.parent_trajectory_ref]
+        if not mains:
             result.skipped += 1
             continue
 
-        # Anonymize all trajectories in the batch before storing
-        trajectories = _anonymize_trajectories(
-            trajectories=trajectories, anonymizer=anonymizer, result=result
-        )
+        if len(mains) <= 1:
+            # Single-session file (main + optional sub-agents): store together
+            session_details.extend(
+                _store_single_session(trajectories, mains[0], file_path, store, anonymizer, result)
+            )
+        else:
+            # Multi-conversation file (e.g. claude.ai export): store each independently
+            session_details.extend(
+                _store_multi_sessions(mains, file_path, store, anonymizer, result)
+            )
 
-        session_id = main.session_id
+    return session_details
+
+
+def _store_single_session(
+    trajectories: list,
+    main: object,
+    file_path: Path,
+    store: DiskStore,
+    anonymizer: RuleAnonymizer,
+    result: UploadResult,
+) -> list[dict]:
+    """Anonymize and store a single-session batch (main + sub-agents).
+
+    Args:
+        trajectories: All trajectories from the file (main + sub-agents).
+        main: The main trajectory (no parent_trajectory_ref).
+        file_path: Source file for error reporting.
+        store: DiskStore for persistence.
+        anonymizer: RuleAnonymizer for redacting sensitive data.
+        result: UploadResult to accumulate counts.
+
+    Returns:
+        List of session detail dicts.
+    """
+    trajectories = _anonymize_trajectories(trajectories, anonymizer, result)
+    try:
+        store.save(trajectories=trajectories)
+    except Exception as exc:
+        logger.warning("Failed to store %s: %s", file_path.name, exc)
+        result.errors.append({"filename": file_path.name, "error": str(exc)})
+        return []
+
+    step_count = sum(len(t.steps) for t in trajectories)
+    result.sessions_parsed += 1
+    result.steps_stored += step_count
+    logger.info(
+        "Stored %d trajectories from %s (upload %s)",
+        len(trajectories),
+        file_path.name,
+        store.root.name,
+    )
+
+    return [{
+        "session_id": main.session_id,
+        "trajectory_count": len(trajectories),
+        "step_count": step_count,
+        "source_file": file_path.name,
+    }]
+
+
+def _store_multi_sessions(
+    mains: list,
+    file_path: Path,
+    store: DiskStore,
+    anonymizer: RuleAnonymizer,
+    result: UploadResult,
+) -> list[dict]:
+    """Anonymize and store each main trajectory independently.
+
+    Used for multi-conversation files (e.g. claude.ai export) where
+    parse_file returns many independent trajectories.
+
+    Args:
+        mains: List of independent main trajectories.
+        file_path: Source file for error reporting.
+        store: DiskStore for persistence.
+        anonymizer: RuleAnonymizer for redacting sensitive data.
+        result: UploadResult to accumulate counts.
+
+    Returns:
+        List of session detail dicts.
+    """
+    details: list[dict] = []
+    for traj in mains:
+        anonymized = _anonymize_trajectories([traj], anonymizer, result)
+        if not anonymized:
+            continue
+        anon_traj = anonymized[0]
         try:
-            store.save(trajectories=trajectories)
+            store.save(trajectories=[anon_traj])
         except Exception as exc:
-            logger.warning("Failed to store %s: %s", file_path.name, exc)
+            logger.warning("Failed to store session %s: %s", anon_traj.session_id, exc)
             result.errors.append({"filename": file_path.name, "error": str(exc)})
             continue
 
-        step_count = sum(len(t.steps) for t in trajectories)
+        step_count = len(anon_traj.steps)
         result.sessions_parsed += 1
         result.steps_stored += step_count
+        details.append({
+            "session_id": anon_traj.session_id,
+            "trajectory_count": 1,
+            "step_count": step_count,
+            "source_file": file_path.name,
+        })
 
-        session_details.append(
-            {
-                "session_id": session_id,
-                "trajectory_count": len(trajectories),
-                "step_count": step_count,
-                "source_file": file_path.name,
-            }
-        )
-        logger.info(
-            "Stored %d trajectories from %s (upload %s)",
-            len(trajectories),
-            file_path.name,
-            store.root.name,
-        )
-
-    return session_details
+    logger.info(
+        "Stored %d sessions from multi-conversation file %s (upload %s)",
+        len(details),
+        file_path.name,
+        store.root.name,
+    )
+    return details
 
 
 def _anonymize_trajectories(

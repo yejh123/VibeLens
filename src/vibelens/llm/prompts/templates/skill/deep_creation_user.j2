@@ -1,0 +1,31 @@
+Generate a complete SKILL.md for the following approved proposal.
+
+## Proposal
+
+- **Name**: {{ proposal_name }}
+- **Description**: {{ proposal_description }}
+- **Rationale**: {{ proposal_rationale }}
+{% if addressed_patterns %}
+- **Addressed Patterns**: {{ addressed_patterns | join(", ") }}
+{% endif %}
+
+## Session Evidence
+
+{{ session_digest }}
+
+{% if installed_skills %}
+## Installed Skills
+
+The user already has these skills. Ensure the new skill does not duplicate them:
+{% for skill in installed_skills %}
+
+- [id={{ loop.index0 }}] **{{ skill.name }}**: {{ skill.description }}
+{% endfor %}
+{% endif %}
+
+Provide:
+- `name`: The proposal name ({{ proposal_name }}).
+- `description`: Trigger description for the YAML frontmatter.
+- `skill_md_content`: Complete SKILL.md content with YAML frontmatter and markdown body.
+- `rationale`: Why this skill improves the user's workflow.
+- `tools_used`: List of tool names referenced in the skill (e.g., Read, Edit, Bash).

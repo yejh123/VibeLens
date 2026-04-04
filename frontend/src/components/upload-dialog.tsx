@@ -3,6 +3,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  ExternalLink,
   FileArchive,
   Loader2,
   Trash2,
@@ -23,6 +24,7 @@ type Step = "select" | "upload" | "confirm" | "result";
 
 const AGENT_OPTIONS: { type: AgentType; label: string }[] = [
   { type: "claude_code", label: "Claude Code" },
+  { type: "claude_code_web", label: "Claude Web" },
   { type: "codex", label: "Codex CLI" },
   { type: "gemini", label: "Gemini CLI" },
 ];
@@ -35,6 +37,7 @@ const OS_OPTIONS: { platform: OSPlatform; label: string }[] = [
 
 const AGENT_LABELS: Record<AgentType, string> = {
   claude_code: "Claude Code",
+  claude_code_web: "Claude Web",
   codex: "Codex CLI",
   gemini: "Gemini CLI",
 };
@@ -57,10 +60,11 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
   const [uploadPhase, setUploadPhase] = useState<"sending" | "processing">("sending");
   const [result, setResult] = useState<UploadResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isWebExport = agentType === "claude_code_web";
 
-  // Fetch command when entering upload step
+  // Fetch command when entering upload step (skip for web exports)
   useEffect(() => {
-    if (step !== "upload") return;
+    if (step !== "upload" || isWebExport) return;
     setCommandLoading(true);
     fetchWithToken(
       `/api/upload/commands?agent_type=${agentType}&os_platform=${osPlatform}`
@@ -74,7 +78,7 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
         setCommands({ command: "# Failed to load command", description: "" })
       )
       .finally(() => setCommandLoading(false));
-  }, [step, agentType, osPlatform, fetchWithToken]);
+  }, [step, agentType, osPlatform, isWebExport, fetchWithToken]);
 
   const fileTooLarge = file ? file.size > maxZipBytes : false;
 
@@ -220,12 +224,14 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
           {step === "select" && (
             <div className="space-y-5">
               <p className="text-sm text-zinc-300">
-                Which agent and OS are you using?
+                {isWebExport
+                  ? "Which data source are you uploading from?"
+                  : "Which agent and OS are you using?"}
               </p>
 
               {/* Agent selector */}
               <SelectorRow
-                label="Agent"
+                label="Source"
                 options={AGENT_OPTIONS.map((o) => ({
                   value: o.type,
                   label: o.label,
@@ -234,16 +240,18 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
                 onSelect={(v) => setAgentType(v as AgentType)}
               />
 
-              {/* OS selector */}
-              <SelectorRow
-                label="Your OS"
-                options={OS_OPTIONS.map((o) => ({
-                  value: o.platform,
-                  label: o.label,
-                }))}
-                selected={osPlatform}
-                onSelect={(v) => setOsPlatform(v as OSPlatform)}
-              />
+              {/* OS selector — hidden for web exports */}
+              {!isWebExport && (
+                <SelectorRow
+                  label="Your OS"
+                  options={OS_OPTIONS.map((o) => ({
+                    value: o.platform,
+                    label: o.label,
+                  }))}
+                  selected={osPlatform}
+                  onSelect={(v) => setOsPlatform(v as OSPlatform)}
+                />
+              )}
 
               <div className="flex justify-end pt-1">
                 <button
@@ -259,31 +267,35 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
 
           {step === "upload" && (
             <div className="space-y-4">
-              {/* Command area */}
-              <div className="space-y-1.5">
-                <p className="text-sm text-zinc-300">
-                  Run this command in your terminal, then upload the zip.
-                </p>
-                {commands?.description && (
-                  <p className="text-xs text-zinc-500">{commands.description}</p>
-                )}
-                {commandLoading ? (
-                  <div className="flex items-center justify-center py-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                    <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 pr-10 text-xs text-cyan-300 font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                      {commands?.command ?? ""}
-                    </pre>
-                    {commands && (
-                      <div className="absolute top-2 right-2">
-                        <CopyButton text={commands.command} />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {/* Instructions area — web export vs CLI command */}
+              {isWebExport ? (
+                <WebExportInstructions />
+              ) : (
+                <div className="space-y-1.5">
+                  <p className="text-sm text-zinc-300">
+                    Run this command in your terminal, then upload the zip.
+                  </p>
+                  {commands?.description && (
+                    <p className="text-xs text-zinc-500">{commands.description}</p>
+                  )}
+                  {commandLoading ? (
+                    <div className="flex items-center justify-center py-4 bg-zinc-950 border border-zinc-800 rounded-lg">
+                      <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 pr-10 text-xs text-cyan-300 font-mono overflow-x-auto whitespace-pre-wrap break-all">
+                        {commands?.command ?? ""}
+                      </pre>
+                      {commands && (
+                        <div className="absolute top-2 right-2">
+                          <CopyButton text={commands.command} />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Drop zone */}
               <div
@@ -452,6 +464,42 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const WEB_EXPORT_STEPS = [
+  { num: "1", text: "Open claude.ai and go to Settings" },
+  { num: "2", text: 'Scroll to "Export Data" and click Export' },
+  { num: "3", text: "Wait for the email, then download the zip" },
+  { num: "4", text: "Upload the downloaded zip below" },
+];
+
+function WebExportInstructions() {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-zinc-300">
+        Export your data from claude.ai, then upload the zip.
+      </p>
+      <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 space-y-2">
+        {WEB_EXPORT_STEPS.map((s) => (
+          <div key={s.num} className="flex items-start gap-2.5">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-violet-600/20 text-violet-400 text-[10px] font-bold shrink-0 mt-px">
+              {s.num}
+            </span>
+            <span className="text-xs text-zinc-300">{s.text}</span>
+          </div>
+        ))}
+      </div>
+      <a
+        href="https://claude.ai/settings"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition"
+      >
+        Open claude.ai Settings
+        <ExternalLink className="w-3 h-3" />
+      </a>
     </div>
   );
 }

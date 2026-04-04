@@ -8,7 +8,7 @@ import json
 import secrets
 from pathlib import Path
 
-from vibelens.models.skill.skills import SkillAnalysisResult
+from vibelens.models.skill import SkillAnalysisResult
 from vibelens.schemas.skills import SkillAnalysisMeta
 from vibelens.utils.json_helpers import locked_jsonl_append, locked_jsonl_remove
 from vibelens.utils.log import get_logger

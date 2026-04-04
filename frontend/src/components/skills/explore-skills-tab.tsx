@@ -30,8 +30,9 @@ import {
   SkillSearchBar,
   SourceFilterBar,
 } from "./skill-shared";
+import type { SkillTab } from "./skill-analysis-views";
 
-export function ExploreSkillsTab() {
+export function ExploreSkillsTab({ onSwitchTab }: { onSwitchTab?: (tab: SkillTab) => void }) {
   const { fetchWithToken } = useAppContext();
   const [featured, setFeatured] = useState<FeaturedSkill[]>([]);
   const [allSkills, setAllSkills] = useState<FeaturedSkill[]>([]);
@@ -111,10 +112,10 @@ export function ExploreSkillsTab() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-zinc-100">Explore Skills</h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-300">
               {allSkills.length} community skills from the Anthropic registry
               {updatedAt && (
-                <span className="ml-1 text-zinc-600">
+                <span className="ml-1 text-zinc-400">
                   · updated {new Date(updatedAt).toLocaleDateString()}
                 </span>
               )}
@@ -139,11 +140,19 @@ export function ExploreSkillsTab() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-teal-300">Not sure which skills to add?</p>
-            <p className="text-xs text-teal-400/70 mt-0.5">
+            <p className="text-sm text-teal-400/70 mt-0.5">
               Switch to the <span className="font-semibold text-teal-300">Recommend</span> tab — it analyzes your coding sessions and recommends skills tailored to your workflow.
             </p>
           </div>
-          <Sparkles className="w-5 h-5 text-teal-500/40 shrink-0" />
+          {onSwitchTab && (
+            <button
+              onClick={() => onSwitchTab("retrieve")}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-200 bg-teal-600/30 hover:bg-teal-600/50 border border-teal-500/30 rounded-md transition"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Recommend
+            </button>
+          )}
         </div>
       </div>
 

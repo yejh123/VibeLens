@@ -2,8 +2,11 @@
 
 import json
 import logging
+import re
+import time
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from vibelens.deps import (
@@ -167,6 +170,84 @@ def install_featured_skill(req: FeaturedSkillInstallRequest) -> dict:
         "info": info.model_dump(mode="json") if info else None,
         "sync_results": sync_results,
     }
+
+
+_featured_content_cache: dict[str, tuple[float, str]] = {}
+FEATURED_CONTENT_TTL_SECONDS = 3600
+
+
+@router.get("/featured/{slug}/content")
+def get_featured_skill_content(slug: str) -> dict:
+    """Fetch the SKILL.md content for a featured skill from GitHub.
+
+    Uses an in-memory cache with 1-hour TTL to avoid repeated fetches.
+
+    Args:
+        slug: Skill slug from the featured catalog.
+
+    Returns:
+        Dict with slug and SKILL.md content string.
+    """
+    cached = _featured_content_cache.get(slug)
+    if cached:
+        cached_at, content = cached
+        if time.monotonic() - cached_at < FEATURED_CONTENT_TTL_SECONDS:
+            return {"slug": slug, "content": content}
+        del _featured_content_cache[slug]
+
+    if not FEATURED_SKILLS_PATH.is_file():
+        raise HTTPException(status_code=404, detail="Featured skills catalog not found")
+
+    try:
+        catalog = json.loads(FEATURED_SKILLS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read catalog: {exc}") from exc
+
+    matched = next((s for s in catalog.get("skills", []) if s["slug"] == slug), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail=f"Skill {slug!r} not found in catalog")
+
+    source_url = matched.get("source_url", "")
+    raw_url = _source_url_to_raw(source_url)
+    if not raw_url:
+        raise HTTPException(status_code=404, detail=f"Cannot resolve content URL for {slug!r}")
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.get(raw_url)
+            response.raise_for_status()
+        content = response.text
+    except httpx.HTTPError as exc:
+        logger.warning("Failed to fetch SKILL.md for %s: %s", slug, exc)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch from GitHub: {exc}") from exc
+
+    _featured_content_cache[slug] = (time.monotonic(), content)
+    return {"slug": slug, "content": content}
+
+
+_GITHUB_TREE_RE = re.compile(
+    r"https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/tree/(?P<ref>[^/]+)/(?P<path>.+)"
+)
+
+
+def _source_url_to_raw(source_url: str) -> str | None:
+    """Convert a GitHub tree URL to a raw SKILL.md URL.
+
+    Args:
+        source_url: GitHub tree URL like
+            https://github.com/{owner}/{repo}/tree/main/skills/{slug}
+
+    Returns:
+        Raw content URL or None if the pattern doesn't match.
+    """
+    match = _GITHUB_TREE_RE.match(source_url)
+    if not match:
+        return None
+    owner = match.group("owner")
+    repo = match.group("repo")
+    ref = match.group("ref")
+    path = match.group("path")
+    return f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}/SKILL.md"
 
 
 def _build_skill_md_from_catalog(catalog_entry: dict) -> str:

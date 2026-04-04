@@ -15,6 +15,7 @@ from vibelens.services.context_extraction import (
     _summarize_tool_args,
     extract_session_context,
 )
+from vibelens.services.context_params import PRESET_DETAIL
 
 
 def _make_step(step_id: str, source: str, message: str, tool_calls: list | None = None) -> Step:
@@ -225,25 +226,27 @@ def test_extra_flag_required_for_compaction():
 
 def test_summarize_tool_args():
     """Tool args are summarized per tool-specific rules."""
+    params = PRESET_DETAIL
+
     # Edit: show file_path only
     edit_args = {"file_path": "src/foo.py", "old_string": "xxx", "new_string": "yyy"}
-    assert "file_path=src/foo.py" in _summarize_tool_args("Edit", edit_args)
+    assert "file_path=src/foo.py" in _summarize_tool_args("Edit", edit_args, params)
 
     # Bash: show command (truncated)
-    result = _summarize_tool_args("Bash", {"command": "pytest tests/ -v -s --tb=short"})
+    result = _summarize_tool_args("Bash", {"command": "pytest tests/ -v -s --tb=short"}, params)
     assert "command=" in result
 
     # Grep: show pattern and path
-    result = _summarize_tool_args("Grep", {"pattern": "def foo", "path": "src/"})
+    result = _summarize_tool_args("Grep", {"pattern": "def foo", "path": "src/"}, params)
     assert "pattern=def foo" in result
     assert "path=src/" in result
 
     # Unknown tool: best effort
-    result = _summarize_tool_args("CustomTool", {"file_path": "x.py", "other": "value"})
+    result = _summarize_tool_args("CustomTool", {"file_path": "x.py", "other": "value"}, params)
     assert "file_path=x.py" in result
 
     # None args
-    assert _summarize_tool_args("Edit", None) == ""
+    assert _summarize_tool_args("Edit", None, params) == ""
 
     print("All tool arg tests passed")
 

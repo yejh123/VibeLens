@@ -27,7 +27,11 @@ from vibelens.models.enums import AppMode
 from vibelens.services.dashboard.loader import warm_cache
 from vibelens.services.job_tracker import cleanup_stale as cleanup_stale_jobs
 from vibelens.services.session.demo import load_demo_examples
-from vibelens.services.session.search import build_search_index
+from vibelens.services.session.search import (
+    build_full_search_index,
+    build_search_index,
+    refresh_search_index,
+)
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)
@@ -65,18 +69,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, _lightweight_startup, settings)
 
-    # Build search index eagerly so first search is instant
-    asyncio.create_task(_async_build_search_index())
+    # Tier 1: instant metadata-based search index (no disk I/O, <100ms)
+    build_search_index()
+
+    # Tier 2: full-text search index built in background thread
+    asyncio.create_task(_async_build_full_search_index())
 
     # Dashboard cache warming as an async background task so it yields
     # the event loop between session batches instead of holding the GIL
     asyncio.create_task(_async_warm_cache())
+
+    # Periodic incremental search index refresh (diff-based, <1s typical)
+    search_refresh_task = asyncio.create_task(_periodic_search_refresh())
 
     # Periodic cleanup of finished job tracker entries to prevent memory leak
     cleanup_task = asyncio.create_task(_periodic_job_cleanup())
 
     yield
 
+    search_refresh_task.cancel()
     cleanup_task.cancel()
 
 
@@ -95,12 +106,31 @@ async def _periodic_job_cleanup() -> None:
             logger.warning("Job cleanup failed", exc_info=True)
 
 
-async def _async_build_search_index() -> None:
-    """Pre-build the search index at startup so the first query is instant."""
+async def _async_build_full_search_index() -> None:
+    """Build the full-text (Tier 2) search index in a background thread."""
     try:
-        await asyncio.to_thread(build_search_index)
+        await asyncio.to_thread(build_full_search_index)
     except Exception:
-        logger.warning("Search index pre-build failed", exc_info=True)
+        logger.warning("Full search index build failed", exc_info=True)
+
+
+SEARCH_REFRESH_INTERVAL_SECONDS = 300
+
+
+async def _periodic_search_refresh() -> None:
+    """Incrementally refresh the search index every 5 minutes.
+
+    Uses diff-based refresh that only loads new sessions and removes
+    stale ones, completing in <1s for typical workloads.
+    """
+    while True:
+        await asyncio.sleep(SEARCH_REFRESH_INTERVAL_SECONDS)
+        try:
+            await asyncio.to_thread(refresh_search_index)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("Search index refresh failed", exc_info=True)
 
 
 async def _async_warm_cache() -> None:
@@ -162,7 +192,7 @@ def _seed_mock_skill_history() -> None:
     and generates mock analysis results for retrieval, creation, and
     evolution modes so the History sidebar has sample entries.
     """
-    from vibelens.models.skill.skills import SkillMode
+    from vibelens.models.skill import SkillMode
     from vibelens.services.skill.mock import build_mock_skill_result
 
     analysis_store = get_skill_analysis_store()

@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.9.20] - 2026-04-04
+
+### Added
+- **Claude Web parser**: New `claude_code_web` parser for claude.ai "Export Data" ZIP files. Upload dialog shows dedicated instructions when this source is selected. Multi-conversation files are split into independent sessions automatically.
+- **Agent-level dashboard filtering**: Clicking an agent row in the distribution chart drills down into that agent's stats. Breadcrumb navigation shows `Agent / Project` hierarchy with clickable segments.
+- **Skill preview dialog**: Unified `SkillPreviewDialog` replaces the old inline-edit and direct-install flows. Users can read, edit, and confirm SKILL.md content before installing or updating -- used for catalog recommendations, new creations, and evolution suggestions.
+- **CLI model selector**: LLM config now shows available models per CLI backend with inline pricing. Backends declare `available_models`, `default_model`, and `supports_freeform_model`. New `GET /llm/cli-models` endpoint powers the selector.
+- **LLM pricing in status bar**: `GET /llm/status` and `POST /llm/configure` now return `pricing` (input/output per MTok) for the configured model.
+- **Skill evolution selection step**: New LLM-powered pre-filter asks which installed skills are relevant before loading full SKILL.md content, reducing context bloat for large skill collections.
+- **Featured skill preview**: `GET /skills/featured/{slug}/content` fetches raw SKILL.md from GitHub with 1-hour cache, enabling preview-before-install in the Explore tab.
+
+### Changed
+- **Shared analysis infrastructure**: Extracted `analysis_shared.py` with `require_backend()`, `run_batches_concurrent()`, `build_digest_from_contexts()`, and other helpers that were duplicated across friction, retrieval, creation, and evolution services.
+- **Configurable context extraction**: Replaced hardcoded truncation constants with `ContextParams` dataclass and three presets (`PRESET_CONCISE`, `PRESET_MEDIUM`, `PRESET_DETAIL`). Added path shortening (`$HOME` → `~`).
+- **Batched skill analysis**: Retrieval, creation, and evolution now use the same batch + synthesis pattern as friction -- concurrent LLM calls per batch with a synthesis pass when multiple batches exist.
+- **Skill models split**: Monolithic `models/skill/skills.py` split into `patterns.py`, `retrieve.py`, `create.py`, `evolve.py`, `results.py` with mode-specific output types replacing the catch-all `SkillLLMOutput`.
+- **Simplified `SkillEdit` model**: Dropped `kind`/`target`/`replacement`/`conflict_type` enum pattern in favor of `old_string`/`new_string`/`replace_all` -- mirrors text editor semantics and is less ambiguous for LLM output.
+- **Template directory reorganization**: Flat `templates/` Jinja2 files moved into `templates/friction/`, `templates/highlights/`, `templates/skill/` subdirectories.
+- **Two-tier search index**: Replaced single-tier 5-minute-TTL index with lazy two-tier architecture -- Tier 1 (metadata-only) loads synchronously at startup for instant search; Tier 2 (full text) builds asynchronously in a thread pool. Incremental `add_sessions_to_index()` after uploads instead of full invalidation.
+- **Evolution diff view**: Now computes real 1-based line numbers from original file content and shows grey context lines alongside red/green diff rows.
+- **Gemini CLI system prompt**: System prompt now passed via `GEMINI_SYSTEM_MD` env var temp file instead of stdin concatenation. OpenCode CLI gained `--system` flag support.
+- **CLI backend model resolution**: When user config has the LiteLLM default or is empty, falls back to each backend's own `default_model`.
+- **Skills tab labels**: "Discover" renamed to "Recommend". "Apply & Edit" renamed to "Preview & Update". Explore tab gains a "Recommend" shortcut button.
+- **Tour steps**: Single "AI-Powered Insights" stop split into "Productivity Tips" and "Personalization" with distinct icons.
+- **Nav tooltips**: Native `title` attributes replaced with shared `Tooltip` components on all main-nav tab buttons.
+- **`WorkflowPattern.pain_point` renamed to `gap`** across models, templates, and UI.
+
+### Removed
+- **StepSignal-based digest path**: Deleted `services/friction/signals.py` and `services/skill/digest.py`. All analysis now uses the `SessionContext` path from `context_extraction.py`.
+- **`skill_creation.py` prompt**: Single-call creation prompt removed; creation now uses the proposal + deep-creation two-phase pipeline exclusively.
+- **Dead skill constants**: `EDIT_KIND_*`, `CONFLICT_TYPE_*`, `MODE_COLORS` removed from frontend constants.
+
 ## [0.9.19] - 2026-04-03
 
 ### Fixed

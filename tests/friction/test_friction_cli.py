@@ -27,7 +27,10 @@ from vibelens.models.analysis.friction import (
 )
 from vibelens.models.inference import InferenceRequest
 from vibelens.models.trajectories import Trajectory
-from vibelens.services.context_extraction import extract_session_context, remap_session_ids
+from vibelens.services.context_extraction import (
+    extract_session_context,
+    remap_session_ids,
+)
 from vibelens.services.friction.analysis import (
     FRICTION_OUTPUT_TOKENS,
     FRICTION_TIMEOUT_SECONDS,
@@ -300,14 +303,13 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
     assert len(all_batch_outputs) > 0, "No batch produced valid output"
 
 
-SKIP_NO_EXAMPLES = pytest.mark.skipif(
-    not EXAMPLES_DIR.exists(), reason="Example data not found"
-)
+SKIP_NO_EXAMPLES = pytest.mark.skipif(not EXAMPLES_DIR.exists(), reason="Example data not found")
 SKIP_NO_CLAUDE_CLI = pytest.mark.skipif(
     shutil.which("claude") is None, reason="claude CLI not in PATH"
 )
 
 
+@pytest.mark.slow
 @SKIP_NO_EXAMPLES
 @SKIP_NO_CLAUDE_CLI
 def test_friction_cli_2_sessions():
@@ -315,6 +317,7 @@ def test_friction_cli_2_sessions():
     _run_cli_friction_test("2_sessions", session_count=2)
 
 
+@pytest.mark.slow
 @SKIP_NO_EXAMPLES
 @SKIP_NO_CLAUDE_CLI
 def test_friction_cli_all_sessions():

@@ -1,39 +1,41 @@
 """Skill domain models."""
 
-from vibelens.models.skill.info import VALID_SKILL_NAME, SkillInfo
-from vibelens.models.skill.skills import (
-    SkillAnalysisResult,
-    SkillConflictType,
+from vibelens.models.skill.create import (
     SkillCreation,
     SkillDeepCreationOutput,
-    SkillEdit,
-    SkillEditKind,
-    SkillEvolutionSuggestion,
-    SkillLLMOutput,
-    SkillMode,
     SkillProposal,
     SkillProposalOutput,
     SkillProposalResult,
-    SkillRecommendation,
 )
+from vibelens.models.skill.evolve import (
+    SkillEdit,
+    SkillEvolutionOutput,
+    SkillEvolutionSuggestion,
+    SkillSelectionOutput,
+)
+from vibelens.models.skill.info import VALID_SKILL_NAME, SkillInfo
+from vibelens.models.skill.patterns import SkillMode, WorkflowPattern
+from vibelens.models.skill.results import SkillAnalysisResult
+from vibelens.models.skill.retrieve import SkillRecommendation, SkillRetrievalOutput
 from vibelens.models.skill.source import SkillSource, SkillSourceType
 
 __all__ = [
-    "SkillInfo",
-    "SkillSource",
-    "SkillSourceType",
     "SkillAnalysisResult",
-    "SkillConflictType",
     "SkillCreation",
     "SkillDeepCreationOutput",
     "SkillEdit",
-    "SkillEditKind",
+    "SkillEvolutionOutput",
     "SkillEvolutionSuggestion",
-    "SkillLLMOutput",
+    "SkillInfo",
     "SkillMode",
     "SkillProposal",
     "SkillProposalOutput",
     "SkillProposalResult",
     "SkillRecommendation",
+    "SkillRetrievalOutput",
+    "SkillSelectionOutput",
+    "SkillSource",
+    "SkillSourceType",
     "VALID_SKILL_NAME",
+    "WorkflowPattern",
 ]

@@ -21,10 +21,11 @@ def dashboard_stats(
     project_path: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    agent_name: str | None = None,
     x_session_token: str | None = Header(None),
 ) -> DashboardStats:
     """Compute aggregate dashboard statistics from full trajectories."""
-    return get_dashboard_stats(project_path, date_from, date_to, x_session_token)
+    return get_dashboard_stats(project_path, date_from, date_to, x_session_token, agent_name)
 
 
 @router.get("/analysis/tool-usage")
@@ -32,10 +33,11 @@ def tool_usage(
     project_path: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    agent_name: str | None = None,
     x_session_token: str | None = Header(None),
 ) -> list[ToolUsageStat]:
     """Compute per-tool usage statistics (cached)."""
-    return get_tool_usage(project_path, date_from, date_to, x_session_token)
+    return get_tool_usage(project_path, date_from, date_to, x_session_token, agent_name)
 
 
 @router.get("/analysis/sessions/{session_id}/stats")
@@ -55,10 +57,15 @@ def export_dashboard(
     project_path: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    agent_name: str | None = None,
     x_session_token: str | None = Header(None),
 ) -> StreamingResponse:
     """Export dashboard data as a downloadable file."""
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     if format == "json":
-        return export_dashboard_json(project_path, date_from, date_to, x_session_token, timestamp)
-    return export_dashboard_csv(project_path, date_from, date_to, x_session_token, timestamp)
+        return export_dashboard_json(
+            project_path, date_from, date_to, x_session_token, timestamp, agent_name
+        )
+    return export_dashboard_csv(
+        project_path, date_from, date_to, x_session_token, timestamp, agent_name
+    )

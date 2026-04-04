@@ -1,39 +1,22 @@
-import { ArrowRight, FileText, Pencil, Plus, Wrench, Zap } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { SkillEdit } from "../../types";
-import { Tooltip } from "../tooltip";
-import {
-  CONFLICT_TYPE_DESCRIPTIONS,
-  CONFLICT_TYPE_LABELS,
-  CONFLICT_TYPE_STYLES,
-  EDIT_KIND_DESCRIPTIONS,
-  EDIT_KIND_LABELS,
-  EDIT_KIND_STYLES,
-} from "./skill-constants";
-
-const EDIT_KIND_ICONS: Record<string, React.ReactNode> = {
-  add_instruction: <Plus className="w-2.5 h-2.5" />,
-  remove_instruction: <Zap className="w-2.5 h-2.5" />,
-  replace_instruction: <ArrowRight className="w-2.5 h-2.5" />,
-  update_description: <Pencil className="w-2.5 h-2.5" />,
-  add_tool: <Wrench className="w-2.5 h-2.5" />,
-  remove_tool: <Wrench className="w-2.5 h-2.5" />,
-};
-
-const ADD_ONLY_KINDS = new Set(["add_instruction", "add_tool"]);
-const REMOVE_ONLY_KINDS = new Set(["remove_instruction", "remove_tool"]);
-
-/** Synthetic line gap between non-adjacent hunks. */
-const HUNK_GAP = 4;
 
 type DiffRow =
-  | { type: "hunk-header"; edit: SkillEdit; index: number }
-  | { type: "removed"; oldNum: number; text: string }
-  | { type: "added"; newNum: number; text: string }
-  | { type: "separator" }
-  | { type: "rationale"; text: string };
+  | { type: "hunk-header"; index: number }
+  | { type: "context"; lineNum: number; text: string }
+  | { type: "removed"; lineNum: number; text: string }
+  | { type: "added"; lineNum: number; text: string }
+  | { type: "separator" };
 
-export function EvolutionDiffView({ skillName, edits }: { skillName: string; edits: SkillEdit[] }) {
-  const rows = buildDiffRows(edits);
+interface EvolutionDiffViewProps {
+  skillName: string;
+  edits: SkillEdit[];
+  /** Original SKILL.md content for computing real line numbers. */
+  originalContent?: string;
+}
+
+export function EvolutionDiffView({ skillName, edits, originalContent }: EvolutionDiffViewProps) {
+  const rows = buildDiffRows(edits, originalContent);
 
   return (
     <div className="rounded-lg border border-zinc-700/60 overflow-hidden bg-zinc-900/60">
@@ -42,15 +25,15 @@ export function EvolutionDiffView({ skillName, edits }: { skillName: string; edi
         {rows.map((row, i) => {
           switch (row.type) {
             case "hunk-header":
-              return <HunkHeader key={i} edit={row.edit} index={row.index} />;
+              return <HunkHeader key={i} index={row.index} />;
+            case "context":
+              return <ContextLine key={i} lineNum={row.lineNum} text={row.text} />;
             case "removed":
-              return <RemovedLine key={i} oldNum={row.oldNum} text={row.text} />;
+              return <RemovedLine key={i} lineNum={row.lineNum} text={row.text} />;
             case "added":
-              return <AddedLine key={i} newNum={row.newNum} text={row.text} />;
+              return <AddedLine key={i} lineNum={row.lineNum} text={row.text} />;
             case "separator":
               return <HunkSeparator key={i} />;
-            case "rationale":
-              return <HunkRationale key={i} text={row.text} />;
           }
         })}
       </div>
@@ -70,37 +53,36 @@ function DiffFileHeader({ skillName, editCount }: { skillName: string; editCount
   );
 }
 
-function HunkHeader({ edit, index }: { edit: SkillEdit; index: number }) {
+function HunkHeader({ index }: { index: number }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] flex-wrap border-b border-zinc-800/40">
-      <Tooltip text={EDIT_KIND_DESCRIPTIONS[edit.kind] || "A specific edit to the skill"}>
-        <span
-          className={`inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-md cursor-help ${EDIT_KIND_STYLES[edit.kind] || "bg-zinc-700/80 text-zinc-300"}`}
-        >
-          {EDIT_KIND_ICONS[edit.kind] || <Pencil className="w-2.5 h-2.5" />}
-          {EDIT_KIND_LABELS[edit.kind] || edit.kind}
-        </span>
-      </Tooltip>
-      {edit.conflict_type && (
-        <Tooltip text={CONFLICT_TYPE_DESCRIPTIONS[edit.conflict_type] || "Conflict detected"}>
-          <span
-            className={`inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-md cursor-help ${CONFLICT_TYPE_STYLES[edit.conflict_type] || "bg-zinc-700/80 text-zinc-300"}`}
-          >
-            {CONFLICT_TYPE_LABELS[edit.conflict_type] || edit.conflict_type}
-          </span>
-        </Tooltip>
-      )}
-      <span className="text-zinc-600 ml-auto">hunk {index + 1}</span>
+      <span className="text-zinc-500 ml-auto">hunk {index + 1}</span>
     </div>
   );
 }
 
-/** Removed line: old line number on left gutter, right gutter empty. */
-function RemovedLine({ oldNum, text }: { oldNum: number; text: string }) {
+function ContextLine({ lineNum, text }: { lineNum: number; text: string }) {
+  return (
+    <div className="flex">
+      <span className="w-10 shrink-0 text-right pr-1.5 text-[10px] leading-5 select-none text-zinc-600">
+        {lineNum}
+      </span>
+      <span className="w-10 shrink-0 text-right pr-1.5 text-[10px] leading-5 select-none text-zinc-600">
+        {lineNum}
+      </span>
+      <span className="w-5 shrink-0 leading-5 select-none" />
+      <span className="flex-1 px-2 leading-5 whitespace-pre-wrap break-words text-zinc-400">
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function RemovedLine({ lineNum, text }: { lineNum: number; text: string }) {
   return (
     <div className="flex bg-red-950/30">
       <span className="w-10 shrink-0 text-right pr-1.5 text-[10px] leading-5 select-none bg-red-900/40 text-red-400/70">
-        {oldNum}
+        {lineNum}
       </span>
       <span className="w-10 shrink-0 leading-5 select-none bg-red-950/20" />
       <span className="w-5 shrink-0 text-center leading-5 select-none text-red-500/70">-</span>
@@ -111,13 +93,12 @@ function RemovedLine({ oldNum, text }: { oldNum: number; text: string }) {
   );
 }
 
-/** Added line: left gutter empty, new line number on right gutter. */
-function AddedLine({ newNum, text }: { newNum: number; text: string }) {
+function AddedLine({ lineNum, text }: { lineNum: number; text: string }) {
   return (
     <div className="flex bg-emerald-950/25">
       <span className="w-10 shrink-0 leading-5 select-none bg-emerald-950/10" />
       <span className="w-10 shrink-0 text-right pr-1.5 text-[10px] leading-5 select-none bg-emerald-900/35 text-emerald-400/70">
-        {newNum}
+        {lineNum}
       </span>
       <span className="w-5 shrink-0 text-center leading-5 select-none text-emerald-500/70">+</span>
       <span className="flex-1 px-2 leading-5 whitespace-pre-wrap break-words text-emerald-300/90">
@@ -132,68 +113,115 @@ function HunkSeparator() {
     <div className="flex items-center py-0.5 bg-zinc-800/30 text-zinc-600 text-[10px] select-none border-y border-zinc-800/40">
       <span className="w-10 shrink-0" />
       <span className="w-10 shrink-0" />
-      <span className="px-2">···</span>
+      <span className="px-2">&middot;&middot;&middot;</span>
     </div>
   );
 }
 
-function HunkRationale({ text }: { text: string }) {
-  return (
-    <div className="px-3 py-1.5 bg-zinc-800/30 border-t border-zinc-800/40">
-      <p className="text-[11px] text-zinc-500 italic font-sans pl-[5.25rem]">{text}</p>
-    </div>
-  );
+/**
+ * Find the 1-based line number where `needle` starts in `haystack`.
+ * Returns 0 if not found.
+ */
+function findLineNumber(haystack: string, needle: string): number {
+  const idx = haystack.indexOf(needle);
+  if (idx < 0) return 0;
+  return haystack.substring(0, idx).split("\n").length;
 }
 
-/** Build a flat list of diff rows from all edits, with synthetic line numbers. */
-function buildDiffRows(edits: SkillEdit[]): DiffRow[] {
+/**
+ * Compute the common prefix and suffix line counts between old and new lines.
+ * These are the context lines the LLM embedded around the actual change.
+ */
+function computeContextBounds(oldLines: string[], newLines: string[]): { prefixLen: number; suffixLen: number } {
+  let prefixLen = 0;
+  const maxPrefix = Math.min(oldLines.length, newLines.length);
+  while (prefixLen < maxPrefix && oldLines[prefixLen] === newLines[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  const maxSuffix = Math.min(oldLines.length - prefixLen, newLines.length - prefixLen);
+  while (
+    suffixLen < maxSuffix &&
+    oldLines[oldLines.length - 1 - suffixLen] === newLines[newLines.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  return { prefixLen, suffixLen };
+}
+
+function buildDiffRows(edits: SkillEdit[], originalContent?: string): DiffRow[] {
   const rows: DiffRow[] = [];
-  let oldCursor = 1;
-  let newCursor = 1;
 
   edits.forEach((edit, idx) => {
     if (idx > 0) {
       rows.push({ type: "separator" });
-      oldCursor += HUNK_GAP;
-      newCursor += HUNK_GAP;
+    }
+    rows.push({ type: "hunk-header", index: idx });
+
+    // Compute the starting line number from the original file
+    const startLine = originalContent && edit.old_string
+      ? findLineNumber(originalContent, edit.old_string)
+      : 0;
+
+    const oldLines = splitText(edit.old_string);
+    const newLines = splitText(edit.new_string);
+
+    if (oldLines.length === 0 && newLines.length === 0) return;
+
+    // For append edits (old_string is empty), just show added lines
+    if (oldLines.length === 0) {
+      const appendStart = originalContent ? originalContent.split("\n").length + 1 : 1;
+      let addCursor = appendStart;
+      for (const line of newLines) {
+        rows.push({ type: "added", lineNum: addCursor++, text: line });
+      }
+      return;
     }
 
-    rows.push({ type: "hunk-header", edit, index: idx });
+    // Find matching context prefix/suffix between old and new
+    const { prefixLen, suffixLen } = computeContextBounds(oldLines, newLines);
 
-    const removed = getRemoved(edit);
-    const added = getAdded(edit);
+    let oldCursor = startLine || 1;
+    let newCursor = startLine || 1;
 
-    for (const line of removed) {
-      rows.push({ type: "removed", oldNum: oldCursor++, text: line });
+    // Leading context lines (identical in old and new)
+    for (let i = 0; i < prefixLen; i++) {
+      rows.push({ type: "context", lineNum: oldCursor, text: oldLines[i] });
+      oldCursor++;
+      newCursor++;
     }
-    for (const line of added) {
-      rows.push({ type: "added", newNum: newCursor++, text: line });
+
+    // Changed old lines (removed)
+    const oldChangeEnd = oldLines.length - suffixLen;
+    for (let i = prefixLen; i < oldChangeEnd; i++) {
+      rows.push({ type: "removed", lineNum: oldCursor++, text: oldLines[i] });
     }
 
-    // Sync cursors so the next hunk starts from the same baseline
+    // Changed new lines (added)
+    const newChangeEnd = newLines.length - suffixLen;
+    for (let i = prefixLen; i < newChangeEnd; i++) {
+      rows.push({ type: "added", lineNum: newCursor++, text: newLines[i] });
+    }
+
+    // Sync cursors after changed region
     const maxCursor = Math.max(oldCursor, newCursor);
     oldCursor = maxCursor;
     newCursor = maxCursor;
 
-    if (edit.rationale) {
-      rows.push({ type: "rationale", text: edit.rationale });
+    // Trailing context lines
+    for (let i = oldLines.length - suffixLen; i < oldLines.length; i++) {
+      rows.push({ type: "context", lineNum: oldCursor, text: oldLines[i] });
+      oldCursor++;
+      newCursor++;
     }
   });
 
   return rows;
 }
 
-function getRemoved(edit: SkillEdit): string[] {
-  if (ADD_ONLY_KINDS.has(edit.kind)) return [];
-  return splitText(edit.target);
-}
-
-function getAdded(edit: SkillEdit): string[] {
-  if (REMOVE_ONLY_KINDS.has(edit.kind)) return [];
-  return splitText(edit.replacement);
-}
-
-function splitText(text: string | null | undefined): string[] {
+function splitText(text: string): string[] {
   if (!text || text.trim().length === 0) return [];
   return text.split("\n");
 }

@@ -6,6 +6,7 @@ Trajectory objects for downstream analytics and storage.
 
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.ingest.parsers.claude_code import ClaudeCodeParser, count_history_entries
+from vibelens.ingest.parsers.claude_code_web import ClaudeCodeWebParser
 from vibelens.ingest.parsers.codex import CodexParser
 from vibelens.ingest.parsers.dataclaw import DataclawParser
 from vibelens.ingest.parsers.gemini import GeminiParser
@@ -24,6 +25,7 @@ LOCAL_PARSER_CLASSES: list[type[BaseParser]] = [
 __all__ = [
     "BaseParser",
     "ClaudeCodeParser",
+    "ClaudeCodeWebParser",
     "CodexParser",
     "DataclawParser",
     "GeminiParser",

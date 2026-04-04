@@ -11,6 +11,7 @@ class AgentType(StrEnum):
     """
 
     CLAUDE_CODE = "claude_code"
+    CLAUDE_CODE_WEB = "claude_code_web"
     CODEX = "codex"
     GEMINI = "gemini"
     DATACLAW = "dataclaw"

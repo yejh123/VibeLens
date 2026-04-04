@@ -210,6 +210,7 @@ def _run_friction_analysis(label: str, groups: dict[str, list[Trajectory]]) -> N
     assert all(len(o.summary) > 0 for o in all_outputs), "All batches should have summaries"
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(SKIP_LIVE, reason=SKIP_REASON)
 def test_friction_2_sessions():
     """Friction analysis with 2 sessions — should fit in 1 batch."""
@@ -220,6 +221,7 @@ def test_friction_2_sessions():
     _run_friction_analysis("2_sessions", groups)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(SKIP_LIVE, reason=SKIP_REASON)
 def test_friction_5_sessions():
     """Friction analysis with all sessions — may produce multiple batches."""

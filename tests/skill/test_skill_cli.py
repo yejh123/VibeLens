@@ -30,7 +30,7 @@ from vibelens.llm.prompts.skill_proposal import (
 )
 from vibelens.llm.tokenizer import count_tokens
 from vibelens.models.inference import InferenceRequest
-from vibelens.models.skill.skills import SkillDeepCreationOutput, SkillProposalOutput
+from vibelens.models.skill import SkillDeepCreationOutput, SkillProposalOutput
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.context_extraction import extract_session_context
 from vibelens.services.friction.digest import format_batch_digest
@@ -221,7 +221,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
                     {
                         "title": p.title,
                         "description": p.description,
-                        "pain_point": p.pain_point,
+                        "gap": p.gap,
                     }
                     for p in output.workflow_patterns
                 ],
@@ -363,6 +363,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
     assert total_proposals > 0, "No proposals generated"
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not EXAMPLES_DIR.exists(), reason="Example data not found")
 def test_skill_proposals_litellm():
     """Skill proposal + deep creation via LiteLLM backend."""
@@ -373,6 +374,7 @@ def test_skill_proposals_litellm():
     _run_proposal_test(backend, "litellm_proposals", session_count=2)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not EXAMPLES_DIR.exists(), reason="Example data not found")
 @pytest.mark.skipif(shutil.which("codex") is None, reason="codex CLI not in PATH")
 def test_skill_proposals_codex_cli():

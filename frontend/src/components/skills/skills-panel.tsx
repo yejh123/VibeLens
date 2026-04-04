@@ -4,6 +4,7 @@ import { useAppContext } from "../../app";
 import type { AnalysisJobResponse, AnalysisJobStatus, LLMStatus, SkillAnalysisResult, SkillMode } from "../../types";
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH } from "../../styles";
 import { AnalysisWelcomePage } from "../analysis-welcome";
+import { Tooltip } from "../tooltip";
 import { ExploreSkillsTab } from "./explore-skills-tab";
 import { LocalSkillsTab } from "./local-skills-tab";
 import {
@@ -13,12 +14,12 @@ import {
 } from "./skill-analysis-views";
 import { SkillsHistory } from "./skills-history";
 
-const TAB_CONFIG: { id: SkillTab; label: string }[] = [
-  { id: "local", label: "Local Skills" },
-  { id: "explore", label: "Explore" },
-  { id: "retrieve", label: "Discover" },
-  { id: "create", label: "Customize" },
-  { id: "evolve", label: "Evolve" },
+const TAB_CONFIG: { id: SkillTab; label: string; tooltip: string }[] = [
+  { id: "local", label: "Local Skills", tooltip: "Manage installed SKILL.md files" },
+  { id: "explore", label: "Explore", tooltip: "Browse community skills" },
+  { id: "retrieve", label: "Recommend", tooltip: "Find skills matching your workflow" },
+  { id: "create", label: "Customize", tooltip: "Generate skills from your patterns" },
+  { id: "evolve", label: "Evolve", tooltip: "Improve existing skills from usage" },
 ];
 
 const ACTIVE_TAB_STYLE = "bg-teal-600/20 text-teal-300 border border-teal-500/30";
@@ -212,22 +213,23 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
       {/* Sub-tab bar — unified teal accent, enlarged text */}
       <div className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 shrink-0">
         {TAB_CONFIG.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              // Clear stale analysis results when switching between analysis tabs
-              if (tab.id !== activeTab && MODE_MAP[tab.id] && MODE_MAP[activeTab]) {
-                setAnalysisResult(null);
-                setAnalysisError(null);
-              }
-              setActiveTab(tab.id);
-            }}
-            className={`flex-1 px-3 py-1.5 text-sm font-semibold rounded-md transition text-center ${
-              activeTab === tab.id ? ACTIVE_TAB_STYLE : INACTIVE_TAB_STYLE
-            }`}
-          >
-            {tab.label}
-          </button>
+          <Tooltip key={tab.id} text={tab.tooltip} className="flex-1 min-w-0">
+            <button
+              onClick={() => {
+                // Clear stale analysis results when switching between analysis tabs
+                if (tab.id !== activeTab && MODE_MAP[tab.id] && MODE_MAP[activeTab]) {
+                  setAnalysisResult(null);
+                  setAnalysisError(null);
+                }
+                setActiveTab(tab.id);
+              }}
+              className={`w-full px-3 py-1.5 text-sm font-semibold rounded-md transition text-center ${
+                activeTab === tab.id ? ACTIVE_TAB_STYLE : INACTIVE_TAB_STYLE
+              }`}
+            >
+              {tab.label}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -235,14 +237,14 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
       <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-h-0 overflow-y-auto">
           {activeTab === "local" && <LocalSkillsTab />}
-          {activeTab === "explore" && <ExploreSkillsTab />}
+          {activeTab === "explore" && <ExploreSkillsTab onSwitchTab={setActiveTab} />}
           {isAnalysisTab && analysisLoading && (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-5">
                 <AnalysisLoadingState mode={currentMode} sessionCount={checkedIds.size} />
                 {activeJobId && (
                   <div className="flex flex-col items-center gap-2 mt-2">
-                    <p className="text-xs text-zinc-500">Running in background — you can switch tabs</p>
+                    <p className="text-xs text-zinc-300">Running in background — you can switch tabs</p>
                     <button
                       onClick={handleStopAnalysis}
                       className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs text-zinc-300 hover:text-white bg-zinc-700 hover:bg-zinc-600 border border-zinc-600 rounded-md transition"

@@ -6,7 +6,6 @@ results → validate step_id refs → compute type_summary → synthesize
 final report via LLM → persist → cache.
 """
 
-import asyncio
 import hashlib
 import json
 import time
@@ -16,10 +15,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from vibelens.deps import (
-    get_friction_store,
-    get_inference_backend,
-)
+from vibelens.deps import get_friction_store
 from vibelens.llm.backend import InferenceBackend, InferenceError
 from vibelens.llm.cost_estimator import CostEstimate, estimate_friction_cost
 from vibelens.llm.prompts.friction_analysis import (
@@ -40,14 +36,21 @@ from vibelens.models.analysis.friction import (
 from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.inference import InferenceRequest
 from vibelens.models.trajectories import Trajectory
+from vibelens.services.analysis_shared import (
+    build_system_kwargs,
+    extract_all_contexts,
+    get_cached,
+    require_backend,
+    run_batches_concurrent,
+    save_analysis_log,
+    truncate_digest_to_fit,
+)
 from vibelens.services.context_extraction import (
     IdMapping,
     SessionContext,
-    extract_session_context,
     remap_session_ids,
 )
 from vibelens.services.friction.digest import format_batch_digest
-from vibelens.services.session.store_resolver import get_metadata_from_stores, load_from_stores
 from vibelens.services.session_batcher import SessionBatch, build_batches
 from vibelens.utils.json_extract import extract_json as _extract_json
 from vibelens.utils.json_extract import repair_truncated_json as _repair_truncated_json
@@ -55,7 +58,6 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
-CACHE_TTL_SECONDS = 3600
 FRICTION_OUTPUT_TOKENS = 8192
 FRICTION_TIMEOUT_SECONDS = 300
 MAX_TOP_MITIGATIONS = 3
@@ -80,8 +82,8 @@ def estimate_friction(session_ids: list[str], session_token: str | None = None) 
     Raises:
         ValueError: If no sessions could be loaded.
     """
-    backend = _require_backend()
-    contexts, loaded_ids, skipped_ids = _extract_all_contexts(session_ids, session_token)
+    backend = require_backend()
+    contexts, loaded_ids, skipped_ids = extract_all_contexts(session_ids, session_token)
 
     if not contexts:
         raise ValueError(f"No sessions could be loaded from: {session_ids}")
@@ -117,12 +119,12 @@ async def analyze_friction(
         InferenceError: If LLM backend fails.
     """
     cache_key = _friction_cache_key(session_ids)
-    cached = _get_cached(cache_key)
+    cached = get_cached(_cache, cache_key)
     if cached:
         return cached
 
-    backend = _require_backend()
-    contexts, loaded_ids, skipped_ids = _extract_all_contexts(session_ids, session_token)
+    backend = require_backend()
+    contexts, loaded_ids, skipped_ids = extract_all_contexts(session_ids, session_token)
 
     if not contexts:
         raise ValueError(f"No sessions could be loaded from: {session_ids}")
@@ -147,7 +149,8 @@ async def analyze_friction(
     project_by_session = _build_project_lookup(contexts)
 
     # Pipeline: concurrent LLM inference → resolve IDs → merge → type summary → synthesize
-    batch_results, batch_warnings = await _run_all_batches(backend, batches, log_dir)
+    tasks = [_infer_batch(backend, batch, log_dir, idx) for idx, batch in enumerate(batches)]
+    batch_results, batch_warnings = await run_batches_concurrent(tasks, "friction")
 
     # Resolve synthetic 0-indexed IDs back to real UUIDs before merging
     for batch_output, _ in batch_results:
@@ -206,43 +209,6 @@ async def analyze_friction(
     return friction_result
 
 
-def _extract_all_contexts(
-    session_ids: list[str], session_token: str | None
-) -> tuple[list[SessionContext], list[str], list[str]]:
-    """Load sessions and extract compressed contexts.
-
-    Args:
-        session_ids: Sessions to load.
-        session_token: Browser tab token for upload scoping.
-
-    Returns:
-        Tuple of (session_contexts, loaded_ids, skipped_ids).
-    """
-    contexts: list[SessionContext] = []
-    loaded_ids: list[str] = []
-    skipped_ids: list[str] = []
-
-    for sid in session_ids:
-        if get_metadata_from_stores(sid, session_token) is None:
-            skipped_ids.append(sid)
-            continue
-        try:
-            trajectories = load_from_stores(sid, session_token)
-        except (OSError, ValueError, KeyError) as exc:
-            logger.warning("Failed to load session %s, skipping: %s", sid, exc)
-            skipped_ids.append(sid)
-            continue
-        if not trajectories:
-            skipped_ids.append(sid)
-            continue
-
-        ctx = extract_session_context(trajectories)
-        contexts.append(ctx)
-        loaded_ids.append(sid)
-
-    return contexts, loaded_ids, skipped_ids
-
-
 async def _infer_batch(
     backend: InferenceBackend, batch: SessionBatch, log_dir: Path, batch_index: int
 ) -> tuple[FrictionLLMBatchOutput, float]:
@@ -259,11 +225,18 @@ async def _infer_batch(
     """
     digest = format_batch_digest(batch)
     session_count = len(batch.session_contexts)
-    output_schema = json.dumps(FRICTION_ANALYSIS_PROMPT.output_model.model_json_schema(), indent=2)
 
-    system_prompt = FRICTION_ANALYSIS_PROMPT.render_system()
+    system_kwargs = build_system_kwargs(FRICTION_ANALYSIS_PROMPT.output_model, backend)
+    system_prompt = FRICTION_ANALYSIS_PROMPT.render_system(**system_kwargs)
+
+    # Safety net: truncate digest if it exceeds context budget
+    non_digest_overhead = FRICTION_ANALYSIS_PROMPT.render_user(
+        session_count=session_count, batch_digest=""
+    )
+    digest = truncate_digest_to_fit(digest, system_prompt, non_digest_overhead)
+
     user_prompt = FRICTION_ANALYSIS_PROMPT.render_user(
-        session_count=session_count, batch_digest=digest, output_schema=output_schema
+        session_count=session_count, batch_digest=digest
     )
 
     request = InferenceRequest(
@@ -276,57 +249,21 @@ async def _infer_batch(
 
     # Save system prompt only once (shared across batches)
     if batch_index == 0:
-        _save_friction_log(log_dir, "system_prompt.txt", system_prompt)
-    _save_friction_log(log_dir, f"user_prompt_{batch_index}.txt", user_prompt)
+        save_analysis_log(log_dir, "system_prompt.txt", system_prompt)
+    save_analysis_log(log_dir, f"user_prompt_{batch_index}.txt", user_prompt)
 
     try:
         result = await backend.generate(request)
     except Exception:
         error_file = f"error_{batch_index}.txt"
-        _save_friction_log(log_dir, error_file, "LLM inference failed.")
+        save_analysis_log(log_dir, error_file, "LLM inference failed.")
         raise
 
-    _save_friction_log(log_dir, f"raw_output_{batch_index}.txt", result.text)
+    save_analysis_log(log_dir, f"raw_output_{batch_index}.txt", result.text)
 
     batch_output = _parse_llm_output(result.text)
     cost = result.cost_usd or 0.0
     return batch_output, cost
-
-
-async def _run_all_batches(
-    backend: InferenceBackend, batches: list[SessionBatch], log_dir: Path
-) -> tuple[list[tuple[FrictionLLMBatchOutput, float]], list[str]]:
-    """Run all batches concurrently, tolerating individual failures.
-
-    Args:
-        backend: Configured inference backend.
-        batches: List of session batches.
-        log_dir: Timestamped directory for saving prompts and outputs.
-
-    Returns:
-        Tuple of (successful results, warning messages).
-
-    Raises:
-        InferenceError: If every batch fails.
-    """
-    tasks = [_infer_batch(backend, batch, log_dir, idx) for idx, batch in enumerate(batches)]
-    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    successes: list[tuple[FrictionLLMBatchOutput, float]] = []
-    warnings: list[str] = []
-    for idx, result in enumerate(raw_results):
-        if isinstance(result, BaseException):
-            warnings.append(f"Batch {idx + 1}/{len(batches)} failed: {result}")
-            logger.warning("Friction batch %d failed: %s", idx, result)
-        else:
-            successes.append(result)
-
-    if not successes:
-        raise InferenceError(
-            f"All {len(batches)} friction batch(es) failed. Last error: {raw_results[-1]}"
-        )
-
-    return successes, warnings
 
 
 async def _synthesize_results(
@@ -375,15 +312,14 @@ async def _synthesize_results(
         for e in events[:MAX_EVENTS_FOR_SYNTHESIS]
     ]
 
-    output_schema = json.dumps(FRICTION_SYNTHESIS_PROMPT.output_model.model_json_schema(), indent=2)
-    system_prompt = FRICTION_SYNTHESIS_PROMPT.render_system()
+    system_kwargs = build_system_kwargs(FRICTION_SYNTHESIS_PROMPT.output_model, backend)
+    system_prompt = FRICTION_SYNTHESIS_PROMPT.render_system(**system_kwargs)
     user_prompt = FRICTION_SYNTHESIS_PROMPT.render_user(
         batch_count=batch_count,
         session_count=session_count,
         batch_summaries=batch_summaries,
         type_stats=type_stats,
         top_events=top_events,
-        output_schema=output_schema,
     )
 
     request = InferenceRequest(
@@ -394,11 +330,11 @@ async def _synthesize_results(
         json_schema=FRICTION_SYNTHESIS_PROMPT.output_model.model_json_schema(),
     )
 
-    _save_friction_log(log_dir, "synthesis_system.txt", system_prompt)
-    _save_friction_log(log_dir, "synthesis_user.txt", user_prompt)
+    save_analysis_log(log_dir, "synthesis_system.txt", system_prompt)
+    save_analysis_log(log_dir, "synthesis_user.txt", user_prompt)
 
     result = await backend.generate(request)
-    _save_friction_log(log_dir, "synthesis_raw_output.txt", result.text)
+    save_analysis_log(log_dir, "synthesis_raw_output.txt", result.text)
 
     synthesis = _parse_synthesis_output(result.text)
     cost = result.cost_usd or 0.0
@@ -801,26 +737,6 @@ def _friction_cache_key(session_ids: list[str]) -> str:
     return f"friction:{hashlib.sha256(sorted_ids.encode()).hexdigest()[:16]}"
 
 
-def _require_backend() -> InferenceBackend:
-    """Get the inference backend or raise if unavailable."""
-    backend = get_inference_backend()
-    if not backend:
-        raise ValueError("No inference backend configured. Set llm.backend in config.")
-    return backend
-
-
-def _get_cached(cache_key: str) -> BaseModel | None:
-    """Return cached result if still valid, or None."""
-    entry = _cache.get(cache_key)
-    if not entry:
-        return None
-    cached_at, result = entry
-    if time.monotonic() - cached_at > CACHE_TTL_SECONDS:
-        del _cache[cache_key]
-        return None
-    return result
-
-
 def _parse_llm_output(text: str) -> FrictionLLMBatchOutput:
     """Parse LLM output text into FrictionLLMBatchOutput.
 
@@ -859,21 +775,6 @@ def _parse_llm_output(text: str) -> FrictionLLMBatchOutput:
         raise InferenceError(
             f"LLM JSON does not match FrictionLLMBatchOutput schema: {exc}"
         ) from exc
-
-
-def _save_friction_log(log_dir: Path, filename: str, content: str) -> None:
-    """Save friction analysis log to a timestamped directory.
-
-    Args:
-        log_dir: Target directory (e.g. logs/friction/20260326153000).
-        filename: File name within the directory.
-        content: Text content to write.
-    """
-    try:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / filename).write_text(content, encoding="utf-8")
-    except OSError as exc:
-        logger.warning("Failed to save friction log %s/%s: %s", log_dir, filename, exc)
 
 
 def _log_analysis_summary(

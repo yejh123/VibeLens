@@ -38,6 +38,7 @@ def export_dashboard_csv(
     date_to: str | None,
     session_token: str | None,
     timestamp: str,
+    agent_name: str | None = None,
 ) -> StreamingResponse:
     """Build CSV export from filtered trajectories.
 
@@ -47,12 +48,13 @@ def export_dashboard_csv(
         date_to: Optional end date (YYYY-MM-DD).
         session_token: Browser tab token for upload scoping.
         timestamp: YYYYMMDDHHMMSS string for the filename.
+        agent_name: Optional agent name filter.
 
     Returns:
         StreamingResponse with CSV content.
     """
     trajectories, _meta = load_filtered_trajectories(
-        project_path, date_from, date_to, session_token
+        project_path, date_from, date_to, session_token, agent_name
     )
 
     buf = io.StringIO()
@@ -78,6 +80,7 @@ def export_dashboard_json(
     date_to: str | None,
     session_token: str | None,
     timestamp: str,
+    agent_name: str | None = None,
 ) -> StreamingResponse:
     """Build JSON export with dashboard stats.
 
@@ -87,12 +90,13 @@ def export_dashboard_json(
         date_to: Optional end date (YYYY-MM-DD).
         session_token: Browser tab token for upload scoping.
         timestamp: YYYYMMDDHHMMSS string for the filename.
+        agent_name: Optional agent name filter.
 
     Returns:
         StreamingResponse with JSON content.
     """
     trajectories, _meta = load_filtered_trajectories(
-        project_path, date_from, date_to, session_token
+        project_path, date_from, date_to, session_token, agent_name
     )
     stats = compute_dashboard_stats(trajectories)
     payload = json.dumps(stats.model_dump(mode="json"), indent=2, ensure_ascii=False)

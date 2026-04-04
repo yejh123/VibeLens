@@ -9,12 +9,10 @@ from datetime import UTC, datetime
 from vibelens.deps import get_central_skill_store
 from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.inference import BackendType
-from vibelens.models.skill.skills import (
+from vibelens.models.skill import (
     SkillAnalysisResult,
-    SkillConflictType,
     SkillCreation,
     SkillEdit,
-    SkillEditKind,
     SkillEvolutionSuggestion,
     SkillMode,
     SkillProposal,
@@ -227,7 +225,7 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Grep for a pattern, read the matching file, then edit it. "
                 "This three-step sequence appears whenever code modifications are needed."
             ),
-            pain_point=(
+            gap=(
                 "Manual three-step workflow repeated across sessions. "
                 "Could be a single skill that searches, reads context, and applies edits."
             ),
@@ -239,7 +237,7 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Run tests, read failure output, apply fix, re-run tests. "
                 "Iterative debugging cycle until all tests pass."
             ),
-            pain_point=(
+            gap=(
                 "Repetitive cycle consumes context window and developer attention. "
                 "A skill could automate the read-fix-verify loop."
             ),
@@ -251,7 +249,7 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Create file with boilerplate structure, add standard imports, "
                 "then run the linter. Identical scaffolding repeated for every new module."
             ),
-            pain_point=(
+            gap=(
                 "Boilerplate structure is identical across files. "
                 "A skill could generate the full scaffold in one step."
             ),
@@ -263,7 +261,7 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Check outdated packages, read changelogs, update version constraints, "
                 "run tests, and fix any breaking changes. Multi-step process per dependency."
             ),
-            pain_point=(
+            gap=(
                 "Each dependency upgrade requires 4-5 manual steps. "
                 "Batching multiple upgrades amplifies the effort."
             ),
@@ -275,7 +273,7 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Read config files, add feature flags, update environment templates, "
                 "and modify conditional logic in multiple source files."
             ),
-            pain_point=(
+            gap=(
                 "Feature toggles touch config, env templates, and source code. "
                 "Easy to miss one location, causing inconsistencies."
             ),
@@ -406,29 +404,16 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                 skill_name=first_skill.name,
                 edits=[
                     SkillEdit(
-                        kind=SkillEditKind.ADD_INSTRUCTION,
-                        target="end of skill body",
-                        replacement=(
-                            "5. Run `ruff check` after every edit to catch lint errors early."
-                        ),
-                        rationale="User frequently runs linter manually after edits.",
-                        conflict_type=SkillConflictType.ADDED_STEP,
+                        old_string="",
+                        new_string="5. Run `ruff check` after every edit to catch lint errors.",
                     ),
                     SkillEdit(
-                        kind=SkillEditKind.UPDATE_DESCRIPTION,
-                        target="skill description",
-                        replacement=(
-                            f"{first_skill.name} with automatic linting and error checking"
-                        ),
-                        rationale="Updated trigger description to reflect new capabilities.",
-                        conflict_type=SkillConflictType.BAD_TRIGGER,
+                        old_string=first_skill.description or first_skill.name,
+                        new_string=f"{first_skill.name} with automatic linting and error checking",
                     ),
                     SkillEdit(
-                        kind=SkillEditKind.ADD_TOOL,
-                        target="allowed-tools",
-                        replacement="Grep",
-                        rationale="Skill could benefit from Grep for searching related files.",
-                        conflict_type=SkillConflictType.WRONG_TOOL,
+                        old_string="allowed_tools: [Read, Edit]",
+                        new_string="allowed_tools: [Read, Edit, Grep]",
                     ),
                 ],
                 rationale=(
@@ -446,18 +431,12 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
                 skill_name=second_skill.name,
                 edits=[
                     SkillEdit(
-                        kind=SkillEditKind.REMOVE_INSTRUCTION,
-                        target="Step 3: Manual verification",
-                        replacement=None,
-                        rationale="This step is redundant -- automated tests already cover it.",
-                        conflict_type=SkillConflictType.SKIPPED_STEP,
+                        old_string="Step 3: Manual verification\n",
+                        new_string="",
                     ),
                     SkillEdit(
-                        kind=SkillEditKind.REPLACE_INSTRUCTION,
-                        target="Step 2: Read all files in directory",
-                        replacement="Step 2: Read only modified files (use `git diff --name-only`)",
-                        rationale="Reading all files wastes context. Focus on changed files only.",
-                        conflict_type=SkillConflictType.OUTDATED_INSTRUCTION,
+                        old_string="Step 2: Read all files in directory",
+                        new_string="Step 2: Read only modified files (use `git diff --name-only`)",
                     ),
                 ],
                 rationale=(
@@ -467,18 +446,14 @@ def _build_mock_evolutions() -> list[SkillEvolutionSuggestion]:
             )
         )
 
-    # Add a suggestion even if no skills installed
     if not suggestions:
         suggestions.append(
             SkillEvolutionSuggestion(
                 skill_name="example-skill",
                 edits=[
                     SkillEdit(
-                        kind=SkillEditKind.ADD_INSTRUCTION,
-                        target="end of skill body",
-                        replacement="Always verify changes with the linter before completing.",
-                        rationale="Consistent linting reduces review cycles.",
-                        conflict_type=SkillConflictType.ADDED_STEP,
+                        old_string="",
+                        new_string="Always verify changes with the linter before completing.",
                     ),
                 ],
                 rationale=(

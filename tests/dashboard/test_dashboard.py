@@ -73,9 +73,7 @@ def _make_trajectory(
     obs_results = []
     for i, tool_name in enumerate(tools):
         tc = ToolCall(
-            tool_call_id=f"tc-{i}",
-            function_name=tool_name,
-            arguments={"path": f"/tmp/file{i}.py"},
+            tool_call_id=f"tc-{i}", function_name=tool_name, arguments={"path": f"/tmp/file{i}.py"}
         )
         tool_calls_list.append(tc)
         obs_results.append(

@@ -65,14 +65,16 @@ def filter_metadata(
     project_path: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    agent_name: str | None = None,
 ) -> list[dict]:
-    """Filter metadata by project path and date range.
+    """Filter metadata by project path, date range, and agent name.
 
     Args:
         metadata_list: Raw metadata list from store.
         project_path: Optional project path filter.
         date_from: Optional start date (YYYY-MM-DD, inclusive).
         date_to: Optional end date (YYYY-MM-DD, inclusive).
+        agent_name: Optional agent name filter (e.g. "claude_code", "codex").
 
     Returns:
         Filtered metadata list.
@@ -81,6 +83,12 @@ def filter_metadata(
 
     if project_path:
         result = [m for m in result if m.get("project_path") == project_path]
+
+    if agent_name:
+        result = [
+            m for m in result
+            if (m.get("agent") or {}).get("name") == agent_name
+        ]
 
     if date_from or date_to:
         result = [m for m in result if _in_date_range(m, date_from, date_to)]

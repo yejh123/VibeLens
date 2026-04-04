@@ -6,7 +6,7 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException
 
 from vibelens.deps import get_skill_analysis_store, is_demo_mode, is_test_mode
-from vibelens.models.skill.skills import SkillAnalysisResult
+from vibelens.models.skill import SkillAnalysisResult
 from vibelens.schemas.analysis import AnalysisJobResponse, AnalysisJobStatus
 from vibelens.schemas.skills import (
     SkillAnalysisMeta,

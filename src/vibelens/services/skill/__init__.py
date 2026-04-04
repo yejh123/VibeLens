@@ -1,12 +1,11 @@
 """Skill-related services — analysis, persistence, and digest formatting."""
 
-from vibelens.models.skill.skills import (
+from vibelens.models.skill import (
     SkillAnalysisResult,
     SkillCreation,
     SkillMode,
     SkillProposalResult,
 )
-from vibelens.services.skill.digest import digest_step_signals_for_skills
 from vibelens.services.skill.store import SkillAnalysisStore
 
 __all__ = [
@@ -14,7 +13,6 @@ __all__ = [
     "analyze_proposals",
     "analyze_skills",
     "deep_create_skill",
-    "digest_step_signals_for_skills",
 ]
 
 

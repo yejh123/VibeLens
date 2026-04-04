@@ -42,7 +42,11 @@ _tool_usage_cache: dict[str, tuple[float, list[ToolUsageStat]]] = {}
 
 
 def load_filtered_trajectories(
-    project_path: str | None, date_from: str | None, date_to: str | None, session_token: str | None
+    project_path: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    session_token: str | None,
+    agent_name: str | None = None,
 ) -> tuple[list[Trajectory], list[dict]]:
     """Load all trajectories matching the filters.
 
@@ -55,12 +59,13 @@ def load_filtered_trajectories(
         date_from: Optional start date (YYYY-MM-DD).
         date_to: Optional end date (YYYY-MM-DD).
         session_token: Browser tab token for upload scoping.
+        agent_name: Optional agent name filter.
 
     Returns:
         Tuple of (loaded trajectories, filtered metadata list).
     """
     metadata = list_all_metadata(session_token)
-    filtered = filter_metadata(metadata, project_path, date_from, date_to)
+    filtered = filter_metadata(metadata, project_path, date_from, date_to, agent_name)
 
     trajectories = []
     for meta in filtered:
@@ -83,7 +88,11 @@ def load_filtered_trajectories(
 
 
 def get_dashboard_stats(
-    project_path: str | None, date_from: str | None, date_to: str | None, session_token: str | None
+    project_path: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    session_token: str | None,
+    agent_name: str | None = None,
 ) -> DashboardStats:
     """Compute dashboard stats with caching and session count reconciliation.
 
@@ -95,11 +104,15 @@ def get_dashboard_stats(
         date_from: Optional start date (YYYY-MM-DD).
         date_to: Optional end date (YYYY-MM-DD).
         session_token: Browser tab token for upload scoping.
+        agent_name: Optional agent name filter.
 
     Returns:
         DashboardStats with all chart data.
     """
-    cache_key = f"dash:{project_path or 'all'}:{date_from}:{date_to}:{session_token}"
+    cache_key = (
+        f"dash:{project_path or 'all'}:{date_from}:{date_to}"
+        f":{session_token}:{agent_name or 'all'}"
+    )
     cached = _dashboard_cache.get(cache_key)
     if cached:
         cached_time, cached_result = cached
@@ -107,13 +120,13 @@ def get_dashboard_stats(
             return cached_result
 
     metadata = list_all_metadata(session_token)
-    filtered = filter_metadata(metadata, project_path, date_from, date_to)
+    filtered = filter_metadata(metadata, project_path, date_from, date_to, agent_name)
 
     if _has_enriched_metrics(filtered):
         result = compute_dashboard_stats_from_metadata(filtered)
     else:
         trajectories, filtered = load_filtered_trajectories(
-            project_path, date_from, date_to, session_token
+            project_path, date_from, date_to, session_token, agent_name
         )
         result = compute_dashboard_stats(trajectories)
         _reconcile_session_counts(result, trajectories, filtered)
@@ -124,7 +137,11 @@ def get_dashboard_stats(
 
 
 def get_tool_usage(
-    project_path: str | None, date_from: str | None, date_to: str | None, session_token: str | None
+    project_path: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    session_token: str | None,
+    agent_name: str | None = None,
 ) -> list[ToolUsageStat]:
     """Compute per-tool usage statistics with caching.
 
@@ -133,11 +150,15 @@ def get_tool_usage(
         date_from: Optional start date (YYYY-MM-DD).
         date_to: Optional end date (YYYY-MM-DD).
         session_token: Browser tab token for upload scoping.
+        agent_name: Optional agent name filter.
 
     Returns:
         ToolUsageStat list sorted by call_count descending.
     """
-    cache_key = f"tools:{project_path or 'all'}:{date_from}:{date_to}:{session_token}"
+    cache_key = (
+        f"tools:{project_path or 'all'}:{date_from}:{date_to}"
+        f":{session_token}:{agent_name or 'all'}"
+    )
     cached = _tool_usage_cache.get(cache_key)
     if cached:
         cached_time, cached_result = cached
@@ -145,7 +166,7 @@ def get_tool_usage(
             return cached_result
 
     trajectories, _meta = load_filtered_trajectories(
-        project_path, date_from, date_to, session_token
+        project_path, date_from, date_to, session_token, agent_name
     )
     result = compute_tool_usage(trajectories)
     _tool_usage_cache[cache_key] = (time.monotonic(), result)

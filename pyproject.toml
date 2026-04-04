@@ -1,6 +1,6 @@
 [project]
 name = "vibelens"
-version = "0.9.19"
+version = "0.9.20"
 description = "Agent Trajectory visualization and analysis platform"
 readme = "README.md"
 license = "MIT"
@@ -69,3 +69,7 @@ known-first-party = ["vibelens"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "slow: marks tests that make real LLM calls (deselect with '-m \"not slow\"')",
+]
+addopts = "-m 'not slow'"

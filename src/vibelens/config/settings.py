@@ -31,13 +31,9 @@ class Settings(BaseSettings):
 
     # Server
     host: str = Field(
-        default="127.0.0.1",
-        description="Network interface to bind the HTTP server to.",
+        default="127.0.0.1", description="Network interface to bind the HTTP server to."
     )
-    port: int = Field(
-        default=12001,
-        description="TCP port for the HTTP server.",
-    )
+    port: int = Field(default=12001, description="TCP port for the HTTP server.")
     public_url: str = Field(
         default="",
         description="Public-facing base URL for shareable links (e.g. https://vibelens.chats-lab.org).",
@@ -132,9 +128,8 @@ class Settings(BaseSettings):
     visible_agents: list[str] = Field(
         default=["all"],
         description=(
-            "Agent names to display in the session list. "
-            'Use ["all"] to show every agent, or specify names like '
-            '["claude-code", "codex"].'
+            "Agent names to display in the session list. Use ['all'] to show every "
+            "agent, or specify names like ['claude-code', 'codex']."
         ),
     )
 

@@ -234,7 +234,7 @@ export function SkillDetailPopup({
                 const isSynced = skill.skill_targets.includes(src.key) ||
                   skill.sources.some((s) => s.source_type === src.key);
                 return (
-                  <Tooltip key={src.key} text={isSynced ? `Already synced to ${src.label}` : `Copy skill to ${src.label} (${src.skills_dir})`}>
+                  <Tooltip key={src.key} text={isSynced ? `Synced to ${src.label}` : `Sync to ${src.label}`}>
                     <button
                       onClick={() => handleSync(src.key)}
                       disabled={syncing === src.key}

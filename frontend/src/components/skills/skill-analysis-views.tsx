@@ -5,8 +5,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Code2,
-  Download,
+  Eye,
   FileCode,
   GitBranch,
   Lightbulb,
@@ -15,12 +14,11 @@ import {
   Plus,
   RefreshCw,
   Repeat,
-  RotateCcw,
   Search,
-  Shield,
   Sparkles,
   Target,
   TrendingUp,
+  User,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -37,10 +35,9 @@ import type {
 import { DemoBanner } from "../demo-banner";
 import { Tooltip } from "../tooltip";
 import { WarningsBanner } from "../warnings-banner";
-import { InstallTargetDialog } from "./install-target-dialog";
 import { applySkillEdits } from "./skill-edit-utils";
 import { EvolutionDiffView } from "./skill-evolution-diff";
-import { SkillUpdateDialog } from "./skill-update-dialog";
+import { SkillPreviewDialog } from "./skill-preview-dialog";
 
 export type SkillTab = "local" | "explore" | "retrieve" | "create" | "evolve";
 
@@ -63,7 +60,7 @@ export function AnalysisLoadingState({ mode, sessionCount }: { mode: SkillMode; 
         <p className="text-base font-semibold text-zinc-100">
           Analyzing {sessionCount} session{sessionCount !== 1 ? "s" : ""}
         </p>
-        <p className="text-sm text-zinc-500 mt-1.5">{MODE_SUBLABELS[mode]}</p>
+        <p className="text-sm text-zinc-300 mt-1.5">{MODE_SUBLABELS[mode]}</p>
       </div>
     </div>
   );
@@ -109,7 +106,11 @@ export function AnalysisResultView({
 
       {/* Recommended Skills (Recommend) */}
       {activeTab === "retrieve" && result.recommendations.length > 0 && (
-        <RecommendationSection recommendations={result.recommendations} />
+        <RecommendationSection
+          recommendations={result.recommendations}
+          fetchWithToken={fetchWithToken}
+          agentSources={agentSources}
+        />
       )}
 
       {/* Generated Skills (Create) */}
@@ -188,12 +189,19 @@ function ResultHeader({
 
 function SummaryCard({ summary, userProfile }: { summary: string; userProfile: string }) {
   return (
-    <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
-      <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+    <div className="space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5">
+        <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+      </div>
       {userProfile && (
-        <div className="flex items-start gap-2 pt-3 border-t border-zinc-700/40">
-          <Shield className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-          <p className="text-sm text-zinc-200 italic leading-relaxed">{userProfile}</p>
+        <div className="bg-gradient-to-r from-violet-950/30 to-zinc-900/60 border border-violet-700/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="p-1.5 rounded-lg bg-violet-600/15">
+              <User className="w-4 h-4 text-violet-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-zinc-100">User Profile</h3>
+          </div>
+          <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{userProfile}</p>
         </div>
       )}
     </div>
@@ -227,7 +235,7 @@ function MetadataFooter({ result }: { result: SkillAnalysisResult }) {
   const timeStr = isNaN(computedDate.getTime()) ? "" : computedDate.toLocaleTimeString();
 
   return (
-    <Tooltip text="Inference backend, model, and estimated API cost for this analysis run">
+    <Tooltip text="Backend, model, and API cost">
       <div className="border-t border-zinc-800 pt-4 text-xs text-zinc-500 flex items-center justify-between gap-4 w-full cursor-help">
         <div className="flex items-center gap-2 flex-wrap">
           <span>{result.backend_id}/{result.model}</span>
@@ -251,7 +259,7 @@ function PatternSection({ patterns }: { patterns: WorkflowPattern[] }) {
       <SectionHeader
         icon={<Target className="w-5 h-5" />}
         title="Workflow Patterns"
-        tooltip="Recurring tool sequences and task types detected across your sessions. Each pattern is a potential skill opportunity."
+        tooltip="Recurring patterns detected across sessions"
       />
       <div className="space-y-3">
         {patterns.map((p, i) => <PatternCard key={i} pattern={p} index={i} />)}
@@ -275,7 +283,7 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5">
             <h5 className="text-sm font-bold text-zinc-100">{pattern.title}</h5>
-            <Tooltip text={`Observed ${pattern.frequency} time${pattern.frequency !== 1 ? "s" : ""} across sessions`}>
+            <Tooltip text={`Seen ${pattern.frequency}x across sessions`}>
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-teal-900/30 text-teal-300 border border-teal-700/20">
                 <Repeat className="w-2.5 h-2.5" />
                 {pattern.frequency}x
@@ -292,15 +300,15 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
       </button>
       {expanded && (
         <div className="px-5 pb-4 pl-[3.25rem] space-y-4 border-t border-zinc-700/30 pt-4 mx-3 mb-1">
-          {/* Pain Point */}
+          {/* Gap */}
           <div className="rounded-lg bg-amber-950/15 border border-amber-800/20 px-4 py-3">
-            <Tooltip text="The reason this workflow is suboptimal and could benefit from automation">
+            <Tooltip text="Automation gap in this workflow">
               <div className="flex items-center gap-1.5 text-xs text-amber-400/80 mb-1.5 cursor-help">
                 <Zap className="w-3.5 h-3.5" />
-                <span className="font-semibold uppercase tracking-wider">Pain Point</span>
+                <span className="font-semibold uppercase tracking-wider">Gap</span>
               </div>
             </Tooltip>
-            <p className="text-sm text-amber-200/80 leading-relaxed">{pattern.pain_point}</p>
+            <p className="text-sm text-amber-200/80 leading-relaxed">{pattern.gap}</p>
           </div>
 
           {/* Example Steps */}
@@ -315,7 +323,7 @@ function StepRefList({ refs }: { refs: StepRef[] }) {
   if (refs.length === 0) return null;
   return (
     <div>
-      <Tooltip text="Steps in the session transcripts where this pattern was observed">
+      <Tooltip text="Session steps where this pattern appears">
         <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-2 cursor-help">
           <BookOpen className="w-3.5 h-3.5" />
           <span className="font-semibold">Evidence</span>
@@ -342,7 +350,7 @@ function JumpToStepButton({ stepRef }: { stepRef: StepRef }) {
   );
 
   return (
-    <Tooltip text={`Jump to step ${stepRef.start_step_id.slice(0, 12)} in session viewer`}>
+    <Tooltip text="Open step in session viewer">
       <button
         onClick={handleClick}
         className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md bg-zinc-700/50 text-zinc-300 hover:bg-teal-900/40 hover:text-teal-300 transition font-mono border border-zinc-600/30 hover:border-teal-700/30"
@@ -356,28 +364,89 @@ function JumpToStepButton({ stepRef }: { stepRef: StepRef }) {
 
 /* ── Recommendations (Recommend) ── */
 
-function RecommendationSection({ recommendations }: { recommendations: SkillRecommendation[] }) {
+function RecommendationSection({
+  recommendations,
+  fetchWithToken,
+  agentSources,
+}: {
+  recommendations: SkillRecommendation[];
+  fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
+  agentSources: SkillSourceInfo[];
+}) {
   return (
     <section>
       <SectionHeader
         icon={<Search className="w-5 h-5" />}
         title="Discovered Skills"
-        tooltip="Pre-built skills from the catalog that match your workflow patterns"
+        tooltip="Catalog skills matching your workflow"
       />
       <div className="space-y-3">
-        {recommendations.map((rec) => <RecommendationCard key={rec.skill_name} rec={rec} />)}
+        {recommendations.map((rec) => (
+          <RecommendationCard
+            key={rec.skill_name}
+            rec={rec}
+            fetchWithToken={fetchWithToken}
+            agentSources={agentSources}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function RecommendationCard({ rec }: { rec: SkillRecommendation }) {
+function RecommendationCard({
+  rec,
+  fetchWithToken,
+  agentSources,
+}: {
+  rec: SkillRecommendation;
+  fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
+  agentSources: SkillSourceInfo[];
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [installed, setInstalled] = useState(false);
+
   const confidencePct = Math.round(rec.confidence * 100);
   const isHigh = rec.confidence >= CONFIDENCE_THRESHOLDS.HIGH;
   const isMedium = rec.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM;
   const barColor = isHigh ? "bg-emerald-500" : isMedium ? "bg-amber-500" : "bg-zinc-600";
   const textColor = isHigh ? "text-emerald-400" : isMedium ? "text-amber-400" : "text-zinc-500";
   const borderColor = isHigh ? "border-emerald-700/30" : isMedium ? "border-amber-700/30" : "border-zinc-700/50";
+
+  const handlePreview = useCallback(async () => {
+    setShowPreview(true);
+    if (previewContent !== null) return;
+    setLoadingPreview(true);
+    try {
+      const res = await fetchWithToken(`/api/skills/featured/${rec.skill_name}/content`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewContent(data.content);
+      } else {
+        setPreviewContent("(Content unavailable)");
+      }
+    } catch {
+      setPreviewContent("(Failed to fetch content)");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [fetchWithToken, rec.skill_name, previewContent]);
+
+  const handleInstall = useCallback(async (_content: string, targets: string[]) => {
+    try {
+      const res = await fetchWithToken("/api/skills/featured/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: rec.skill_name, targets }),
+      });
+      if (res.ok) setInstalled(true);
+    } catch {
+      /* ignore */
+    }
+    setShowPreview(false);
+  }, [fetchWithToken, rec.skill_name]);
 
   return (
     <div className={`border ${borderColor} rounded-xl bg-zinc-800/40 overflow-hidden`}>
@@ -389,17 +458,39 @@ function RecommendationCard({ rec }: { rec: SkillRecommendation }) {
             </div>
             <span className="font-mono text-sm font-bold text-zinc-100">{rec.skill_name}</span>
           </div>
-          <Tooltip text={`How well this skill matches your detected patterns (${confidencePct}%)`}>
-            <div className="flex items-center gap-2 cursor-help">
-              <div className="w-16 h-1.5 rounded-full bg-zinc-700/60 overflow-hidden">
-                <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${confidencePct}%` }} />
+          <div className="flex items-center gap-2.5">
+            <Tooltip text={`${confidencePct}% match to your patterns`}>
+              <div className="flex items-center gap-2 cursor-help">
+                <div className="w-16 h-1.5 rounded-full bg-zinc-700/60 overflow-hidden">
+                  <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${confidencePct}%` }} />
+                </div>
+                <span className={`text-xs font-semibold ${textColor} tabular-nums`}>{confidencePct}%</span>
               </div>
-              <span className={`text-xs font-semibold ${textColor} tabular-nums`}>{confidencePct}%</span>
-            </div>
-          </Tooltip>
+            </Tooltip>
+            <Tooltip text={installed ? "Already installed" : "Preview skill content"}>
+              <button
+                onClick={handlePreview}
+                disabled={installed}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition px-2.5 py-1 rounded-md hover:bg-zinc-800 border border-zinc-700/30 disabled:opacity-50"
+              >
+                {installed ? <Check className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {installed ? "Installed" : "Preview"}
+              </button>
+            </Tooltip>
+          </div>
         </div>
         <p className="text-sm text-zinc-400 leading-relaxed pl-[2.375rem]">{rec.match_reason}</p>
       </div>
+      {showPreview && (
+        <SkillPreviewDialog
+          skillName={rec.skill_name}
+          content={previewContent ?? ""}
+          onInstall={handleInstall}
+          onCancel={() => setShowPreview(false)}
+          agentSources={agentSources}
+          loading={loadingPreview}
+        />
+      )}
     </div>
   );
 }
@@ -420,7 +511,7 @@ function CreationSection({
       <SectionHeader
         icon={<Sparkles className="w-5 h-5" />}
         title="Custom Skills"
-        tooltip="New SKILL.md files generated from your workflow patterns"
+        tooltip="Generated skills from your patterns"
         accentColor="text-emerald-400"
       />
       <div className="space-y-3">
@@ -437,6 +528,30 @@ function CreationSection({
   );
 }
 
+function ConfidenceBar({ confidence, accentColor = "emerald" }: { confidence: number; accentColor?: "emerald" | "amber" }) {
+  const pct = Math.round(confidence * 100);
+  const isHigh = confidence >= CONFIDENCE_THRESHOLDS.HIGH;
+  const isMedium = confidence >= CONFIDENCE_THRESHOLDS.MEDIUM;
+
+  const barColor = isHigh
+    ? (accentColor === "amber" ? "bg-amber-500" : "bg-emerald-500")
+    : isMedium ? "bg-amber-500" : "bg-zinc-600";
+  const textColor = isHigh
+    ? (accentColor === "amber" ? "text-amber-400" : "text-emerald-400")
+    : isMedium ? "text-amber-400" : "text-zinc-500";
+
+  return (
+    <Tooltip text={`${pct}% confidence`}>
+      <div className="flex items-center gap-2 cursor-help">
+        <div className="w-16 h-1.5 rounded-full bg-zinc-700/60 overflow-hidden">
+          <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className={`text-xs font-semibold ${textColor} tabular-nums`}>{pct}%</span>
+      </div>
+    </Tooltip>
+  );
+}
+
 function CreatedSkillCard({
   skill,
   fetchWithToken,
@@ -446,20 +561,17 @@ function CreatedSkillCard({
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [installed, setInstalled] = useState(false);
-  const [editedContent, setEditedContent] = useState<string | null>(null);
-
-  const activeContent = editedContent ?? skill.skill_md_content;
+  const [editedContent, setEditedContent] = useState(skill.skill_md_content);
 
   const handleInstall = useCallback(
-    async (targets: string[]) => {
+    async (content: string, targets: string[]) => {
       try {
         const res = await fetchWithToken("/api/skills/install", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: skill.name, content: activeContent }),
+          body: JSON.stringify({ name: skill.name, content }),
         });
         if (!res.ok) return;
 
@@ -474,9 +586,9 @@ function CreatedSkillCard({
       } catch {
         /* ignore */
       }
-      setShowInstallDialog(false);
+      setShowPreview(false);
     },
-    [fetchWithToken, skill, activeContent],
+    [fetchWithToken, skill.name],
   );
 
   return (
@@ -488,58 +600,38 @@ function CreatedSkillCard({
               <FileCode className="w-4 h-4 text-emerald-400" />
             </div>
             <span className="font-mono text-sm font-bold text-zinc-100">{skill.name}</span>
+            {skill.confidence > 0 && <ConfidenceBar confidence={skill.confidence} />}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition px-2.5 py-1 rounded-md hover:bg-zinc-800 border border-zinc-700/30"
-            >
-              <Code2 className="w-3 h-3" />
-              {expanded ? "Hide" : "Preview"}
-            </button>
-            <Tooltip text="Install this skill to your agent interfaces">
+            <Tooltip text="Preview and install skill">
               <button
-                onClick={() => setShowInstallDialog(true)}
+                onClick={() => setShowPreview(true)}
                 disabled={installed}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition px-2.5 py-1 rounded-md hover:bg-zinc-800 border border-zinc-700/30 disabled:opacity-50"
               >
-                {installed
-                  ? (<><Check className="w-3.5 h-3.5" /> Installed</>)
-                  : (<><Download className="w-3.5 h-3.5" /> Install</>)}
+                {installed ? <Check className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {installed ? "Installed" : "Preview"}
               </button>
             </Tooltip>
           </div>
         </div>
         <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{skill.description}</p>
-        <div className="flex items-start gap-1.5 mt-2.5 pl-[2.375rem]">
-          <Lightbulb className="w-3 h-3 text-emerald-500/60 mt-0.5 shrink-0" />
-          <p className="text-sm text-emerald-300/80 italic leading-relaxed">{skill.rationale}</p>
+        <div className="mt-2.5 pl-[2.375rem]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Lightbulb className="w-3 h-3 text-emerald-500/60 shrink-0" />
+            <span className="text-xs font-semibold text-emerald-400/70">Why this is useful</span>
+          </div>
+          <p className="text-sm text-emerald-300/80 leading-relaxed pl-[1.125rem]">{skill.rationale}</p>
         </div>
       </div>
-      {expanded && (
-        <div className="border-t border-emerald-800/20 px-5 py-4 bg-zinc-900/30 space-y-2">
-          <textarea
-            value={activeContent}
-            onChange={(e) => setEditedContent(e.target.value)}
-            className="w-full min-h-[200px] max-h-72 bg-zinc-900/80 text-zinc-300 text-xs font-mono rounded-lg p-4 border border-zinc-800/50 focus:border-emerald-600/50 focus:outline-none resize-y whitespace-pre-wrap leading-relaxed"
-            spellCheck={false}
-          />
-          {editedContent !== null && (
-            <button
-              onClick={() => setEditedContent(null)}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition px-2 py-1 rounded-md hover:bg-zinc-800 border border-zinc-700/30"
-            >
-              <RotateCcw className="w-3 h-3" /> Reset
-            </button>
-          )}
-        </div>
-      )}
-      {showInstallDialog && (
-        <InstallTargetDialog
+      {showPreview && (
+        <SkillPreviewDialog
           skillName={skill.name}
-          agentSources={agentSources}
+          content={editedContent}
+          onContentChange={setEditedContent}
           onInstall={handleInstall}
-          onCancel={() => setShowInstallDialog(false)}
+          onCancel={() => setShowPreview(false)}
+          agentSources={agentSources}
         />
       )}
     </div>
@@ -589,39 +681,55 @@ function EvolutionCard({
   agentSources: SkillSourceInfo[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [mergedContent, setMergedContent] = useState<string | null>(null);
   const [loadingOriginal, setLoadingOriginal] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(false);
   const [updated, setUpdated] = useState(false);
 
-  const handleApplyAndEdit = useCallback(async () => {
+  const fetchOriginal = useCallback(async (): Promise<string | null> => {
+    if (originalContent !== null) return originalContent;
     setLoadingOriginal(true);
     setFetchError(null);
     try {
       const res = await fetchWithToken(`/api/skills/local/${suggestion.skill_name}`);
       if (res.status === 404) {
         setFetchError("Skill not found in central store");
-        return;
+        return null;
       }
       if (!res.ok) {
         setFetchError("Failed to fetch skill content");
-        return;
+        return null;
       }
       const data = await res.json();
-      const merged = applySkillEdits(data.content, suggestion.edits);
-      setMergedContent(merged);
-      setShowUpdateDialog(true);
+      setOriginalContent(data.content);
+      return data.content as string;
     } catch {
       setFetchError("Network error fetching skill");
+      return null;
     } finally {
       setLoadingOriginal(false);
     }
-  }, [fetchWithToken, suggestion]);
+  }, [fetchWithToken, suggestion.skill_name, originalContent]);
+
+  const handleExpand = useCallback(async () => {
+    const willExpand = !expanded;
+    setExpanded(willExpand);
+    if (willExpand && originalContent === null) {
+      await fetchOriginal();
+    }
+  }, [expanded, originalContent, fetchOriginal]);
+
+  const handlePreview = useCallback(async () => {
+    const content = await fetchOriginal();
+    if (!content) return;
+    const merged = applySkillEdits(content, suggestion.edits);
+    setMergedContent(merged);
+    setShowPreview(true);
+  }, [fetchOriginal, suggestion.edits]);
 
   const handleUpdate = useCallback(async (content: string, targets: string[]) => {
-    setUpdating(true);
     try {
       const res = await fetchWithToken(`/api/skills/local/${suggestion.skill_name}`, {
         method: "PUT",
@@ -640,21 +748,19 @@ function EvolutionCard({
       setUpdated(true);
     } catch {
       /* ignore */
-    } finally {
-      setUpdating(false);
-      setShowUpdateDialog(false);
     }
+    setShowPreview(false);
   }, [fetchWithToken, suggestion.skill_name]);
 
   return (
     <div className="border border-amber-700/30 rounded-xl bg-amber-950/15 overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)} className="w-full text-left px-5 py-4">
+      <button onClick={handleExpand} className="w-full text-left px-5 py-4">
         <div className="flex items-center gap-2.5 mb-2">
           <div className="p-1.5 rounded-lg bg-amber-600/15">
             <TrendingUp className="w-4 h-4 text-amber-400" />
           </div>
           <span className="font-mono text-sm font-bold text-zinc-100">{suggestion.skill_name}</span>
-          <Tooltip text={`${suggestion.edits.length} specific edit(s) suggested for this skill`}>
+          <Tooltip text={`${suggestion.edits.length} edit${suggestion.edits.length !== 1 ? "s" : ""} suggested`}>
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-300 border border-amber-700/20 cursor-help">
               <Pencil className="w-2.5 h-2.5" />
               {suggestion.edits.length} edit{suggestion.edits.length !== 1 ? "s" : ""}
@@ -669,40 +775,48 @@ function EvolutionCard({
       </button>
       {expanded && suggestion.edits.length > 0 && (
         <div className="border-t border-amber-800/20 px-5 py-4 bg-zinc-900/20 space-y-4">
-          {/* Apply & Edit action row */}
           <div className="flex items-center gap-2">
             {updated ? (
               <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-amber-900/30 rounded-lg border border-amber-700/20">
                 <Check className="w-3.5 h-3.5" /> Updated
               </span>
             ) : (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleApplyAndEdit(); }}
-                disabled={loadingOriginal}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition disabled:opacity-50"
-              >
-                {loadingOriginal
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Pencil className="w-3.5 h-3.5" />}
-                Apply &amp; Edit
-              </button>
+              <>
+                <Tooltip text="Preview merged result">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePreview(); }}
+                    disabled={loadingOriginal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition disabled:opacity-50"
+                  >
+                    {loadingOriginal
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Eye className="w-3.5 h-3.5" />}
+                    Preview &amp; Update
+                  </button>
+                </Tooltip>
+              </>
             )}
             {fetchError && (
               <span className="text-xs text-red-400">{fetchError}</span>
             )}
           </div>
 
-          <EvolutionDiffView skillName={suggestion.skill_name} edits={suggestion.edits} />
+          <EvolutionDiffView
+            skillName={suggestion.skill_name}
+            edits={suggestion.edits}
+            originalContent={originalContent ?? undefined}
+          />
         </div>
       )}
-      {showUpdateDialog && mergedContent !== null && (
-        <SkillUpdateDialog
+      {showPreview && mergedContent !== null && (
+        <SkillPreviewDialog
           skillName={suggestion.skill_name}
-          initialContent={mergedContent}
+          content={mergedContent}
+          onContentChange={setMergedContent}
+          onInstall={handleUpdate}
+          onCancel={() => setShowPreview(false)}
           agentSources={agentSources}
-          onUpdate={handleUpdate}
-          onCancel={() => setShowUpdateDialog(false)}
-          updating={updating}
+          variant="update"
         />
       )}
     </div>

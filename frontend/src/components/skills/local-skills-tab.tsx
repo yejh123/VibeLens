@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Code2, Package, Plus, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Code2, Info, Package, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppContext } from "../../app";
 import type { SkillInfo, SkillSourceInfo } from "../../types";
@@ -206,7 +206,7 @@ export function LocalSkillsTab() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-zinc-100">Skills</h2>
-            <p className="text-xs text-zinc-500">Manage and sync skills across agent interfaces</p>
+            <p className="text-xs text-zinc-300">Manage and sync skills across agent interfaces</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -220,11 +220,23 @@ export function LocalSkillsTab() {
           <button
             onClick={() => { fetchSkills(true); fetchSources(); }}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 rounded-md transition disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 rounded-md transition disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
+      </div>
+
+      {/* Skill explanation */}
+      <div className="mb-5 flex items-start gap-3 px-4 py-3.5 bg-teal-900/20 border border-teal-700/30 rounded-lg">
+        <Info className="w-4.5 h-4.5 text-teal-400 shrink-0 mt-0.5" />
+        <p className="text-sm text-zinc-200 leading-relaxed">
+          <span className="font-semibold text-teal-300">What's a skill?</span>{" "}
+          A skill is a SKILL.md instruction file for your coding agent. It tells
+          the agent how to handle specific tasks — like a personalized rulebook.
+          Install skills here, browse the community, or let VibeLens create them
+          from your session patterns.
+        </p>
       </div>
 
       <SourceFilterBar

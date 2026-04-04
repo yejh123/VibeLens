@@ -14,7 +14,7 @@ from vibelens.llm.prompts.skill_deep_creation import SKILL_DEEP_CREATION_PROMPT
 from vibelens.llm.prompts.skill_proposal import SKILL_PROPOSAL_PROMPT
 from vibelens.llm.tokenizer import count_tokens
 from vibelens.models.inference import InferenceRequest
-from vibelens.models.skill.skills import SkillDeepCreationOutput, SkillProposalOutput
+from vibelens.models.skill import SkillDeepCreationOutput, SkillProposalOutput
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.context_extraction import extract_session_context
 from vibelens.services.friction.digest import format_batch_digest

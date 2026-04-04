@@ -10,14 +10,14 @@ from vibelens.models.prompts import AnalysisPrompt, load_template
 
 FRICTION_ANALYSIS_PROMPT = AnalysisPrompt(
     task_id="friction_analysis",
-    system_template=load_template("friction_analysis_system.j2"),
-    user_template=load_template("friction_analysis_user.j2"),
+    system_template=load_template("friction/analysis_system.j2"),
+    user_template=load_template("friction/analysis_user.j2"),
     output_model=FrictionLLMBatchOutput,
 )
 
 FRICTION_SYNTHESIS_PROMPT = AnalysisPrompt(
     task_id="friction_synthesis",
-    system_template=load_template("friction_synthesis_system.j2"),
-    user_template=load_template("friction_synthesis_user.j2"),
+    system_template=load_template("friction/synthesis_system.j2"),
+    user_template=load_template("friction/synthesis_user.j2"),
     output_model=FrictionSynthesisOutput,
 )
