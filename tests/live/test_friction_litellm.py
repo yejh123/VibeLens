@@ -1,4 +1,4 @@
-"""Live friction analysis tests — calls the real LLM backend.
+"""Live friction analysis tests -- calls the real LLM backend.
 
 Tests user-centric friction analysis with batched pipeline using
 the configured LLM backend. Saves detailed logs to logs/friction/.
@@ -12,7 +12,6 @@ import json
 import os
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -30,31 +29,13 @@ from vibelens.services.session_batcher import build_batches
 from vibelens.utils.json_extract import extract_json as _extract_json
 from vibelens.utils.json_extract import repair_truncated_json as _repair_truncated_json
 
-EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "claude-codex-example" / "parsed"
-LOGS_DIR = Path(__file__).parent.parent / "logs" / "friction"
+from .conftest import EXAMPLES_DIR, LOGS_DIR, load_trajectory_groups
+
+FRICTION_LOGS_DIR = LOGS_DIR / "friction"
 
 _no_api_key = not os.environ.get("ANTHROPIC_API_KEY")
 SKIP_LIVE = os.environ.get("SKIP_LIVE_LLM", "0") == "1" or _no_api_key
-SKIP_REASON = "No ANTHROPIC_API_KEY or SKIP_LIVE_LLM=1 — skipping live LLM tests"
-
-
-def _load_trajectory_groups() -> dict[str, list[Trajectory]]:
-    """Load all parsed trajectories grouped by session_id."""
-    json_files = sorted(EXAMPLES_DIR.glob("*.json"))
-    session_files = [f for f in json_files if not f.name.endswith(".meta.json")]
-
-    groups: dict[str, list[Trajectory]] = {}
-    for filepath in session_files:
-        data = json.loads(filepath.read_text())
-        trajectories = []
-        if isinstance(data, list):
-            for item in data:
-                trajectories.append(Trajectory.model_validate(item))
-        else:
-            trajectories.append(Trajectory.model_validate(data))
-        for t in trajectories:
-            groups.setdefault(t.session_id, []).append(t)
-    return groups
+SKIP_REASON = "No ANTHROPIC_API_KEY or SKIP_LIVE_LLM=1 -- skipping live LLM tests"
 
 
 def _select_sessions(
@@ -183,10 +164,10 @@ def _run_friction_analysis(label: str, groups: dict[str, list[Trajectory]]) -> N
     print(f"  Total cost: ${total_cost:.4f}")
 
     # Save log
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    FRICTION_LOGS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     safe_label = label.lower().replace(" ", "_").replace("/", "-")
-    log_path = LOGS_DIR / f"{timestamp}_{safe_label}.txt"
+    log_path = FRICTION_LOGS_DIR / f"{timestamp}_{safe_label}.txt"
 
     log_lines = [
         f"FRICTION ANALYSIS LOG — {label}",
@@ -217,7 +198,7 @@ def test_friction_2_sessions():
     if not EXAMPLES_DIR.exists():
         pytest.skip(f"Examples not found: {EXAMPLES_DIR}")
 
-    groups = _select_sessions(_load_trajectory_groups(), count=2)
+    groups = _select_sessions(load_trajectory_groups(), count=2)
     _run_friction_analysis("2_sessions", groups)
 
 
@@ -228,5 +209,5 @@ def test_friction_5_sessions():
     if not EXAMPLES_DIR.exists():
         pytest.skip(f"Examples not found: {EXAMPLES_DIR}")
 
-    groups = _load_trajectory_groups()
+    groups = load_trajectory_groups()
     _run_friction_analysis("all_sessions", groups)

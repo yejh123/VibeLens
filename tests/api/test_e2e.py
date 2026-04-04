@@ -6,6 +6,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+import vibelens.app
+import vibelens.deps
 from vibelens.app import create_app
 from vibelens.config import Settings
 from vibelens.models.trajectories import Trajectory
@@ -177,229 +179,106 @@ def sample_sessions(test_settings, sample_history):
     return {"session-001": session_1_data, "session-002": session_2_data}
 
 
+@pytest.fixture
+async def app_client(test_settings, monkeypatch):
+    """Create an async HTTP client with mocked settings."""
+    settings, _, _ = test_settings
+    monkeypatch.setattr(vibelens.app, "load_settings", lambda: settings)
+    monkeypatch.setattr(vibelens.deps, "load_settings", lambda: settings)
+    app = create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        yield client
+
+
 @pytest.mark.asyncio
 class TestAPIEndpoints:
     """Test API endpoints."""
 
-    async def test_get_projects(self, test_settings, monkeypatch):
+    async def test_get_projects(self, app_client):
         """Test /api/projects endpoint."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/projects")
+        assert response.status_code == 200
+        projects = response.json()
+        assert isinstance(projects, list)
 
-        def mock_load_settings():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/projects")
-            assert response.status_code == 200
-            projects = response.json()
-            assert isinstance(projects, list)
-
-    async def test_list_sessions(self, test_settings, sample_history, sample_sessions, monkeypatch):
+    async def test_list_sessions(self, sample_history, sample_sessions, app_client):
         """Test /api/sessions endpoint returns trajectory summaries."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
-
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions?limit=100")
-            assert response.status_code == 200
-            sessions = response.json()
-            assert isinstance(sessions, list)
-            assert len(sessions) == 2  # Only 2 have files, 1 is ghost
-            session_ids = [s["session_id"] for s in sessions]
-            assert "session-001" in session_ids
-            assert "session-002" in session_ids
+        response = await app_client.get("/api/sessions?limit=100")
+        assert response.status_code == 200
+        sessions = response.json()
+        assert isinstance(sessions, list)
+        assert len(sessions) == 2  # Only 2 have files, 1 is ghost
+        session_ids = [s["session_id"] for s in sessions]
+        assert "session-001" in session_ids
+        assert "session-002" in session_ids
 
     async def test_list_sessions_with_pagination(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
+        self, sample_history, sample_sessions, app_client
     ):
         """Test pagination parameters."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
-
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions?limit=1&offset=0")
-            assert response.status_code == 200
-            sessions = response.json()
-            assert len(sessions) == 1
+        response = await app_client.get("/api/sessions?limit=1&offset=0")
+        assert response.status_code == 200
+        sessions = response.json()
+        assert len(sessions) == 1
 
     async def test_list_sessions_by_project(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
+        self, sample_history, sample_sessions, app_client
     ):
         """Test filtering by project name."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions?project_name=Agent-Test")
+        assert response.status_code == 200
+        sessions = response.json()
+        assert all(s.get("project_path") == "Agent-Test" for s in sessions)
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions?project_name=Agent-Test")
-            assert response.status_code == 200
-            sessions = response.json()
-            # All trajectories from this directory have project_path "Agent-Test"
-            assert all(s.get("project_path") == "Agent-Test" for s in sessions)
-
-    async def test_get_session_detail(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
-    ):
+    async def test_get_session_detail(self, sample_history, sample_sessions, app_client):
         """Test /api/sessions/{id} returns trajectory group as JSON array."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions/session-001")
+        assert response.status_code == 200
+        group = response.json()
 
-        def mock_load_settings_inner():
-            return settings
+        assert isinstance(group, list)
+        assert len(group) >= 1
+        main_traj = group[0]
+        assert main_traj["session_id"] == "session-001"
+        assert len(main_traj["steps"]) == 2
 
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/session-001")
-            assert response.status_code == 200
-            group = response.json()
-
-            # Response is a list of trajectory dicts
-            assert isinstance(group, list)
-            assert len(group) >= 1
-            main_traj = group[0]
-            assert main_traj["session_id"] == "session-001"
-            assert len(main_traj["steps"]) == 2
-
-    async def test_get_nonexistent_session(self, test_settings, sample_history, monkeypatch):
+    async def test_get_nonexistent_session(self, sample_history, app_client):
         """Test error handling for missing sessions."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions/nonexistent-session")
+        assert response.status_code == 404
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/nonexistent-session")
-            assert response.status_code == 404
-
-    async def test_get_ghost_session(self, test_settings, sample_history, monkeypatch):
+    async def test_get_ghost_session(self, sample_history, app_client):
         """Test that ghost records are filtered out."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions?limit=100")
+        sessions = response.json()
+        session_ids = [s["session_id"] for s in sessions]
+        assert "session-ghost" not in session_ids
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions?limit=100")
-            sessions = response.json()
-            session_ids = [s["session_id"] for s in sessions]
-            assert "session-ghost" not in session_ids
-
-    async def test_session_with_tool_calls(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
-    ):
+    async def test_session_with_tool_calls(self, sample_history, sample_sessions, app_client):
         """Test parsing of tool calls and results."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions/session-002")
+        assert response.status_code == 200
+        group = response.json()
+        main_traj = group[0]
 
-        def mock_load_settings_inner():
-            return settings
+        tool_steps = [
+            s for s in main_traj["steps"] if s["source"] == "agent" and s.get("tool_calls")
+        ]
+        assert len(tool_steps) > 0
+        assert tool_steps[0]["tool_calls"][0]["function_name"] == "Read"
 
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/session-002")
-            assert response.status_code == 200
-            group = response.json()
-            main_traj = group[0]
-
-            # Find the step with tool calls
-            tool_steps = [
-                s for s in main_traj["steps"] if s["source"] == "agent" and s.get("tool_calls")
-            ]
-            assert len(tool_steps) > 0
-            assert tool_steps[0]["tool_calls"][0]["function_name"] == "Read"
-
-    async def test_session_token_usage(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
-    ):
+    async def test_session_token_usage(self, sample_history, sample_sessions, app_client):
         """Test token usage on steps."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions/session-001")
+        assert response.status_code == 200
+        group = response.json()
+        main_traj = group[0]
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/session-001")
-            assert response.status_code == 200
-            group = response.json()
-            main_traj = group[0]
-
-            # Verify token counts on individual steps
-            steps = main_traj["steps"]
-            total_prompt = sum((s.get("metrics") or {}).get("prompt_tokens", 0) for s in steps)
-            assert total_prompt > 0
+        steps = main_traj["steps"]
+        total_prompt = sum((s.get("metrics") or {}).get("prompt_tokens", 0) for s in steps)
+        assert total_prompt > 0
 
 
 class TestDataParsing:
@@ -495,9 +374,9 @@ class TestErrorHandling:
         # The parser should skip invalid lines but continue
 
     @pytest.mark.asyncio
-    async def test_missing_session_file(self, test_settings, monkeypatch):
+    async def test_missing_session_file(self, test_settings, app_client):
         """Test behavior when session referenced in history has no file."""
-        settings, claude_dir, _ = test_settings
+        _, claude_dir, _ = test_settings
 
         history_file = claude_dir / "history.jsonl"
         with open(history_file, "w") as f:
@@ -513,27 +392,12 @@ class TestErrorHandling:
                 + "\n"
             )
 
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions?limit=100")
+        sessions = response.json()
+        assert len(sessions) == 0
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            # Ghost record should not appear in list
-            response = await client.get("/api/sessions?limit=100")
-            sessions = response.json()
-            assert len(sessions) == 0
-
-            # Direct access should fail
-            response = await client.get("/api/sessions/no-such-session")
-            assert response.status_code == 404
+        response = await app_client.get("/api/sessions/no-such-session")
+        assert response.status_code == 404
 
 
 class TestEdgeCases:
@@ -556,34 +420,17 @@ class TestEdgeCases:
             summaries = source.list_metadata()
             assert len(summaries) == 0
 
-    async def test_large_pagination_offset(
-        self, test_settings, sample_history, sample_sessions, monkeypatch
-    ):
+    async def test_large_pagination_offset(self, sample_history, sample_sessions, app_client):
         """Test pagination with offset beyond available sessions."""
-        settings, _, _ = test_settings
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions?limit=100&offset=1000")
+        assert response.status_code == 200
+        sessions = response.json()
+        assert len(sessions) == 0
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions?limit=100&offset=1000")
-            assert response.status_code == 200
-            sessions = response.json()
-            assert len(sessions) == 0
-
-    async def test_session_with_empty_messages(self, test_settings, monkeypatch):
+    async def test_session_with_empty_messages(self, test_settings, app_client):
         """Test session file with no messages."""
-        settings, claude_dir, test_project = test_settings
+        _, claude_dir, test_project = test_settings
 
-        # Create history entry
         history_file = claude_dir / "history.jsonl"
         with open(history_file, "w") as f:
             f.write(
@@ -598,33 +445,16 @@ class TestEdgeCases:
                 + "\n"
             )
 
-        # Create empty session file
         session_file = test_project / "empty.jsonl"
         session_file.write_text("")
 
-        import vibelens.app
-        import vibelens.deps
+        response = await app_client.get("/api/sessions/empty")
+        assert response.status_code in (200, 404)
 
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            # Empty session file won't produce valid trajectory (min 1 step)
-            # so it will either not appear or return 404
-            response = await client.get("/api/sessions/empty")
-            assert response.status_code in (200, 404)
-
-    async def test_special_characters_in_content(self, test_settings, monkeypatch):
+    async def test_special_characters_in_content(self, test_settings, app_client):
         """Test handling of special characters in message content."""
-        settings, claude_dir, test_project = test_settings
+        _, claude_dir, test_project = test_settings
 
-        # Create history
         history_file = claude_dir / "history.jsonl"
         with open(history_file, "w") as f:
             f.write(
@@ -639,7 +469,6 @@ class TestEdgeCases:
                 + "\n"
             )
 
-        # Create session with special content
         session_file = test_project / "unicode-test.jsonl"
         with open(session_file, "w") as f:
             f.write(
@@ -657,25 +486,12 @@ class TestEdgeCases:
                 + "\n"
             )
 
-        import vibelens.app
-        import vibelens.deps
-
-        def mock_load_settings_inner():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings_inner)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings_inner)
-        app = create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/unicode-test")
-            assert response.status_code == 200
-            group = response.json()
-            assert isinstance(group, list)
-            assert len(group) >= 1
-            assert len(group[0]["steps"]) == 1
+        response = await app_client.get("/api/sessions/unicode-test")
+        assert response.status_code == 200
+        group = response.json()
+        assert isinstance(group, list)
+        assert len(group) >= 1
+        assert len(group[0]["steps"]) == 1
 
 
 class TestLocalStoreABC:

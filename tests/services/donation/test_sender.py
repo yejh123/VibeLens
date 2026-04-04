@@ -15,7 +15,7 @@ from vibelens.services.donation.sender import (
 from vibelens.utils.git import resolve_git_root
 
 # VibeLens repo root (this test file lives inside it)
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 DONATION_ID = "20260401120000_test"
 

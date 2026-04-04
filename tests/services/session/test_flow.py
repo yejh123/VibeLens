@@ -5,8 +5,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
 import pytest
 
+import vibelens.app
+import vibelens.deps
 from vibelens.config import Settings
 from vibelens.models.trajectories import (
     Agent,
@@ -24,7 +27,7 @@ from vibelens.services.session.flow import get_session_flow
 def _make_flow_trajectory(
     session_id: str = "flow-test-session",
 ) -> Trajectory:
-    """Build a trajectory with read→edit tool calls for flow graph testing."""
+    """Build a trajectory with read->edit tool calls for flow graph testing."""
     ts = datetime(2026, 3, 15, 10, 0, tzinfo=UTC)
 
     user_step = Step(
@@ -96,6 +99,18 @@ def _make_flow_trajectory(
     )
 
 
+def _run_flow(session_id: str, trajectories: list[Trajectory]) -> dict | None:
+    """Run get_session_flow with mocked store lookups."""
+    with (
+        patch(
+            "vibelens.services.session.flow.get_metadata_from_stores",
+            return_value={"session_id": session_id},
+        ),
+        patch("vibelens.services.session.flow.load_from_stores", return_value=trajectories),
+    ):
+        return get_session_flow(session_id, None)
+
+
 class TestGetSessionFlow:
     """Tests for the get_session_flow service function."""
 
@@ -111,14 +126,7 @@ class TestGetSessionFlow:
     def test_returns_flow_data_structure(self):
         """Valid session returns dict with expected keys."""
         traj = _make_flow_trajectory()
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "flow-test-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("flow-test-session", None)
+        result = _run_flow("flow-test-session", [traj])
 
         assert result is not None
         assert result["session_id"] == "flow-test-session"
@@ -128,14 +136,7 @@ class TestGetSessionFlow:
     def test_tool_graph_has_nodes_and_edges(self):
         """Tool graph contains nodes for each tool call and inferred edges."""
         traj = _make_flow_trajectory()
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "flow-test-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("flow-test-session", None)
+        result = _run_flow("flow-test-session", [traj])
 
         graph = result["tool_graph"]
         assert graph["session_id"] == "flow-test-session"
@@ -147,14 +148,7 @@ class TestGetSessionFlow:
     def test_tool_graph_contains_read_before_write_edge(self):
         """Read(auth.py) followed by Edit(auth.py) produces read_before_write edge."""
         traj = _make_flow_trajectory()
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "flow-test-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("flow-test-session", None)
+        result = _run_flow("flow-test-session", [traj])
 
         graph = result["tool_graph"]
         rbw_edges = [e for e in graph["edges"] if e["relation"] == "read_before_write"]
@@ -167,14 +161,7 @@ class TestGetSessionFlow:
     def test_tool_graph_contains_search_then_read_edge(self):
         """Grep followed by Read produces search_then_read edge."""
         traj = _make_flow_trajectory()
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "flow-test-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("flow-test-session", None)
+        result = _run_flow("flow-test-session", [traj])
 
         graph = result["tool_graph"]
         str_edges = [e for e in graph["edges"] if e["relation"] == "search_then_read"]
@@ -185,14 +172,7 @@ class TestGetSessionFlow:
     def test_phase_segments_cover_session(self):
         """Phase segments list is non-empty and has expected structure."""
         traj = _make_flow_trajectory()
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "flow-test-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("flow-test-session", None)
+        result = _run_flow("flow-test-session", [traj])
 
         segments = result["phase_segments"]
         assert isinstance(segments, list)
@@ -218,14 +198,7 @@ class TestGetSessionFlow:
             ],
             final_metrics=FinalMetrics(duration=5, total_steps=1, tool_call_count=0),
         )
-        with (
-            patch(
-                "vibelens.services.session.flow.get_metadata_from_stores",
-                return_value={"session_id": "empty-session"},
-            ),
-            patch("vibelens.services.session.flow.load_from_stores", return_value=[traj]),
-        ):
-            result = get_session_flow("empty-session", None)
+        result = _run_flow("empty-session", [traj])
 
         graph = result["tool_graph"]
         assert len(graph["nodes"]) == 0
@@ -326,52 +299,33 @@ def _e2e_session(_e2e_settings):
     return _e2e_settings
 
 
+@pytest.fixture
+async def app_client(_e2e_settings, monkeypatch):
+    """Create an async HTTP client with mocked settings."""
+    settings, _, _ = _e2e_settings
+    monkeypatch.setattr(vibelens.app, "load_settings", lambda: settings)
+    monkeypatch.setattr(vibelens.deps, "load_settings", lambda: settings)
+    app = vibelens.app.create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        yield client
+
+
 @pytest.mark.asyncio
 class TestFlowAPIEndpoint:
     """Tests for the /analysis/sessions/{id}/flow API endpoint."""
 
-    async def test_flow_endpoint_returns_200(self, _e2e_session, monkeypatch):
+    async def test_flow_endpoint_returns_200(self, _e2e_session, app_client):
         """Flow endpoint returns 200 with valid session."""
-        settings, _, _ = _e2e_session
-        import httpx
+        response = await app_client.get("/api/sessions/session-002/flow")
+        assert response.status_code == 200
+        data = response.json()
+        assert "session_id" in data
+        assert "tool_graph" in data
+        assert "phase_segments" in data
 
-        import vibelens.app
-        import vibelens.deps
-
-        def mock_load_settings():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings)
-        app = vibelens.app.create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/session-002/flow")
-            assert response.status_code == 200
-            data = response.json()
-            assert "session_id" in data
-            assert "tool_graph" in data
-            assert "phase_segments" in data
-
-    async def test_flow_endpoint_returns_404_for_missing(self, _e2e_settings, monkeypatch):
+    async def test_flow_endpoint_returns_404_for_missing(self, app_client):
         """Flow endpoint returns 404 for non-existent session."""
-        settings, _, _ = _e2e_settings
-        import httpx
-
-        import vibelens.app
-        import vibelens.deps
-
-        def mock_load_settings():
-            return settings
-
-        monkeypatch.setattr(vibelens.app, "load_settings", mock_load_settings)
-        monkeypatch.setattr(vibelens.deps, "load_settings", mock_load_settings)
-        app = vibelens.app.create_app()
-
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/api/sessions/nonexistent/flow")
-            assert response.status_code == 404
+        response = await app_client.get("/api/sessions/nonexistent/flow")
+        assert response.status_code == 404

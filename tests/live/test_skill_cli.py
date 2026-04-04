@@ -1,14 +1,14 @@
 """Live skill analysis tests via LiteLLM and Codex CLI backends.
 
 Exercises the full proposal + deep-creation pipeline:
-  1. Load example sessions → extract contexts → build batches
+  1. Load example sessions -> extract contexts -> build batches
   2. Run proposal inference via backend
   3. Parse SkillProposalOutput
   4. Run deep creation for the first proposal
   5. Parse SkillDeepCreationOutput
   6. Log everything to logs/skill/
 
-Run: python -m pytest tests/skill/test_skill_cli.py -s -v
+Run: python -m pytest tests/live/test_skill_cli.py -s -v
 """
 
 import asyncio
@@ -16,7 +16,6 @@ import json
 import shutil
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -31,7 +30,6 @@ from vibelens.llm.prompts.skill_proposal import (
 from vibelens.llm.tokenizer import count_tokens
 from vibelens.models.inference import InferenceRequest
 from vibelens.models.skill import SkillDeepCreationOutput, SkillProposalOutput
-from vibelens.models.trajectories import Trajectory
 from vibelens.services.context_extraction import extract_session_context
 from vibelens.services.friction.digest import format_batch_digest
 from vibelens.services.session_batcher import build_batches
@@ -44,33 +42,9 @@ from vibelens.services.skill.creation import (
 from vibelens.services.skill.retrieval import _gather_installed_skills
 from vibelens.utils.json_extract import extract_json as _extract_json
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-EXAMPLES_DIR = PROJECT_ROOT / "examples" / "claude-codex-example" / "parsed"
-LOGS_DIR = PROJECT_ROOT / "logs" / "skill"
+from .conftest import EXAMPLES_DIR, LOGS_DIR, load_trajectory_groups, save_log
 
-
-def _load_trajectory_groups() -> dict[str, list[Trajectory]]:
-    """Load all parsed trajectories grouped by session_id."""
-    json_files = sorted(EXAMPLES_DIR.glob("*.json"))
-    session_files = [f for f in json_files if not f.name.endswith(".meta.json")]
-
-    groups: dict[str, list[Trajectory]] = {}
-    for filepath in session_files:
-        data = json.loads(filepath.read_text())
-        trajectories = []
-        if isinstance(data, list):
-            for item in data:
-                trajectories.append(Trajectory.model_validate(item))
-        else:
-            trajectories.append(Trajectory.model_validate(data))
-        for t in trajectories:
-            groups.setdefault(t.session_id, []).append(t)
-    return groups
-
-
-def _save_log(log_dir: Path, filename: str, content: str) -> None:
-    log_dir.mkdir(parents=True, exist_ok=True)
-    (log_dir / filename).write_text(content, encoding="utf-8")
+SKILL_LOGS_DIR = LOGS_DIR / "skill"
 
 
 def _parse_proposal_output(raw_text: str) -> SkillProposalOutput:
@@ -92,7 +66,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
     if not EXAMPLES_DIR.exists():
         pytest.skip(f"Examples not found: {EXAMPLES_DIR}")
 
-    groups = _load_trajectory_groups()
+    groups = load_trajectory_groups()
     groups = dict(list(groups.items())[:session_count])
 
     # Extract contexts
@@ -103,7 +77,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
 
     batches = build_batches(contexts)
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    log_dir = LOGS_DIR / f"{timestamp}_{label}"
+    log_dir = SKILL_LOGS_DIR / f"{timestamp}_{label}"
 
     installed_skills = _gather_installed_skills()
 
@@ -133,8 +107,8 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
         print(f"  Prompt tokens: {prompt_tokens:,}")
 
         if idx == 0:
-            _save_log(log_dir, "proposal_system.txt", system_prompt)
-        _save_log(log_dir, f"proposal_user_{idx}.txt", user_prompt)
+            save_log(log_dir, "proposal_system.txt", system_prompt)
+        save_log(log_dir, f"proposal_user_{idx}.txt", user_prompt)
 
         request = InferenceRequest(
             system=system_prompt,
@@ -156,8 +130,8 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
         if result.cost_usd:
             print(f"  Cost: ${result.cost_usd:.4f}")
 
-        _save_log(log_dir, f"proposal_raw_{idx}.txt", result.text)
-        _save_log(
+        save_log(log_dir, f"proposal_raw_{idx}.txt", result.text)
+        save_log(
             log_dir,
             f"proposal_metadata_{idx}.json",
             json.dumps(
@@ -185,7 +159,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
 
         if proposal_output:
             all_proposal_outputs.append(proposal_output)
-            _save_log(
+            save_log(
                 log_dir,
                 f"proposal_parsed_{idx}.json",
                 json.dumps(proposal_output.model_dump(), indent=2, default=str),
@@ -208,7 +182,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
                 )
         else:
             print(f"  PARSE ERROR: {parse_error}")
-            _save_log(log_dir, f"proposal_error_{idx}.txt", parse_error or "unknown")
+            save_log(log_dir, f"proposal_error_{idx}.txt", parse_error or "unknown")
 
     # Synthesis test (if multiple batches)
     if len(all_proposal_outputs) > 1:
@@ -249,8 +223,8 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
             output_schema=output_schema,
         )
 
-        _save_log(log_dir, "synthesis_system.txt", system_prompt)
-        _save_log(log_dir, "synthesis_user.txt", user_prompt)
+        save_log(log_dir, "synthesis_system.txt", system_prompt)
+        save_log(log_dir, "synthesis_user.txt", user_prompt)
 
         syn_request = InferenceRequest(
             system=system_prompt,
@@ -264,12 +238,12 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
         syn_result = asyncio.run(backend.generate(syn_request))
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
-        _save_log(log_dir, "synthesis_raw.txt", syn_result.text)
+        save_log(log_dir, "synthesis_raw.txt", syn_result.text)
         print(f"  Duration: {elapsed_ms:,}ms")
 
         try:
             synthesis = _parse_proposal_output(syn_result.text.strip())
-            _save_log(
+            save_log(
                 log_dir,
                 "synthesis_parsed.json",
                 json.dumps(synthesis.model_dump(), indent=2, default=str),
@@ -279,7 +253,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
             print(f"  Summary: {synthesis.summary[:120]!r}")
         except Exception as exc:
             print(f"  SYNTHESIS PARSE ERROR: {exc}")
-            _save_log(log_dir, "synthesis_error.txt", str(exc))
+            save_log(log_dir, "synthesis_error.txt", str(exc))
 
     # Deep creation test for first proposal
     total_proposals = sum(len(o.proposals) for o in all_proposal_outputs)
@@ -304,8 +278,8 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
             output_schema=output_schema,
         )
 
-        _save_log(log_dir, "deep_creation_system.txt", system_prompt)
-        _save_log(log_dir, "deep_creation_user.txt", user_prompt)
+        save_log(log_dir, "deep_creation_system.txt", system_prompt)
+        save_log(log_dir, "deep_creation_user.txt", user_prompt)
 
         dc_request = InferenceRequest(
             system=system_prompt,
@@ -319,8 +293,8 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
         dc_result = asyncio.run(backend.generate(dc_request))
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
-        _save_log(log_dir, "deep_creation_raw.txt", dc_result.text)
-        _save_log(
+        save_log(log_dir, "deep_creation_raw.txt", dc_result.text)
+        save_log(
             log_dir,
             "deep_creation_metadata.json",
             json.dumps(
@@ -340,7 +314,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
 
         try:
             deep_output = _parse_deep_creation_output(dc_result.text.strip())
-            _save_log(
+            save_log(
                 log_dir,
                 "deep_creation_parsed.json",
                 json.dumps(deep_output.model_dump(), indent=2, default=str),
@@ -353,7 +327,7 @@ def _run_proposal_test(backend, label: str, session_count: int = 2) -> None:
             print(f"  SKILL.md preview:\n{deep_output.skill_md_content[:500]}")
         except Exception as exc:
             print(f"  DEEP CREATION PARSE ERROR: {exc}")
-            _save_log(log_dir, "deep_creation_error.txt", str(exc))
+            save_log(log_dir, "deep_creation_error.txt", str(exc))
 
     print(f"\n  Total proposals: {total_proposals}")
     print(f"  Logs: {log_dir}")

@@ -14,6 +14,7 @@ from vibelens.services.context_extraction import (
     _find_main_trajectory,
     _summarize_tool_args,
     extract_session_context,
+    remap_session_ids,
 )
 from vibelens.services.context_params import PRESET_DETAIL
 
@@ -261,3 +262,90 @@ def test_linked_session_refs():
 
     assert ctx.last_trajectory_ref_id == "session-2"
     assert ctx.continued_trajectory_ref_id == "session-4"
+
+
+def test_system_only_trajectory():
+    """Trajectory with only a system step produces header-only context (no user/agent content)."""
+    main = _make_trajectory(
+        "system-only-session",
+        [_make_step("s1", "system", "Internal prompt")],
+        project_path="/test/project",
+    )
+
+    ctx = extract_session_context([main])
+
+    assert ctx.session_id == "system-only-session"
+    assert ctx.project_path == "/test/project"
+    assert "=== SESSION: system-only-session ===" in ctx.context_text
+    assert ctx.char_count > 0
+    # System steps are skipped, so no step IDs assigned
+    assert ctx.step_index_map == {}
+    print(f"System-only trajectory context:\n{ctx.context_text}")
+
+
+def test_tool_calls_without_observations():
+    """Agent steps with tool calls but no observation are still included."""
+    main = _make_trajectory(
+        "no-obs-session",
+        steps=[
+            _make_step("s1", "user", "Read the config"),
+            Step(
+                step_id="s2",
+                source="agent",
+                message="Reading config",
+                tool_calls=[
+                    ToolCall(
+                        tool_call_id="tc1",
+                        function_name="Read",
+                        arguments={"file_path": "config.yaml"},
+                    ),
+                    ToolCall(
+                        tool_call_id="tc2",
+                        function_name="Grep",
+                        arguments={"pattern": "port", "path": "src/"},
+                    ),
+                ],
+                observation=None,
+            ),
+        ],
+    )
+
+    ctx = extract_session_context([main])
+
+    assert "fn=Read" in ctx.context_text
+    assert "fn=Grep" in ctx.context_text
+    assert "file_path=config.yaml" in ctx.context_text
+    assert "ERROR" not in ctx.context_text
+    print(f"No-observation context:\n{ctx.context_text}")
+
+
+def test_remap_session_ids():
+    """remap_session_ids replaces real UUIDs with 0-based indices."""
+    ctx_a = extract_session_context(
+        [_make_trajectory("uuid-aaa-111", [_make_step("s1", "user", "hello")])]
+    )
+    ctx_b = extract_session_context(
+        [_make_trajectory("uuid-bbb-222", [_make_step("s1", "user", "world")])]
+    )
+
+    mapping = remap_session_ids([ctx_a, ctx_b])
+
+    # Session IDs replaced in context text
+    assert "=== SESSION: 0 ===" in ctx_a.context_text
+    assert "=== SESSION: 1 ===" in ctx_b.context_text
+    assert "uuid-aaa-111" not in ctx_a.context_text
+    assert "uuid-bbb-222" not in ctx_b.context_text
+
+    # char_count updated after replacement
+    assert ctx_a.char_count == len(ctx_a.context_text)
+    assert ctx_b.char_count == len(ctx_b.context_text)
+
+    # Mapping resolves back to real UUIDs
+    assert mapping.resolve_session_id("0") == "uuid-aaa-111"
+    assert mapping.resolve_session_id("1") == "uuid-bbb-222"
+    assert mapping.resolve_session_id("999") is None
+    assert mapping.resolve_session_id("invalid") is None
+
+    print(f"Mapping: {mapping.session_index_to_id}")
+    print(f"Remapped A:\n{ctx_a.context_text}")
+    print(f"Remapped B:\n{ctx_b.context_text}")

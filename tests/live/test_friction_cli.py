@@ -3,7 +3,7 @@
 Exercises the full pipeline: extract → batch → claude -p - --output-format json → parse.
 Saves raw prompts, raw CLI output, and parsed results to logs/friction/.
 
-Run: python -m pytest tests/friction/test_friction_cli.py -s -v
+Run: python -m pytest tests/live/test_friction_cli.py -s -v
 """
 
 import asyncio
@@ -11,7 +11,6 @@ import json
 import shutil
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -26,7 +25,6 @@ from vibelens.models.analysis.friction import (
     FrictionSynthesisOutput,
 )
 from vibelens.models.inference import InferenceRequest
-from vibelens.models.trajectories import Trajectory
 from vibelens.services.context_extraction import (
     extract_session_context,
     remap_session_ids,
@@ -42,33 +40,9 @@ from vibelens.services.session_batcher import build_batches
 from vibelens.utils.json_extract import extract_json as _extract_json
 from vibelens.utils.json_extract import repair_truncated_json as _repair_truncated_json
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-EXAMPLES_DIR = PROJECT_ROOT / "examples" / "claude-codex-example" / "parsed"
-LOGS_DIR = PROJECT_ROOT / "logs" / "friction"
+from .conftest import EXAMPLES_DIR, LOGS_DIR, load_trajectory_groups, save_log
 
-
-def _load_trajectory_groups() -> dict[str, list[Trajectory]]:
-    """Load all parsed trajectories grouped by session_id."""
-    json_files = sorted(EXAMPLES_DIR.glob("*.json"))
-    session_files = [f for f in json_files if not f.name.endswith(".meta.json")]
-
-    groups: dict[str, list[Trajectory]] = {}
-    for filepath in session_files:
-        data = json.loads(filepath.read_text())
-        trajectories = []
-        if isinstance(data, list):
-            for item in data:
-                trajectories.append(Trajectory.model_validate(item))
-        else:
-            trajectories.append(Trajectory.model_validate(data))
-        for t in trajectories:
-            groups.setdefault(t.session_id, []).append(t)
-    return groups
-
-
-def _save_log(log_dir: Path, filename: str, content: str) -> None:
-    log_dir.mkdir(parents=True, exist_ok=True)
-    (log_dir / filename).write_text(content, encoding="utf-8")
+FRICTION_LOGS_DIR = LOGS_DIR / "friction"
 
 
 def _run_cli_friction_test(label: str, session_count: int | None = None) -> None:
@@ -76,7 +50,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
     if not EXAMPLES_DIR.exists():
         pytest.skip(f"Examples not found: {EXAMPLES_DIR}")
 
-    groups = _load_trajectory_groups()
+    groups = load_trajectory_groups()
     if session_count:
         groups = dict(list(groups.items())[:session_count])
 
@@ -90,7 +64,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
     batches = build_batches(contexts)
 
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    log_dir = LOGS_DIR / f"{timestamp}_cli_{label}"
+    log_dir = FRICTION_LOGS_DIR / f"{timestamp}_cli_{label}"
 
     # Create Claude CLI backend
     backend = ClaudeCliBackend(timeout=FRICTION_TIMEOUT_SECONDS)
@@ -122,9 +96,9 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
 
         # Save prompts
         if idx == 0:
-            _save_log(log_dir, "system_prompt.txt", system_prompt)
-        _save_log(log_dir, f"user_prompt_{idx}.txt", user_prompt)
-        _save_log(log_dir, f"full_prompt_{idx}.txt", total_prompt)
+            save_log(log_dir, "system_prompt.txt", system_prompt)
+        save_log(log_dir, f"user_prompt_{idx}.txt", user_prompt)
+        save_log(log_dir, f"full_prompt_{idx}.txt", total_prompt)
 
         request = InferenceRequest(
             system=system_prompt,
@@ -145,8 +119,8 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
             print(f"  Output tokens: {result.usage.output_tokens:,}")
 
         # Save raw result
-        _save_log(log_dir, f"raw_result_{idx}.txt", result.text)
-        _save_log(
+        save_log(log_dir, f"raw_result_{idx}.txt", result.text)
+        save_log(
             log_dir,
             f"result_metadata_{idx}.json",
             json.dumps(
@@ -188,7 +162,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
 
         if batch_output:
             all_batch_outputs.append(batch_output)
-            _save_log(
+            save_log(
                 log_dir,
                 f"parsed_output_{idx}.json",
                 json.dumps(batch_output.model_dump(), indent=2, default=str),
@@ -209,7 +183,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
                     print(f"        ↳ {m.action}: {m.content[:80]}")
         else:
             print(f"  PARSE ERROR: {parse_error}")
-            _save_log(log_dir, f"parse_error_{idx}.txt", parse_error or "unknown")
+            save_log(log_dir, f"parse_error_{idx}.txt", parse_error or "unknown")
 
     # Synthesis test (if we have events)
     total_events = sum(len(o.events) for o in all_batch_outputs)
@@ -257,8 +231,8 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
             output_schema=output_schema,
         )
 
-        _save_log(log_dir, "synthesis_system.txt", system_prompt)
-        _save_log(log_dir, "synthesis_user.txt", user_prompt)
+        save_log(log_dir, "synthesis_system.txt", system_prompt)
+        save_log(log_dir, "synthesis_user.txt", user_prompt)
 
         syn_request = InferenceRequest(
             system=system_prompt,
@@ -272,7 +246,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
         syn_result = asyncio.get_event_loop().run_until_complete(backend.generate(syn_request))
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
-        _save_log(log_dir, "synthesis_raw.txt", syn_result.text)
+        save_log(log_dir, "synthesis_raw.txt", syn_result.text)
         print(f"  Duration: {elapsed_ms:,}ms")
         print(f"  Raw length: {len(syn_result.text)} chars")
         print(f"  First 200: {syn_result.text.strip()[:200]!r}")
@@ -282,7 +256,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
         try:
             syn_data = json.loads(syn_json)
             synthesis = FrictionSynthesisOutput.model_validate(syn_data)
-            _save_log(
+            save_log(
                 log_dir,
                 "synthesis_parsed.json",
                 json.dumps(synthesis.model_dump(), indent=2, default=str),
@@ -294,7 +268,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
             print(f"  Mitigations: {len(synthesis.mitigations)}")
         except Exception as exc:
             print(f"  SYNTHESIS PARSE ERROR: {exc}")
-            _save_log(log_dir, "synthesis_error.txt", str(exc))
+            save_log(log_dir, "synthesis_error.txt", str(exc))
 
     print(f"\n  Total events: {total_events}")
     print(f"  Logs: {log_dir}")

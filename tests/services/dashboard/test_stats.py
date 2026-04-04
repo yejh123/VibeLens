@@ -1,6 +1,6 @@
 """Tests for dashboard_service aggregation functions."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -50,14 +50,7 @@ def _make_trajectory(
     if timestamp is None:
         timestamp = datetime(2026, 3, 15, 10, 0, tzinfo=UTC)
 
-    end_time = datetime(
-        timestamp.year,
-        timestamp.month,
-        timestamp.day,
-        timestamp.hour,
-        timestamp.minute + 1,
-        tzinfo=UTC,
-    )
+    end_time = timestamp + timedelta(minutes=1)
 
     steps = [
         Step(
@@ -556,3 +549,46 @@ class TestFilterMetadata:
         print(f"None timestamp with date filter: {len(result)}")
         assert len(result) == 1
         assert result[0]["session_id"] == "s1"
+
+
+class TestEdgeCases:
+    """Edge cases for dashboard stats computation."""
+
+    def test_zero_completion_tokens(self):
+        """Zero completion tokens should not cause division-by-zero."""
+        traj = _make_trajectory(prompt_tokens=200, completion_tokens=0)
+        result = compute_dashboard_stats([traj])
+
+        assert result.total_sessions == 1
+        assert result.total_output_tokens == 0
+        # user step (100) + agent step (200) = 300 input tokens, 0 output
+        assert result.total_tokens == 300
+        print(f"Zero completion: tokens={result.total_tokens}")
+
+    def test_identical_timestamps_stable_sort(self):
+        """Sessions with identical timestamps maintain stable ordering."""
+        same_ts = datetime(2026, 3, 15, 10, 0, tzinfo=UTC)
+        trajs = [
+            _make_trajectory(session_id=f"s{i}", timestamp=same_ts)
+            for i in range(5)
+        ]
+        result = compute_dashboard_stats(trajs)
+
+        assert result.total_sessions == 5
+        total_daily = sum(d.session_count for d in result.daily_stats)
+        assert total_daily == 5
+        print(f"Same timestamp: {result.total_sessions} sessions, daily={total_daily}")
+
+    def test_large_token_counts(self):
+        """Very large token counts (1M+) compute cost without overflow."""
+        traj = _make_trajectory(
+            model="claude-sonnet-4-6",
+            prompt_tokens=1_000_000,
+            completion_tokens=500_000,
+        )
+        result = compute_dashboard_stats([traj])
+
+        assert result.total_input_tokens >= 1_000_000
+        assert result.total_output_tokens >= 500_000
+        assert result.total_cost_usd > 0
+        print(f"Large tokens: cost=${result.total_cost_usd:.4f}")
