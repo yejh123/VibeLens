@@ -45,9 +45,7 @@ logs/
 .coverage
 htmlcov/
 examples/*
-!examples/claude-codex-example/
-!examples/codex-example/
-!examples/gemini-cli-example/
+!examples/claude-example-v2/
 
 # Frontend
 frontend/node_modules/

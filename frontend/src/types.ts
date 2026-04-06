@@ -236,6 +236,7 @@ export interface StepRef {
 }
 
 export interface Mitigation {
+  title: string;
   action: string;
   confidence: number;
 }

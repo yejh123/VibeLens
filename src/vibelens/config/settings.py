@@ -145,8 +145,7 @@ class Settings(BaseSettings):
         description="Directory for storing parsed demo example trajectories.",
     )
     demo_example_sessions: str = Field(
-        default="",
-        description="Comma-separated file paths to pre-load as example sessions.",
+        default="", description="Comma-separated file paths to pre-load as example sessions."
     )
 
     @property

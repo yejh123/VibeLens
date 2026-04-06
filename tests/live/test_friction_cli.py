@@ -163,7 +163,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
             print(f"  Events: {len(batch_output.friction_events)}")
             print(f"  Summary: {batch_output.summary!r}")
             for m in batch_output.mitigations:
-                print(f"  Mitigation: [{m.confidence:.0%}] {m.action}")
+                print(f"  Mitigation: [{m.confidence:.0%}] {m.title}: {m.action}")
             for event in batch_output.friction_events:
                 print(
                     f"    [{event.severity}] {event.friction_type}"
@@ -200,7 +200,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
                     for e in output.friction_events
                 ],
                 "mitigations": [
-                    {"action": m.action, "confidence": m.confidence}
+                    {"title": m.title, "action": m.action, "confidence": m.confidence}
                     for m in output.mitigations
                 ],
             }

@@ -10,16 +10,19 @@ app:
   mode: demo
 
 demo:
-  example_sessions: "examples/claude-codex-example, examples/codex-example"
+  example_sessions: "examples/claude-example-v2"
+  friction_dir: "examples/claude-example-v2/friction_analyses"
+  skill_analysis_dir: "examples/claude-example-v2/skill_analyses"
 
 donation:
-  dir: ~/.vibelens/donations
+  dir: ~/.vibelens/donations-v2
 
 server:
   host: 0.0.0.0                      # Bind to all interfaces for public access
   port: 12001
 
 upload:
+  dir: ~/.vibelens/uploads-v2
   max_zip_bytes: 10737418240         # 10 GB
   max_extracted_bytes: 21474836480   # 20 GB
   max_file_count: 10000

@@ -30,7 +30,7 @@ export function SourceBadge({ sourceType, sourcePath }: { sourceType: string; so
 export function TagBadge({ tag }: { tag: string }) {
   return (
     <Tooltip text={TAG_DESCRIPTIONS[tag] || `Tag: ${tag}`}>
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400 cursor-default">
+      <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-300 cursor-default">
         {tag}
       </span>
     </Tooltip>
@@ -89,13 +89,13 @@ export function CategoryBadge({ category }: { category: string }) {
 export function TagList({ tags, max = 5 }: { tags: string[]; max?: number }) {
   if (tags.length === 0) return null;
   return (
-    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-      <Tag className="w-3 h-3 text-zinc-600 shrink-0" />
+    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+      <Tag className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
       {tags.slice(0, max).map((tag) => (
         <TagBadge key={tag} tag={tag} />
       ))}
       {tags.length > max && (
-        <span className="text-[10px] text-zinc-600">+{tags.length - max}</span>
+        <span className="text-xs text-zinc-500">+{tags.length - max}</span>
       )}
     </div>
   );

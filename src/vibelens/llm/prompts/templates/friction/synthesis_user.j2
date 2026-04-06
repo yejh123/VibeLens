@@ -19,7 +19,7 @@ Synthesize friction analysis results from {{ session_count }} session{{ "s" if s
 {% if batch.mitigations %}
 **Mitigations:**
 {% for m in batch.mitigations %}
-- [confidence={{ m.confidence }}] {{ m.action }}
+- [confidence={{ m.confidence }}] {{ m.title }}: {{ m.action }}
 {% endfor %}
 {% endif %}
 

@@ -44,6 +44,7 @@ class FrictionEvent(BaseModel):
 class Mitigation(BaseModel):
     """A concrete, actionable recommendation to reduce friction."""
 
+    title: str = Field(description="Short heading for the mitigation (max 8 words).")
     action: str = Field(description="How to address the friction (max 30 words).")
     confidence: float = Field(default=0.0, description="Confidence this will help. 0.0-1.0.")
 

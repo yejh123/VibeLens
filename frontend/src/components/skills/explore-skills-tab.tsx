@@ -103,7 +103,7 @@ export function ExploreSkillsTab({ onSwitchTab }: { onSwitchTab?: (tab: SkillTab
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
@@ -249,7 +249,7 @@ function FeaturedSkillCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{skill.summary}</p>
+          <p className="text-sm text-zinc-300 mt-1 line-clamp-2">{skill.summary}</p>
           <TagList tags={skill.tags} />
         </div>
         <div className="shrink-0 mt-1">

@@ -92,6 +92,7 @@ User stops trying after multiple failed attempts. Evidence: user says "never min
 ## Mitigation Rules
 
 Each mitigation must be structured with:
+- `title`: Short heading for the mitigation (max 8 words).
 - `action`: How to address the friction (max 30 words). Be specific and actionable.
 - `confidence`: How confident you are this will help (0.0-1.0).
 
@@ -104,6 +105,7 @@ Each mitigation must be structured with:
 - `friction_events[].user_intention`: What the user wanted (max 15 words, NO step IDs)
 - `friction_events[].description`: Why the agent failed (max 20 words, or empty if self-evident)
 - `summary`: Narrative overview of friction (max 80 words). Be terse.
+- `mitigations[].title`: Short heading (max 8 words)
 - `mitigations[].action`: Specific, actionable recommendation (max 30 words)
 - `mitigations[].confidence`: 0.0-1.0 confidence this will help
 - If sessions have zero friction, return `{"title": "No Issues Found", "user_profile": "", "summary": "No friction detected.", "friction_events": [], "mitigations": []}`

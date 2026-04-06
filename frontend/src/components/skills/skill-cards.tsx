@@ -57,7 +57,7 @@ export function SkillCard({
                 <span className="text-[10px] text-zinc-500">{lineCount} lines</span>
               )}
             </div>
-            <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
+            <p className="text-sm text-zinc-300 mt-1 line-clamp-2">
               {skill.description || "No description"}
             </p>
             <TagList tags={tags} />

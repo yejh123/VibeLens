@@ -2,7 +2,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
-  CheckCircle2,
+
   ChevronDown,
   ChevronRight,
   Clock,
@@ -432,12 +432,19 @@ function SummarySection({
   userProfile?: string | null;
 }) {
   return (
-    <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5 space-y-3">
-      <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+    <div className="space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5">
+        <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+      </div>
       {userProfile && (
-        <div className="flex items-start gap-2.5 border-t border-zinc-700/40 pt-3">
-          <User className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-zinc-400 leading-relaxed">{userProfile}</p>
+        <div className="bg-gradient-to-r from-amber-950/30 to-zinc-900/60 border border-amber-700/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="p-1.5 rounded-lg bg-amber-600/15">
+              <User className="w-4 h-4 text-amber-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-zinc-100">User Profile</h3>
+          </div>
+          <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{userProfile}</p>
         </div>
       )}
     </div>
@@ -471,29 +478,23 @@ function MitigationCard({ mitigation }: { mitigation: Mitigation }) {
 
   return (
     <div className={`rounded-xl border p-4 transition-all hover:border-zinc-600 ${styleClass}`}>
-      <div className="flex items-start gap-3">
-        <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${
-          level === "high" ? "text-emerald-400" : level === "medium" ? "text-amber-400" : "text-zinc-400"
-        }`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-zinc-200 leading-relaxed">{mitigation.action}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <Tooltip text="How confident we are this will help">
-              <div className="flex items-center gap-2">
-                <div className="w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      level === "high" ? "bg-emerald-400" : level === "medium" ? "bg-amber-400" : "bg-zinc-500"
-                    }`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="text-xs text-zinc-500">{pct}%</span>
-              </div>
-            </Tooltip>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <p className="text-[0.9375rem] font-semibold text-zinc-100">{mitigation.title}</p>
+        <Tooltip text="How confident we are this will help">
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-16 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  level === "high" ? "bg-emerald-400" : level === "medium" ? "bg-amber-400" : "bg-zinc-500"
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs text-zinc-500">{pct}%</span>
           </div>
-        </div>
+        </Tooltip>
       </div>
+      <p className="text-sm text-zinc-200 leading-relaxed">{mitigation.action}</p>
     </div>
   );
 }

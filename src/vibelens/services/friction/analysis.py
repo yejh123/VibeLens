@@ -270,7 +270,8 @@ async def _synthesize_friction_analysis(
                 for e in output.friction_events
             ],
             "mitigations": [
-                {"action": m.action, "confidence": m.confidence} for m in output.mitigations
+                {"title": m.title, "action": m.action, "confidence": m.confidence}
+                for m in output.mitigations
             ],
         }
         for output, _ in batch_results
@@ -423,5 +424,3 @@ def _friction_cache_key(session_ids: list[str]) -> str:
     """Generate a cache key from sorted session IDs."""
     sorted_ids = ",".join(sorted(session_ids))
     return f"friction:{hashlib.sha256(sorted_ids.encode()).hexdigest()[:16]}"
-
-

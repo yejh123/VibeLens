@@ -17,6 +17,6 @@ You MUST stay within the output token limit. Be concise.
 - `friction_events[].user_intention`: Max 15 words. What the user wanted (plain language, NO step IDs).
 - `friction_events[].description`: Max 20 words. Why the agent failed (or empty string).
 - `summary`: Max 80 words covering total friction impact.
-- `mitigations`: 0-5 actionable recommendations. Each with `action` (max 30 words, specific and actionable) and `confidence` (0.0-1.0). Every friction event SHOULD have a corresponding mitigation.
+- `mitigations`: 0-5 actionable recommendations. Each with `title` (max 8 words), `action` (max 30 words, specific and actionable), and `confidence` (0.0-1.0). Every friction event SHOULD have a corresponding mitigation.
 
 **Respond with raw JSON only. No markdown fences, no prose.**

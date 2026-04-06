@@ -61,6 +61,7 @@ def load_demo_examples(settings: Settings, store: DiskStore) -> int:
         if not example_path.exists():
             logger.warning("Example path not found: %s", example_path)
             continue
+        logger.info("Loading example from %s", example_path)
         try:
             if example_path.is_dir():
                 loaded += _load_directory(example_path, store)

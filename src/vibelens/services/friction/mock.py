@@ -49,6 +49,7 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
         ),
         mitigations=[
             Mitigation(
+                title="Confirm requirements before coding",
                 action=(
                     "Before starting implementation, restate the user's"
                     " requirement and wait for confirmation."
@@ -56,6 +57,7 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
                 confidence=0.9,
             ),
             Mitigation(
+                title="Limit changes to requested scope",
                 action=(
                     "Only change what was explicitly requested."
                     " Never refactor adjacent code."
@@ -63,6 +65,7 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
                 confidence=0.85,
             ),
             Mitigation(
+                title="Read full test context first",
                 action=(
                     "When a test fails, read the full test file including"
                     " fixtures before attempting a fix."
