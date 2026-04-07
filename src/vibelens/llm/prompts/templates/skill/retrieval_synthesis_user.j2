@@ -21,8 +21,4 @@ Merge retrieval results from {{ batch_count }} batches analyzing {{ session_coun
 
 {% endfor %}
 
-Produce a single merged result with:
-- `workflow_patterns`: Deduplicated patterns with merged example_refs.
-- `recommendations`: Top 1-10 recommendations ranked by confidence and frequency.
-- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
-- `user_profile`: Merged user profile.
+Produce a single merged result. Deduplicate workflow patterns by merging `example_refs`. Rank recommendations by confidence and frequency. Include `title`, `user_profile`, and `summary`.

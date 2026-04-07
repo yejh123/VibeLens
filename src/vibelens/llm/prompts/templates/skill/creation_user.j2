@@ -23,9 +23,4 @@ The user already has these skills. Ensure the new skill does not duplicate them:
 {% endfor %}
 {% endif %}
 
-Provide:
-- `name`: The proposal name ({{ proposal_name }}).
-- `description`: Specific trigger description. State what the skill does AND when it activates. Include trigger phrases the user would say. Max 30 words.
-- `skill_md_content`: Complete SKILL.md content with YAML frontmatter and markdown body. 1,500-2,000 words, imperative form. Include negative cases.
-- `rationale`: One-sentence conclusion + 1-2 bullet points starting with '- '. Max 50 words.
-- `tools_used`: List of tool names referenced in the skill (e.g., Read, Edit, Bash).
+Use the proposal name as `name`. Include complete YAML frontmatter and a markdown body with step-by-step instructions (1,500-2,000 words, imperative form, with negative cases) in `skill_md_content`.

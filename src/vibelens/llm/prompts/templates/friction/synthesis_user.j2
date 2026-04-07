@@ -9,17 +9,17 @@ Synthesize friction analysis results from {{ session_count }} session{{ "s" if s
 **User Profile:** {{ batch.user_profile }}
 **Summary:** {{ batch.summary }}
 
-{% if batch.friction_events %}
-**Friction Events:**
-{% for event in batch.friction_events %}
-- [severity={{ event.severity }}] {{ event.friction_type }}: "{{ event.user_intention }}" — {{ event.description }} (session={{ event.span_ref.session_id }}, steps={{ event.span_ref.start_step_id }}{% if event.span_ref.end_step_id %}..{{ event.span_ref.end_step_id }}{% endif %})
+{% if batch.friction_types %}
+**Friction Types:**
+{% for ft in batch.friction_types %}
+- [severity={{ ft.severity }}] {{ ft.type_name }}: {{ ft.description }} (examples: {% for ref in ft.example_refs %}session={{ ref.session_id }}, steps={{ ref.start_step_id }}{% if ref.end_step_id %}..{{ ref.end_step_id }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %})
 {% endfor %}
 {% endif %}
 
 {% if batch.mitigations %}
 **Mitigations:**
 {% for m in batch.mitigations %}
-- [confidence={{ m.confidence }}] {{ m.title }}: {{ m.action }}
+- [confidence={{ m.confidence }}] {{ m.title }}: {{ m.action }}{% if m.rationale %} | Rationale: {{ m.rationale }}{% endif %}
 {% endfor %}
 {% endif %}
 

@@ -5,7 +5,7 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CliBackendModels, LLMStatus } from "../types";
 
 const MODEL_PRESETS = [
@@ -86,32 +86,59 @@ function ModelCombobox({
   accentColor?: AccentColor;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const accent = ACCENT_STYLES[accentColor];
+  const query = value.toLowerCase();
+  const filteredPresets = MODEL_PRESETS.filter((p) => p.toLowerCase().includes(query));
+
+  // Flip dropdown upward when insufficient space below
+  const DROPDOWN_HEIGHT = 192;
+  const updateDropDirection = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setDropUp(spaceBelow < DROPDOWN_HEIGHT && rect.top > spaceBelow);
+  }, []);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <div className="flex">
         <input
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setOpen(true)}
-          placeholder="anthropic/claude-haiku-4-5"
+          onChange={(e) => {
+            onChange(e.target.value);
+            updateDropDirection();
+            setOpen(true);
+          }}
+          onFocus={() => {
+            updateDropDirection();
+            setOpen(true);
+          }}
+          placeholder="Type or select a model..."
           className={`w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none ${accent.focus} pr-8`}
         />
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            updateDropDirection();
+            setOpen((v) => !v);
+          }}
           className="absolute right-0 inset-y-0 px-2 flex items-center text-zinc-500 hover:text-zinc-300"
         >
-          <ChevronDown className="w-3.5 h-3.5" />
+          <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
-      {open && (
+      {open && filteredPresets.length > 0 && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <ul className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl">
-            {MODEL_PRESETS.map((preset) => (
+          <ul
+            className={`absolute z-20 w-full max-h-48 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl ${
+              dropUp ? "bottom-full mb-1" : "top-full mt-1"
+            }`}
+          >
+            {filteredPresets.map((preset) => (
               <li key={preset}>
                 <button
                   type="button"

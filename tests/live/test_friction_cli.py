@@ -160,23 +160,26 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
                 f"parsed_output_{idx}.json",
                 json.dumps(batch_output.model_dump(), indent=2, default=str),
             )
-            print(f"  Events: {len(batch_output.friction_events)}")
+            print(f"  Types: {len(batch_output.friction_types)}")
             print(f"  Summary: {batch_output.summary!r}")
             for m in batch_output.mitigations:
                 print(f"  Mitigation: [{m.confidence:.0%}] {m.title}: {m.action}")
-            for event in batch_output.friction_events:
+            for ft in batch_output.friction_types:
+                refs_str = ", ".join(
+                    f"{r.session_id}:{r.start_step_id}→{r.end_step_id}"
+                    for r in ft.example_refs
+                )
                 print(
-                    f"    [{event.severity}] {event.friction_type}"
-                    f" | span=({event.span_ref.session_id}, {event.span_ref.start_step_id}"
-                    f"→{event.span_ref.end_step_id})"
-                    f" | {event.user_intention[:60]}"
+                    f"    [{ft.severity}] {ft.type_name}"
+                    f" | refs=({refs_str})"
+                    f" | {ft.description[:60]}"
                 )
         else:
             print(f"  PARSE ERROR: {parse_error}")
             save_log(log_dir, f"parse_error_{idx}.txt", parse_error or "unknown")
 
     # Synthesis test (if we have events)
-    total_events = sum(len(o.friction_events) for o in all_batch_outputs)
+    total_events = sum(len(o.friction_types) for o in all_batch_outputs)
     if total_events > 0 and all_batch_outputs:
         print("\n  --- Synthesis ---")
 
@@ -185,22 +188,29 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
                 "title": output.title,
                 "user_profile": output.user_profile,
                 "summary": output.summary,
-                "friction_events": [
+                "friction_types": [
                     {
-                        "friction_type": e.friction_type,
-                        "severity": e.severity,
-                        "user_intention": e.user_intention,
-                        "description": e.description,
-                        "span_ref": {
-                            "session_id": e.span_ref.session_id,
-                            "start_step_id": e.span_ref.start_step_id,
-                            "end_step_id": e.span_ref.end_step_id,
-                        },
+                        "type_name": ft.type_name,
+                        "severity": ft.severity,
+                        "description": ft.description,
+                        "example_refs": [
+                            {
+                                "session_id": ref.session_id,
+                                "start_step_id": ref.start_step_id,
+                                "end_step_id": ref.end_step_id,
+                            }
+                            for ref in ft.example_refs
+                        ],
                     }
-                    for e in output.friction_events
+                    for ft in output.friction_types
                 ],
                 "mitigations": [
-                    {"title": m.title, "action": m.action, "confidence": m.confidence}
+                    {
+                        "title": m.title,
+                        "action": m.action,
+                        "rationale": m.rationale,
+                        "confidence": m.confidence,
+                    }
                     for m in output.mitigations
                 ],
             }
@@ -246,7 +256,7 @@ def _run_cli_friction_test(label: str, session_count: int | None = None) -> None
             )
             print(f"  Title: {synthesis.title!r}")
             print(f"  Summary: {synthesis.summary!r}")
-            print(f"  Events: {len(synthesis.friction_events)}")
+            print(f"  Types: {len(synthesis.friction_types)}")
             print(f"  Mitigations: {len(synthesis.mitigations)}")
         except Exception as exc:
             print(f"  SYNTHESIS PARSE ERROR: {exc}")

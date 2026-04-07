@@ -60,7 +60,11 @@ interface SkillsPanelProps {
 
 export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPanelProps) {
   const { fetchWithToken, appMode, maxAnalysisSessions } = useAppContext();
-  const [activeTab, setActiveTab] = useState<SkillTab>("local");
+  const [activeTab, setActiveTab] = useState<SkillTab>(() => {
+    const stored = localStorage.getItem("vibelens-skills-tab");
+    if (stored && TAB_CONFIG.some((t) => t.id === stored)) return stored as SkillTab;
+    return "local";
+  });
   const [analysisResult, setAnalysisResult] = useState<SkillAnalysisResult | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -181,8 +185,64 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
       creation: "create",
       evolution: "evolve",
     };
-    setActiveTab(tabMap[loaded.mode] || "retrieve");
+    const tab = tabMap[loaded.mode] || "retrieve";
+    setActiveTab(tab);
+    localStorage.setItem("vibelens-skills-tab", tab);
   }, []);
+
+  // In demo mode, auto-load the most recent analysis for a given mode
+  const demoHistoryRef = useRef<{ analysis_id: string; mode: SkillMode }[] | null>(null);
+
+  const loadDemoAnalysis = useCallback(
+    async (mode: SkillMode) => {
+      if (appMode !== "demo") return;
+      try {
+        if (!demoHistoryRef.current) {
+          const res = await fetchWithToken("/api/skills/analysis/history");
+          if (!res.ok) return;
+          demoHistoryRef.current = await res.json();
+        }
+        const match = demoHistoryRef.current?.find((h) => h.mode === mode);
+        if (!match) return;
+        const loadRes = await fetchWithToken(`/api/skills/analysis/${match.analysis_id}`);
+        if (!loadRes.ok) return;
+        const result: SkillAnalysisResult = await loadRes.json();
+        setAnalysisResult(result);
+      } catch {
+        /* best-effort — fall back to welcome page */
+      }
+    },
+    [appMode, fetchWithToken],
+  );
+
+  // Auto-load on initial mount in demo mode, respecting stored tab preference
+  const demoLoadedRef = useRef(false);
+  useEffect(() => {
+    if (appMode !== "demo" || demoLoadedRef.current) return;
+    demoLoadedRef.current = true;
+
+    // Only auto-load for analysis tabs (not local/explore)
+    const storedTab = localStorage.getItem("vibelens-skills-tab");
+    const targetMode = storedTab && MODE_MAP[storedTab] ? MODE_MAP[storedTab] : null;
+    if (!targetMode) return;
+
+    (async () => {
+      try {
+        const res = await fetchWithToken("/api/skills/analysis/history");
+        if (!res.ok) return;
+        const history: { analysis_id: string; mode: SkillMode }[] = await res.json();
+        demoHistoryRef.current = history;
+        if (history.length === 0) return;
+        const match = history.find((h) => h.mode === targetMode) ?? history[0];
+        const loadRes = await fetchWithToken(`/api/skills/analysis/${match.analysis_id}`);
+        if (!loadRes.ok) return;
+        const result: SkillAnalysisResult = await loadRes.json();
+        handleHistorySelect(result);
+      } catch {
+        /* best-effort */
+      }
+    })();
+  }, [appMode, fetchWithToken, handleHistorySelect]);
 
   const handleNewAnalysis = useCallback(() => {
     setAnalysisResult(null);
@@ -245,12 +305,15 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
           <Tooltip key={tab.id} text={tab.tooltip} className="flex-1 min-w-0">
             <button
               onClick={() => {
-                // Clear stale analysis results when switching between analysis tabs
                 if (tab.id !== activeTab && MODE_MAP[tab.id] && MODE_MAP[activeTab]) {
                   setAnalysisResult(null);
                   setAnalysisError(null);
+                  if (appMode === "demo" && MODE_MAP[tab.id]) {
+                    loadDemoAnalysis(MODE_MAP[tab.id]);
+                  }
                 }
                 setActiveTab(tab.id);
+                localStorage.setItem("vibelens-skills-tab", tab.id);
               }}
               className={`w-full px-3 py-1.5 text-sm font-semibold rounded-md transition text-center ${
                 activeTab === tab.id ? ACTIVE_TAB_STYLE : INACTIVE_TAB_STYLE

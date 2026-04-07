@@ -1,6 +1,6 @@
 """Mock friction analysis data for demo/test mode.
 
-Builds realistic FrictionAnalysisResult with user-centric friction events
+Builds realistic FrictionAnalysisResult with user-centric friction types
 covering all severity levels, spread across available sessions.
 """
 
@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from vibelens.models.analysis.friction import (
     FrictionAnalysisResult,
     FrictionCost,
-    FrictionEvent,
+    FrictionType,
     Mitigation,
 )
 from vibelens.models.analysis.step_ref import StepRef
@@ -28,23 +28,24 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
         session_ids: Session IDs from the request.
 
     Returns:
-        Mock FrictionAnalysisResult with sample events and mitigations.
+        Mock FrictionAnalysisResult with sample friction types and mitigations.
     """
     step_id_pool = _collect_step_ids(session_ids)
-    events = _build_mock_events(step_id_pool)
+    friction_types = _build_mock_types(step_id_pool)
     skipped = [sid for sid in session_ids if sid not in step_id_pool]
     session_count = len(step_id_pool)
 
     return FrictionAnalysisResult(
         title="Scope Violations and Misunderstood Intent",
         user_profile=(
-            "Full-stack developer working on auth, API, and frontend components. "
-            "Prefers incremental changes over rewrites."
+            "Full-stack developer working on auth, API, and frontend components.\n"
+            "- Prefers incremental changes over rewrites\n"
+            "- Expects tested code on first attempt"
         ),
         summary=(
             f"Agent frequently misunderstood intent across "
             f"{session_count} session{'s' if session_count != 1 else ''}.\n"
-            f"- {len(events)} friction events detected, mostly from scope violations\n"
+            f"- {len(friction_types)} friction categories detected, mostly from scope violations\n"
             "- Repeated pattern of editing files not mentioned in the request\n"
             "- User had to correct or revert changes multiple times"
         ),
@@ -55,7 +56,13 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
                     "Before starting implementation, restate the user's"
                     " requirement and wait for confirmation."
                 ),
+                rationale=(
+                    "Prevents wasted effort from misunderstood intent.\n"
+                    "- Catches scope mismatches before any code is written\n"
+                    "- Reduces correction cycles by 60-80%"
+                ),
                 confidence=0.9,
+                addressed_friction_types=["misunderstood-intent", "scope-violation"],
             ),
             Mitigation(
                 title="Limit changes to requested scope",
@@ -63,7 +70,13 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
                     "Only change what was explicitly requested."
                     " Never refactor adjacent code."
                 ),
+                rationale=(
+                    "Scope creep caused most high-severity friction.\n"
+                    "- Unrequested refactors broke existing tests\n"
+                    "- User had to revert changes multiple times"
+                ),
                 confidence=0.85,
+                addressed_friction_types=["scope-violation"],
             ),
             Mitigation(
                 title="Read full test context first",
@@ -71,10 +84,16 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
                     "When a test fails, read the full test file including"
                     " fixtures before attempting a fix."
                 ),
+                rationale=(
+                    "Repeated failures stemmed from partial context.\n"
+                    "- Agent fixed wrong assertions three times\n"
+                    "- Full fixture reading prevents blind guessing"
+                ),
                 confidence=0.7,
+                addressed_friction_types=["repeated-failure", "quality-rejection"],
             ),
         ],
-        friction_events=events,
+        friction_types=friction_types,
         session_ids=list(step_id_pool.keys()),
         skipped_session_ids=skipped,
         batch_count=1,
@@ -110,7 +129,7 @@ def _collect_step_ids(session_ids: list[str]) -> dict[str, list[str]]:
 def _pick_steps(
     pool: dict[str, list[str]], session_idx: int, start: int, count: int
 ) -> tuple[str, list[str]]:
-    """Pick consecutive step IDs from the pool for a mock event."""
+    """Pick consecutive step IDs from the pool for a mock example ref."""
     sids = list(pool.keys())
     sid = sids[session_idx % len(sids)]
     steps = pool[sid]
@@ -118,8 +137,8 @@ def _pick_steps(
     return sid, steps[actual_start : actual_start + count]
 
 
-def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
-    """Build mock friction events with user-centric friction types."""
+def _build_mock_types(pool: dict[str, list[str]]) -> list[FrictionType]:
+    """Build mock friction types with user-centric categories."""
     if not pool:
         return []
 
@@ -132,83 +151,85 @@ def _build_mock_events(pool: dict[str, list[str]]) -> list[FrictionEvent]:
     sid_5, steps_5 = _pick_steps(pool, 4 % n, 6, 3)
 
     return [
-        FrictionEvent(
-            friction_type="scope-violation",
-            span_ref=StepRef(
-                session_id=sid_3,
-                start_step_id=steps_3[0],
-                end_step_id=steps_3[-1] if len(steps_3) > 1 else None,
-            ),
-            severity=5,
-            user_intention="Fix the login button CSS alignment",
+        FrictionType(
+            type_name="scope-violation",
             description=(
-                "Agent fixed CSS but also refactored the entire"
+                "User wanted CSS alignment fix but agent refactored the entire"
                 " component, breaking existing tests."
             ),
+            severity=5,
+            example_refs=[
+                StepRef(
+                    session_id=sid_3,
+                    start_step_id=steps_3[0],
+                    end_step_id=steps_3[-1] if len(steps_3) > 1 else None,
+                ),
+            ],
             friction_cost=FrictionCost(
                 affected_steps=4, affected_tokens=18000, affected_time_seconds=120
             ),
         ),
-        FrictionEvent(
-            friction_type="misunderstood-intent",
-            span_ref=StepRef(
-                session_id=sid_1,
-                start_step_id=steps_1[0],
-                end_step_id=steps_1[-1] if len(steps_1) > 1 else None,
+        FrictionType(
+            type_name="misunderstood-intent",
+            description=(
+                "User asked for incremental JWT migration but agent"
+                " rewrote the entire auth module from scratch."
             ),
             severity=4,
-            user_intention="Refactor auth module to use JWT tokens instead of session cookies",
-            description=(
-                "Agent rewrote the entire auth module from scratch"
-                " instead of migrating incrementally."
-            ),
+            example_refs=[
+                StepRef(
+                    session_id=sid_1,
+                    start_step_id=steps_1[0],
+                    end_step_id=steps_1[-1] if len(steps_1) > 1 else None,
+                ),
+            ],
             friction_cost=FrictionCost(
                 affected_steps=3, affected_tokens=12000, affected_time_seconds=90
             ),
         ),
-        FrictionEvent(
-            friction_type="quality-rejection",
-            span_ref=StepRef(
-                session_id=sid_2,
-                start_step_id=steps_2[0],
-                end_step_id=steps_2[-1] if len(steps_2) > 1 else None,
+        FrictionType(
+            type_name="quality-rejection",
+            description=(
+                "User wanted simple Pydantic validators but agent"
+                " added overly complex custom validation logic."
             ),
             severity=3,
-            user_intention="Add input validation to the API endpoint",
-            description=(
-                "Agent added overly complex validation when user"
-                " wanted simple Pydantic validators."
-            ),
+            example_refs=[
+                StepRef(
+                    session_id=sid_2,
+                    start_step_id=steps_2[0],
+                    end_step_id=steps_2[-1] if len(steps_2) > 1 else None,
+                ),
+            ],
             friction_cost=FrictionCost(
                 affected_steps=2, affected_tokens=6500, affected_time_seconds=45
             ),
         ),
-        FrictionEvent(
-            friction_type="repeated-failure",
-            span_ref=StepRef(
-                session_id=sid_5,
-                start_step_id=steps_5[0],
-                end_step_id=steps_5[-1] if len(steps_5) > 1 else None,
+        FrictionType(
+            type_name="repeated-failure",
+            description=(
+                "User pointed out fixture issue but agent fixed"
+                " the wrong assertion three times before understanding."
             ),
             severity=3,
-            user_intention="Run the test suite and fix the failing test",
-            description=(
-                "Agent fixed the wrong assertion three times before"
-                " user pointed out the fixture issue."
-            ),
+            example_refs=[
+                StepRef(
+                    session_id=sid_5,
+                    start_step_id=steps_5[0],
+                    end_step_id=steps_5[-1] if len(steps_5) > 1 else None,
+                ),
+            ],
             friction_cost=FrictionCost(
                 affected_steps=3, affected_tokens=9500, affected_time_seconds=60
             ),
         ),
-        FrictionEvent(
-            friction_type="abandoned-task",
-            span_ref=StepRef(
-                session_id=sid_4,
-                start_step_id=steps_4[0],
-            ),
+        FrictionType(
+            type_name="abandoned-task",
+            description="User gave up on generating TypeScript types from the OpenAPI spec.",
             severity=2,
-            user_intention="Generate TypeScript types from the OpenAPI spec",
-            description="",
+            example_refs=[
+                StepRef(session_id=sid_4, start_step_id=steps_4[0]),
+            ],
             friction_cost=FrictionCost(
                 affected_steps=1, affected_tokens=2000, affected_time_seconds=15
             ),

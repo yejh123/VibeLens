@@ -1,8 +1,8 @@
 """Friction service — user-centric multi-session LLM-powered friction analysis.
 
 Pipeline: load sessions → extract context → build batches →
-concurrent LLM inference → optional synthesis → validate span_refs →
-compute friction_cost per event → persist → cache.
+concurrent LLM inference → optional synthesis → validate example_refs →
+compute friction_cost per type → persist → cache.
 """
 
 import hashlib
@@ -24,8 +24,9 @@ from vibelens.models.analysis.friction import (
     FrictionAnalysisOutput,
     FrictionAnalysisResult,
     FrictionCost,
-    FrictionEvent,
+    FrictionType,
 )
+from vibelens.models.analysis.step_ref import StepRef
 from vibelens.models.context import SessionContextBatch
 from vibelens.models.llm.inference import InferenceRequest
 from vibelens.models.trajectories import Trajectory
@@ -102,7 +103,7 @@ async def analyze_friction(
         session_token: Browser tab token for upload scoping.
 
     Returns:
-        FrictionAnalysisResult with identified events and mitigations.
+        FrictionAnalysisResult with identified friction types and mitigations.
 
     Raises:
         ValueError: If no sessions could be loaded.
@@ -152,8 +153,8 @@ async def analyze_friction(
         )
         total_cost += syn_cost
 
-    # Step 3: Resolve synthetic step indices, validate span_refs, compute friction_cost
-    validated_events = _validate_and_enrich(analysis_output.friction_events, context_set)
+    # Step 3: Validate example_refs and compute friction_cost per type
+    validated_types = _validate_and_enrich(analysis_output.friction_types, context_set)
 
     duration = round(time.monotonic() - start_time, 2)
     friction_result = FrictionAnalysisResult(
@@ -161,7 +162,7 @@ async def analyze_friction(
         user_profile=analysis_output.user_profile,
         summary=analysis_output.summary,
         mitigations=analysis_output.mitigations,
-        friction_events=validated_events,
+        friction_types=validated_types,
         session_ids=context_set.session_ids,
         skipped_session_ids=context_set.skipped_session_ids,
         warnings=batch_warnings,
@@ -255,22 +256,29 @@ async def _synthesize_friction_analysis(
             "title": output.title,
             "user_profile": output.user_profile,
             "summary": output.summary,
-            "friction_events": [
+            "friction_types": [
                 {
-                    "friction_type": e.friction_type,
-                    "severity": e.severity,
-                    "user_intention": e.user_intention,
-                    "description": e.description,
-                    "span_ref": {
-                        "session_id": e.span_ref.session_id,
-                        "start_step_id": e.span_ref.start_step_id,
-                        "end_step_id": e.span_ref.end_step_id,
-                    },
+                    "type_name": ft.type_name,
+                    "severity": ft.severity,
+                    "description": ft.description,
+                    "example_refs": [
+                        {
+                            "session_id": ref.session_id,
+                            "start_step_id": ref.start_step_id,
+                            "end_step_id": ref.end_step_id,
+                        }
+                        for ref in ft.example_refs
+                    ],
                 }
-                for e in output.friction_events
+                for ft in output.friction_types
             ],
             "mitigations": [
-                {"title": m.title, "action": m.action, "confidence": m.confidence}
+                {
+                    "title": m.title,
+                    "action": m.action,
+                    "rationale": m.rationale,
+                    "confidence": m.confidence,
+                }
                 for m in output.mitigations
             ],
         }
@@ -304,80 +312,117 @@ async def _synthesize_friction_analysis(
 
 
 def _validate_and_enrich(
-    events: list[FrictionEvent], context_set: SessionContextBatch
-) -> list[FrictionEvent]:
-    """Resolve synthetic step indices, validate span_refs, and enrich events.
+    friction_types: list[FrictionType], context_set: SessionContextBatch
+) -> list[FrictionType]:
+    """Validate example_refs and compute friction_cost per type.
 
-    Pipeline per event: resolve → validate → clamp severity → compute friction_cost.
+    Pipeline per type: resolve refs → drop invalid → clamp severity → compute cost.
 
     Args:
-        events: Friction events from LLM output (with synthetic step indices).
+        friction_types: Friction types from LLM output (with synthetic step indices).
         context_set: SessionContextBatch with trajectories and step index maps.
 
     Returns:
-        List of validated and enriched FrictionEvents, sorted by severity descending.
+        List of validated and enriched FrictionTypes, sorted by severity descending.
     """
-    validated: list[FrictionEvent] = []
-    for event in events:
-        valid_ref = context_set.resolve_step_ref(event.span_ref)
-        if valid_ref is None:
+    validated: list[FrictionType] = []
+    for ft in friction_types:
+        valid_refs: list[StepRef] = []
+        for ref in ft.example_refs:
+            resolved = context_set.resolve_step_ref(ref)
+            if resolved is not None:
+                valid_refs.append(resolved)
+
+        if not valid_refs:
             continue
 
-        event.span_ref = valid_ref
+        ft.example_refs = valid_refs
 
         # Clamp severity to valid range
-        if event.severity < 1 or event.severity > 5:
-            clamped = max(1, min(5, event.severity))
+        if ft.severity < 1 or ft.severity > 5:
+            clamped = max(1, min(5, ft.severity))
             logger.warning(
-                "Clamping severity %d → %d on event [%s]",
-                event.severity,
+                "Clamping severity %d → %d on type [%s]",
+                ft.severity,
                 clamped,
-                event.friction_type,
+                ft.type_name,
             )
-            event.severity = clamped
+            ft.severity = clamped
 
-        event.friction_cost = _compute_event_cost(event, context_set.all_trajectories)
-        validated.append(event)
+        ft.friction_cost = _compute_type_cost(ft.example_refs, context_set.all_trajectories)
+        validated.append(ft)
 
-    dropped_count = len(events) - len(validated)
+    dropped_count = len(friction_types) - len(validated)
     if dropped_count > 0:
         logger.info(
-            "Validation: %d/%d events passed, %d dropped",
+            "Validation: %d/%d types passed, %d dropped",
             len(validated),
-            len(events),
+            len(friction_types),
             dropped_count,
         )
 
-    validated.sort(key=lambda e: e.severity, reverse=True)
+    validated.sort(key=lambda ft: ft.severity, reverse=True)
     return validated
 
 
-def _compute_event_cost(event: FrictionEvent, trajectories: list[Trajectory]) -> FrictionCost:
-    """Compute cost from step span metrics.
+def _compute_type_cost(
+    example_refs: list[StepRef], trajectories: list[Trajectory]
+) -> FrictionCost:
+    """Compute aggregate cost from all example_refs spans.
 
-    Finds steps between start_step_id and end_step_id in matching trajectory,
-    then computes affected_steps, affected_tokens, and affected_time_seconds.
+    For each ref, finds the matching trajectory and walks steps to compute
+    affected_steps, affected_tokens, and affected_time_seconds. Sums across
+    all refs since each span represents independent wasted effort.
 
     Args:
-        event: Friction event with span_ref.
+        example_refs: Step span references for this friction type.
         trajectories: All loaded trajectories.
 
     Returns:
-        Computed FrictionCost.
+        Aggregated FrictionCost across all spans.
     """
-    span_ref = event.span_ref
-    target_sid = span_ref.session_id
+    total_steps = 0
+    total_tokens = 0
+    has_any_metrics = False
+    total_time = 0
+    has_any_time = False
 
+    for ref in example_refs:
+        span_cost = _compute_span_cost(ref, trajectories)
+        total_steps += span_cost.affected_steps
+        if span_cost.affected_tokens is not None:
+            has_any_metrics = True
+            total_tokens += span_cost.affected_tokens
+        if span_cost.affected_time_seconds is not None:
+            has_any_time = True
+            total_time += span_cost.affected_time_seconds
+
+    return FrictionCost(
+        affected_steps=total_steps,
+        affected_tokens=total_tokens if has_any_metrics else None,
+        affected_time_seconds=total_time if has_any_time else None,
+    )
+
+
+def _compute_span_cost(span_ref: StepRef, trajectories: list[Trajectory]) -> FrictionCost:
+    """Compute cost for a single step span.
+
+    Args:
+        span_ref: Step span reference.
+        trajectories: All loaded trajectories.
+
+    Returns:
+        FrictionCost for this single span.
+    """
     target_traj = None
     for t in trajectories:
-        if t.session_id == target_sid:
+        if t.session_id == span_ref.session_id:
             target_traj = t
             break
 
     if not target_traj:
         return FrictionCost(affected_steps=0)
 
-    # Walk all steps to find the start/end indices of the friction span
     start_idx = None
     end_idx = None
     for i, step in enumerate(target_traj.steps):

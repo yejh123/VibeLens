@@ -18,17 +18,14 @@ Analyze the provided session transcripts to:
 ## Pattern Detection Rules
 
 - A pattern must appear at least 2 times across sessions to be reported.
-- Every pattern MUST have a short, readable `title` (e.g. "Search-Read-Edit Cycle", "Test-Fix Loop"). This is shown to users as the pattern heading.
-- Every pattern MUST have a `description` with more detail about what the pattern involves.
 - `example_refs` must reference real step IDs from the session data. Never fabricate.
-- Each `example_ref` needs `session_id` and `start_step_id` pointing to a real step. Optionally include `end_step_id` for multi-step ranges.
 - NEVER reference sessions by ID, index, or UUID in text fields (summary, description, rationale, user_profile). Describe patterns in general terms that readers can understand without session context.
 
 ## Recommendation Rules
 
 - Only recommend skills from the provided candidate list that genuinely address a detected pattern. Do not pad the list.
-- `confidence` ranges from 0.0 to 1.0: 0.8+ = strong match, 0.5-0.8 = moderate, below 0.5 = weak.
-- If no skill candidates match, return an empty recommendations list.
+- `confidence` scale: 0.8+ = strong match, 0.5-0.8 = moderate, below 0.5 = weak.
+- If no skill candidates match, return an empty `recommendations` list.
 - Prefer skills that address high-frequency or high-pain patterns.
 
 ## Output Rules

@@ -145,20 +145,20 @@ def _run_friction_analysis(label: str, groups: dict[str, list[Trajectory]]) -> N
 
         if batch_output:
             all_outputs.append(batch_output)
-            print(f"  Events: {len(batch_output.friction_events)}")
+            print(f"  Types: {len(batch_output.friction_types)}")
             print(f"  Summary: {len(batch_output.summary)} chars")
-            if batch_output.friction_events:
-                for event in batch_output.friction_events:
+            if batch_output.friction_types:
+                for ft in batch_output.friction_types:
                     print(
-                        f"    [{event.severity}] {event.friction_type}"
-                        f" — {event.user_intention[:80]}..."
+                        f"    [{ft.severity}] {ft.type_name}"
+                        f" — {ft.description[:80]}..."
                     )
         else:
             print(f"  PARSE ERROR: {parse_error}")
             print(f"  Raw output (first 500):\n{raw_text[:500]}")
 
     # Summary
-    total_events = sum(len(o.events) for o in all_outputs)
+    total_events = sum(len(o.friction_types) for o in all_outputs)
     print("\n  --- Summary ---")
     print(f"  Total events: {total_events}")
     print(f"  Total cost: ${total_cost:.4f}")

@@ -46,56 +46,64 @@ UPLOAD_COMMANDS: dict[str, dict[str, dict[str, str]]] = {
     AgentType.CLAUDE_CODE: {
         "macos": {
             "command": (
-                "cd ~/.claude && zip -r claude-data.zip projects/ -x '**/._*' '**/__MACOSX/*'"
+                "cd ~/.claude && zip -r ~/Desktop/claude-data.zip projects/"
+                " -x '**/._*' '**/__MACOSX/*'"
             ),
-            "description": "Output: ~/.claude/claude-data.zip",
+            "description": "Output: ~/Desktop/claude-data.zip",
         },
         "linux": {
-            "command": "cd ~/.claude && zip -r claude-data.zip projects/",
-            "description": "Output: ~/.claude/claude-data.zip",
+            "command": "cd ~/.claude && zip -r ~/Desktop/claude-data.zip projects/",
+            "description": "Output: ~/Desktop/claude-data.zip",
         },
         "windows": {
             "command": (
                 "cd $env:USERPROFILE\\.claude; Compress-Archive -Path projects\\*"
-                " -DestinationPath claude-data.zip"
+                " -DestinationPath $env:USERPROFILE\\Desktop\\claude-data.zip"
             ),
-            "description": "Output: ~\\.claude\\claude-data.zip",
+            "description": "Output: Desktop\\claude-data.zip",
         },
     },
     AgentType.CODEX: {
         "macos": {
             "command": (
-                "cd ~/.codex && zip -r codex-data.zip sessions/ -x '**/._*' '**/__MACOSX/*'"
+                "cd ~/.codex && zip -r ~/Desktop/codex-data.zip sessions/"
+                " -x '**/._*' '**/__MACOSX/*'"
             ),
-            "description": "Output: ~/.codex/codex-data.zip",
+            "description": "Output: ~/Desktop/codex-data.zip",
         },
         "linux": {
-            "command": "cd ~/.codex && zip -r codex-data.zip sessions/",
-            "description": "Output: ~/.codex/codex-data.zip",
+            "command": "cd ~/.codex && zip -r ~/Desktop/codex-data.zip sessions/",
+            "description": "Output: ~/Desktop/codex-data.zip",
         },
         "windows": {
             "command": (
                 "cd $env:USERPROFILE\\.codex; Compress-Archive -Path sessions\\*"
-                " -DestinationPath codex-data.zip"
+                " -DestinationPath $env:USERPROFILE\\Desktop\\codex-data.zip"
             ),
-            "description": "Output: ~\\.codex\\codex-data.zip",
+            "description": "Output: Desktop\\codex-data.zip",
         },
     },
     AgentType.GEMINI: {
         "macos": {
-            "command": "cd ~/.gemini && zip -r gemini-data.zip tmp/ -i '*.json' -i '.project_root'",
-            "description": "Output: ~/.gemini/gemini-data.zip",
+            "command": (
+                "cd ~/.gemini && zip -r ~/Desktop/gemini-data.zip tmp/"
+                " -i '*.json' -i '.project_root'"
+            ),
+            "description": "Output: ~/Desktop/gemini-data.zip",
         },
         "linux": {
-            "command": "cd ~/.gemini && zip -r gemini-data.zip tmp/ -i '*.json' -i '.project_root'",
-            "description": "Output: ~/.gemini/gemini-data.zip",
+            "command": (
+                "cd ~/.gemini && zip -r ~/Desktop/gemini-data.zip tmp/"
+                " -i '*.json' -i '.project_root'"
+            ),
+            "description": "Output: ~/Desktop/gemini-data.zip",
         },
         "windows": {
             "command": (
                 "cd $env:USERPROFILE\\.gemini; Compress-Archive -Path tmp\\*"
-                " -DestinationPath gemini-data.zip"
+                " -DestinationPath $env:USERPROFILE\\Desktop\\gemini-data.zip"
             ),
-            "description": "Output: ~\\.gemini\\gemini-data.zip",
+            "description": "Output: Desktop\\gemini-data.zip",
         },
     },
     AgentType.CLAUDE_CODE_WEB: {

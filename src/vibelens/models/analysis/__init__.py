@@ -5,7 +5,7 @@ from vibelens.models.analysis.friction import (
     FrictionAnalysisOutput,
     FrictionAnalysisResult,
     FrictionCost,
-    FrictionEvent,
+    FrictionType,
     Mitigation,
 )
 from vibelens.models.analysis.phase import PhaseSegment
@@ -33,7 +33,7 @@ __all__ = [
     "FrictionAnalysisOutput",
     "FrictionAnalysisResult",
     "FrictionCost",
-    "FrictionEvent",
+    "FrictionType",
     "Mitigation",
     "ModelPricing",
     "PhaseSegment",

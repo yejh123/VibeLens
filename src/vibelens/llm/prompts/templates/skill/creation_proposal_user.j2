@@ -12,17 +12,4 @@ The user already has these skills installed. Do NOT propose skills that duplicat
 {% endfor %}
 {% endif %}
 
-For every workflow pattern, provide:
-- `title`: Short, readable pattern name.
-- `description`: What the pattern does and when it occurs.
-- `example_refs`: StepRef objects with `session_id` and `start_step_id` pointing to real occurrences. Optionally include `end_step_id` for multi-step ranges.
-
-For every proposal, provide:
-- `skill_name`: Kebab-case skill name (e.g., `test-driven-fix`).
-- `description`: Specific trigger description. State what the skill does AND when it activates.
-- `rationale`: One-sentence conclusion + 1-2 bullet points starting with '- '. Max 50 words.
-- `addressed_patterns`: List of pattern titles this proposal addresses.
-
-After patterns and proposals, provide:
-- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
-- `user_profile`: Brief description of the user's working style and preferences.
+Provide `title`, `user_profile`, workflow patterns with real `example_refs`, `summary`, and skill proposals.

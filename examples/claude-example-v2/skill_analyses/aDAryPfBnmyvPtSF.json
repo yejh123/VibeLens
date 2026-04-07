@@ -115,7 +115,7 @@
   "creations": [],
   "evolutions": [],
   "summary": "Recipe book site build reveals strong skill automation candidates.\n- 5 workflow patterns detected across plan-driven scaffolding and visual iteration\n- Parallel file creation (9 files) and screenshot-feedback loops are most frequent\n- Frontend-design and blueprint skills address the core patterns most directly",
-  "user_profile": "Frontend developer building static websites with emphasis on visual polish. Uses plan mode for project scoping, Playwright for visual verification, and iterates based on visual feedback and user-reported bugs.",
+  "user_profile": "Frontend developer building static websites with emphasis on visual polish.\n- Uses plan mode for scoping and Playwright for visual verification\n- Iterates based on visual feedback and user-reported bugs",
   "warnings": [],
   "backend_id": "claude-cli",
   "model": "claude-haiku-4-5",

@@ -6,27 +6,20 @@ The reader is a developer who used a coding agent and wants to understand where 
 
 ## Your Task
 
-Produce a JSON object with:
+Produce a JSON object that synthesizes all batch results into a single user-facing report:
 
-1. **title**: A clear, reader-friendly title (max 8 words) capturing the dominant friction theme. Examples: "Scope Violations Across Test Writing", "Repeated Misunderstandings During Refactoring".
-
-2. **user_profile**: A concise summary of the user's working style and project focus (max 50 words). Merge profiles from all batches into one coherent description.
-
-3. **summary**: One-sentence conclusion followed by 2-4 bullet points starting with '- '. Max 100 words. Focus on the 1-2 biggest patterns, not every detail. Write for someone who cannot remember every interaction. Never reference batches, chunks, or internal processing.
-
-4. **friction_events**: Deduplicated and merged list of the most important friction events across all batches. Keep at most 5. Prefer higher severity and recurring patterns. If two events from different batches describe the same issue, merge them (keep the most representative span_ref).
-
-5. **mitigations**: 0-5 highest-impact actionable recommendations across all sessions. Each must have `title` (max 8 words), `action` (max 30 words, specific and actionable), and `confidence` (0.0-1.0). Deduplicate similar recommendations from different batches.
+1. **title**: Capture the dominant friction theme across all batches.
+2. **user_profile**: Merge profiles from all batches into one coherent description.
+3. **friction_types**: Deduplicated and merged. Keep at most 5. Prefer higher severity and recurring patterns. If two types from different batches share the same `type_name`, merge them into one entry and combine their `example_refs`.
+4. **summary**: Focus on the 1-2 biggest patterns, not every detail. Write for someone who cannot remember every interaction. Never reference batches, chunks, or internal processing.
+5. **mitigations**: 0-5 highest-impact recommendations. Deduplicate similar recommendations from different batches.
 
 ## Output Rules
 
-**CRITICAL: Your entire response must be a single JSON object starting with `{` and ending with `}`. Do NOT wrap it in ```json code fences. No markdown, no prose, no explanation before or after — only raw JSON.**
+**CRITICAL: Your entire response must be a single JSON object starting with `{` and ending with `}`. No markdown fences, no prose, no explanation.**
 
-- `title`: Max 8 words. Clear, reader-friendly, specific.
-- `user_profile`: Max 50 words. Coherent merged profile.
-- `summary`: One-sentence conclusion + 2-4 bullet points. Max 100 words.
-- `friction_events`: At most 5, ordered by severity descending.
-- `mitigations`: 0-5 items, ordered by confidence descending.
+- `friction_types` ordered by severity descending.
+- `mitigations` ordered by confidence descending.
 
 ## Output Schema
 

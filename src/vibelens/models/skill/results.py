@@ -30,6 +30,19 @@ class SkillAnalysisResult(BaseModel):
     title: str = Field(
         default="", description="Clear, reader-friendly analysis title. Max 8 words."
     )
+    summary: str = Field(
+        description=(
+            "One-sentence conclusion followed by 2-4 bullet points "
+            "starting with '- '. Max 100 words."
+        )
+    )
+    user_profile: str = Field(
+        default="",
+        description=(
+            "One-sentence role summary followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        ),
+    )
     workflow_patterns: list[WorkflowPattern] = Field(
         default_factory=list, description="Detected workflow patterns from trajectory analysis."
     )
@@ -42,13 +55,6 @@ class SkillAnalysisResult(BaseModel):
     evolutions: list[SkillEvolution] = Field(
         default_factory=list, description="Evolution suggestions (evolution mode)."
     )
-    summary: str = Field(
-        description=(
-            "One-sentence conclusion followed by 2-4 bullet points "
-            "starting with '- '. Max 100 words."
-        )
-    )
-    user_profile: str = Field(default="", description="Detected user workflow style.")
     backend_id: BackendType = Field(description="Inference backend used.")
     model: str = Field(description="Model identifier.")
     created_at: str = Field(description="ISO timestamp of analysis completion.")

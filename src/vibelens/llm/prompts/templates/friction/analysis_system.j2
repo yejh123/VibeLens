@@ -20,14 +20,14 @@ Friction is detected ONLY from user signals:
 - Agent takes longer than necessary → not friction (unless user notices and objects)
 - Agent makes internal mistakes it self-corrects → not friction (user never saw the issue)
 
-## Event Selection Priority
+## Friction Type Selection
 
 **Focus on HIGH-IMPACT, RECURRING patterns — not one-off minor hiccups.**
 
 - **Prefer severity ≥ 3** — Report moderate-to-critical friction. Only include severity 1-2 if they represent a pattern that recurs across multiple sessions.
 - **Prefer recurring patterns** — A friction type that happens 3 times across sessions is more valuable. Patterns are actionable; flukes are not.
-- **Prefer events with clear mitigations** — If a friction event cannot be addressed by updating CLAUDE.md, writing a test, or creating a skill, it has low report value.
-- **Merge minor events** — If 3 minor events share the same friction type and root cause, report one event with the most representative span_ref.
+- **Prefer types with clear mitigations** — If a friction type cannot be addressed by updating CLAUDE.md, writing a test, or creating a skill, it has low report value.
+- **Group by type** — If multiple occurrences share the same friction type and root cause, report ONE friction_types entry with multiple example_refs.
 - **Skip noise** — Do NOT report trivial corrections (typo fixes, formatting preferences) or single-exchange misunderstandings that the agent resolved immediately.
 
 ## User Feedback Signals
@@ -89,26 +89,13 @@ User stops trying after multiple failed attempts. Evidence: user says "never min
 - **4 — High**: User takes over manually, reverts agent work, or spends significant effort redirecting.
 - **5 — Critical**: User abandons the task, loses work due to agent actions, or session becomes unproductive.
 
-## Mitigation Rules
-
-Each mitigation must be structured with:
-- `title`: Short heading for the mitigation (max 8 words).
-- `action`: How to address the friction (max 30 words). Be specific and actionable.
-- `confidence`: How confident you are this will help (0.0-1.0).
-
 ## Output Rules
 
 **CRITICAL: Your entire response must be a single JSON object. No markdown, no prose, no explanation — only raw JSON.**
 
-- `title`: Clear, reader-friendly title capturing the main theme (max 8 words)
-- `user_profile`: User's working style and project focus (max 50 words)
-- `friction_events[].user_intention`: What the user wanted (max 15 words, NO step IDs)
-- `friction_events[].description`: Why the agent failed (max 20 words, or empty if self-evident)
-- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
-- `mitigations[].title`: Short heading (max 8 words)
-- `mitigations[].action`: Specific, actionable recommendation (max 30 words)
-- `mitigations[].confidence`: 0.0-1.0 confidence this will help
-- If sessions have zero friction, return `{"title": "No Issues Found", "user_profile": "", "summary": "No friction detected.", "friction_events": [], "mitigations": []}`
+- Report at most 5 friction types and 5 mitigations.
+- Each mitigation's `addressed_friction_types` must reference at least one `type_name` present in `friction_types`.
+- If sessions have zero friction, return `{"title": "No Issues Found", "user_profile": "", "summary": "No friction detected.", "friction_types": [], "mitigations": []}`.
 
 ## Output Schema
 

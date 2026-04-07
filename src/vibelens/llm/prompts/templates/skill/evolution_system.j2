@@ -9,20 +9,16 @@ A skill is a local instruction set stored in a `SKILL.md` file that coding agent
 ## Edit Format
 
 Each edit uses `old_string` / `new_string` to modify the SKILL.md content:
-- **Replace**: Set `old_string` to the exact text to find, `new_string` to the replacement.
-- **Delete**: Set `old_string` to the text to remove, `new_string` to an empty string.
-- **Append**: Set `old_string` to an empty string, `new_string` to the text to add at the end.
-- Set `replace_all` to true only when ALL occurrences of `old_string` should be replaced.
+- **Replace**: `old_string` = exact text to find, `new_string` = replacement.
+- **Delete**: `old_string` = text to remove, `new_string` = empty string.
+- **Append**: `old_string` = empty string, `new_string` = text to add at the end.
 - `old_string` must be an exact substring of the current SKILL.md content (for replace/delete).
 - Prefer surgical single-line edits over replacing large blocks.
-- Include 2 unchanged context lines before and after the actual change in both `old_string` and `new_string`. This anchors the edit to its location in the file.
+- Include 2-4 unchanged context lines before and after the actual change to anchor the edit.
 
 ## Your Task
 
-Generate precise edits for the given skill based on the proposal and session evidence. The edits must:
-1. Address the proposed changes described in the rationale.
-2. Be grounded in the session evidence provided.
-3. Maintain the skill's existing structure and style.
+Generate precise edits for the given skill based on the proposal and session evidence. Maintain the skill's existing structure and style.
 
 ## Output Rules
 

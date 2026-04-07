@@ -6,17 +6,9 @@ Analyze {{ session_count }} coding agent session{{ "s" if session_count != 1 els
 
 You MUST stay within the output token limit. Be concise.
 
-- `title`: Max 8 words. Clear, reader-friendly. Capture the dominant friction theme.
-- `user_profile`: Max 50 words. Describe the user's working style and project focus.
-- Report **at most 5** friction events, strictly prioritized by severity AND recurrence. Prefer recurring patterns (same friction type across sessions) over one-off events.
-- **Minimum severity 2** — Do NOT report severity-1 events unless they recur 3+ times.
-- Merge events that share the same friction_type and root cause into a single event with the most representative span_ref.
-- `friction_events[].friction_type`: Kebab-case label from the taxonomy.
-- `friction_events[].span_ref`: session_id + start_step_id + end_step_id referencing where friction occurs. These MUST be the 0-indexed IDs from the session transcript.
-- `friction_events[].severity`: 1-5 using the user-impact severity scale.
-- `friction_events[].user_intention`: Max 15 words. What the user wanted (plain language, NO step IDs).
-- `friction_events[].description`: Max 20 words. Why the agent failed (or empty string).
-- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words total.
-- `mitigations`: 0-5 actionable recommendations. Each with `title` (max 8 words), `action` (max 30 words, specific and actionable), and `confidence` (0.0-1.0). Every friction event SHOULD have a corresponding mitigation.
+- Report **at most 5** friction types, strictly prioritized by severity AND recurrence. Prefer recurring patterns (same type across sessions) over one-off occurrences.
+- **Minimum severity 2** — Do NOT report severity-1 types unless they recur 3+ times.
+- Group occurrences that share the same friction type and root cause into a single `friction_types` entry with multiple `example_refs`.
+- Every friction type SHOULD have a corresponding mitigation.
 
 **Respond with raw JSON only. No markdown fences, no prose.**

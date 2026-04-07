@@ -99,7 +99,7 @@
     }
   ],
   "summary": "Two installed skills need targeted improvements based on static site workflow.\n- Frontend-design lacks CSS architecture patterns and an interactive element checklist\n- Webapp-testing needs structured Playwright templates and interaction smoke tests\n- Both gaps caused real friction: broken modal close and manual screenshot iteration",
-  "user_profile": "Frontend developer building polished static websites. Uses plan mode for scoping, iterates through visual screenshots, and expects production-quality design. Hits UI interaction bugs that systematic testing could prevent.",
+  "user_profile": "Frontend developer building polished static websites.\n- Uses plan mode for scoping and iterates through visual screenshots\n- Hits UI interaction bugs that systematic testing could prevent",
   "warnings": [],
   "backend_id": "claude-cli",
   "model": "claude-haiku-4-5",

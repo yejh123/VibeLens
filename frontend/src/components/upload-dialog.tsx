@@ -275,9 +275,6 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
                   <p className="text-sm text-zinc-300">
                     Run this command in your terminal, then upload the zip.
                   </p>
-                  {commands?.description && (
-                    <p className="text-xs text-zinc-500">{commands.description}</p>
-                  )}
                   {commandLoading ? (
                     <div className="flex items-center justify-center py-4 bg-zinc-950 border border-zinc-800 rounded-lg">
                       <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
@@ -293,6 +290,9 @@ export function UploadDialog({ onClose, onComplete }: UploadDialogProps) {
                         </div>
                       )}
                     </div>
+                  )}
+                  {commands?.description && (
+                    <p className="text-sm text-zinc-300">{commands.description}</p>
                   )}
                 </div>
               )}

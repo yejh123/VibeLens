@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.24] - 2026-04-07
+
+### Changed
+- **Friction panel redesigned**: Productivity Tips (MitigationCard) restyled as sectioned cards with title, action, "Why This is Useful" rationale, and expandable "Addressed Issues" with step reference links. Added `rationale` field to `Mitigation` model.
+- **Issues Found cards**: Boxed card layout with severity badge left of title, description always visible, and clickable whole-block toggle for Details section showing Impact (steps, duration, tokens) and Reference step links.
+- **Workflow Patterns cards**: Redesigned to match Issues Found style with frequency badge left of title, description visible, whole-block clickable toggle for Reference links.
+- **Unified Reference style**: Both friction and skill analyses now use the same enlarged Reference label (`text-sm`, `w-4 h-4` icon) and step buttons (`text-xs`, `px-3 py-1.5`).
+- **Impact section**: Added "Impact:" highlight title with Zap icon and concise tooltips ("Steps affected", "Duration affected", "Tokens affected") replacing verbose descriptions.
+- **Friction type names enlarged**: `text-sm` to `text-base` in both Issues Found cards and Addressed Issues within MitigationCards.
+- **`user_profile` bullet format**: Propagated "one-sentence + bullet points" format across all friction and skill models, prompt templates, mock data, and example JSONs.
+- **Tab persistence**: Personalization sub-tab selection saved to localStorage and respected during demo auto-load.
+- **Enlarged font sizes**: Skill names, card titles, section labels ("Why This is Useful", "Addressed Issues") enlarged from `text-xs`/`text-sm` to `text-sm`/`text-base`.
+- **Legacy friction migration removed**: All `model_validator` migration methods and `Any`/`model_validator` imports removed from `friction.py`. Example data updated to new `friction_types` format.
+
 ## [0.9.23] - 2026-04-07
 
 ### Changed

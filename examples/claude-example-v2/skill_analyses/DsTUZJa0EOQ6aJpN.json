@@ -113,7 +113,7 @@
   ],
   "evolutions": [],
   "summary": "Two strong skill candidates emerged from the recipe site build.\n- Static-site-scaffold eliminates manual 9-file creation with consistent project structures\n- Visual-review-loop formalizes deploy-screenshot-feedback-fix with a pre-deployment checklist\n- 5 workflow patterns detected: scaffolding, file creation, screenshot loops, research, bug fixing",
-  "user_profile": "Frontend-focused developer building static websites. Relies on plan mode for project scoping, iterates through visual screenshots, and expects polished design with curated imagery. Values working demos over documentation.",
+  "user_profile": "Frontend-focused developer building static websites.\n- Relies on plan mode for scoping and iterates through visual screenshots\n- Expects polished design with curated imagery over documentation",
   "warnings": [],
   "backend_id": "claude-cli",
   "model": "claude-haiku-4-5",

@@ -4,7 +4,7 @@ Friction = user dissatisfaction. If the user moves on without complaint,
 there is no friction — even if the agent read 20 files.
 
 Model hierarchy:
-- FrictionEvent: LLM-detected friction with computed cost
+- FrictionType: LLM-detected friction category with computed cost
 - FrictionAnalysisOutput: LLM output model (batch and synthesis)
 - FrictionAnalysisResult: Final merged result across all batches
 """
@@ -17,27 +17,30 @@ from vibelens.models.trajectories.metrics import Metrics
 
 
 class FrictionCost(BaseModel):
-    """Computed from step span — NOT LLM-generated."""
+    """Computed from example_refs spans — NOT LLM-generated."""
 
-    affected_steps: int = Field(default=0, description="Count of steps in the friction span.")
+    affected_steps: int = Field(default=0, description="Total steps across all example spans.")
     affected_tokens: int | None = Field(
-        default=None, description="Sum of step metrics tokens in span."
+        default=None, description="Sum of step metrics tokens across all spans."
     )
     affected_time_seconds: int | None = Field(
-        default=None, description="Timestamp delta in seconds across span."
+        default=None, description="Sum of timestamp deltas across all spans."
     )
 
 
-class FrictionEvent(BaseModel):
-    """A single friction event detected by the LLM."""
+class FrictionType(BaseModel):
+    """A friction category detected by the LLM, with one or more examples."""
 
-    friction_type: str = Field(description="Kebab-case friction type from taxonomy.")
-    span_ref: StepRef = Field(description="Step span where this friction occurs.")
-    user_intention: str = Field(description="What the user wanted (max 15 words).")
-    description: str = Field(description="Why the agent failed to satisfy the user (max 20 words).")
+    type_name: str = Field(description="Kebab-case friction type from taxonomy.")
+    description: str = Field(
+        description="What the user wanted and how the agent performed differently (max 30 words)."
+    )
     severity: int = Field(description="Impact severity from 1 (minor) to 5 (critical).")
+    example_refs: list[StepRef] = Field(
+        default_factory=list, description="Step spans where this friction was observed."
+    )
     friction_cost: FrictionCost = Field(
-        default_factory=FrictionCost, description="Cost computed from step span metrics."
+        default_factory=FrictionCost, description="Aggregate cost computed from example_refs."
     )
 
 
@@ -45,7 +48,18 @@ class Mitigation(BaseModel):
     """A concrete, actionable recommendation to reduce friction."""
 
     title: str = Field(description="Short heading for the mitigation (max 8 words).")
+    addressed_friction_types: list[str] = Field(
+        default_factory=list,
+        description="Friction type slugs this mitigation addresses (e.g. 'scope-violation').",
+    )
     action: str = Field(description="How to address the friction (max 30 words).")
+    rationale: str = Field(
+        default="",
+        description=(
+            "One-sentence conclusion followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        ),
+    )
     confidence: float = Field(default=0.0, description="Confidence this will help. 0.0-1.0.")
 
 
@@ -56,16 +70,19 @@ class FrictionAnalysisOutput(BaseModel):
         description="Clear, reader-friendly title capturing the main theme. Max 8 words."
     )
     user_profile: str = Field(
-        description="User's working style and project focus (max 50 words)."
+        description=(
+            "One-sentence role summary followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        )
+    )
+    friction_types: list[FrictionType] = Field(
+        default_factory=list, description="0-5 friction type categories."
     )
     summary: str = Field(
         description=(
             "One-sentence conclusion followed by 2-4 bullet points "
             "starting with '- '. Max 100 words."
         )
-    )
-    friction_events: list[FrictionEvent] = Field(
-        default_factory=list, description="0-5 friction events."
     )
     mitigations: list[Mitigation] = Field(
         default_factory=list, description="0-5 actionable recommendations."
@@ -78,12 +95,15 @@ class FrictionAnalysisResult(BaseModel):
     analysis_id: str | None = Field(
         default=None, description="Persistence ID. Set when the result is saved to disk."
     )
+    session_ids: list[str] = Field(
+        description="Session IDs that were successfully loaded and analyzed."
+    )
+    skipped_session_ids: list[str] = Field(
+        default_factory=list, description="Session IDs from the request that were not found."
+    )
     title: str | None = Field(
         default=None,
         description="Clear, reader-friendly title from LLM. Max 8 words.",
-    )
-    user_profile: str | None = Field(
-        default=None, description="User's working style and project focus."
     )
     summary: str = Field(
         description=(
@@ -91,26 +111,29 @@ class FrictionAnalysisResult(BaseModel):
             "starting with '- '. Max 100 words."
         )
     )
+    user_profile: str | None = Field(
+        default=None,
+        description=(
+            "One-sentence role summary followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        ),
+    )
     mitigations: list[Mitigation] = Field(
         default_factory=list, description="Actionable recommendations sorted by confidence."
     )
-    friction_events: list[FrictionEvent] = Field(
-        default_factory=list, description="All friction events ordered by severity descending."
+    friction_types: list[FrictionType] = Field(
+        default_factory=list, description="Friction categories ordered by severity descending."
     )
-    session_ids: list[str] = Field(
-        description="Session IDs that were successfully loaded and analyzed."
+    backend_id: BackendType = Field(description="Inference backend used.")
+    model: str = Field(description="Model identifier.")
+    created_at: str = Field(description="ISO timestamp of analysis completion.")
+    batch_count: int = Field(default=1, description="Number of LLM batches used.")
+    metrics: Metrics = Field(
+        default_factory=Metrics, description="Token usage and cost from the inference step."
     )
-    skipped_session_ids: list[str] = Field(
-        default_factory=list, description="Session IDs from the request that were not found."
+    duration_seconds: float | None = Field(
+        default=None, description="Wall-clock analysis duration in seconds."
     )
     warnings: list[str] = Field(
         default_factory=list, description="Non-fatal issues encountered during analysis."
     )
-    backend_id: BackendType = Field(description="Inference backend used.")
-    model: str = Field(description="Model identifier.")
-    metrics: Metrics = Field(default_factory=Metrics, description="Token usage and cost.")
-    duration_seconds: float | None = Field(
-        default=None, description="Wall-clock analysis duration in seconds."
-    )
-    batch_count: int = Field(default=1, description="Number of LLM batches used.")
-    created_at: str = Field(description="ISO timestamp of analysis completion.")

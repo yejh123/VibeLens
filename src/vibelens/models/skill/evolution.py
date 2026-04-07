@@ -41,8 +41,8 @@ class SkillEvolutionProposalOutput(BaseModel):
     user_profile: str = Field(
         default="",
         description=(
-            "2-3 sentence description of the user's working style and project focus. "
-            "Under 50 words."
+            "One-sentence role summary followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
         ),
     )
     workflow_patterns: list[WorkflowPattern] = Field(

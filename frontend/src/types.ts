@@ -238,15 +238,16 @@ export interface StepRef {
 export interface Mitigation {
   title: string;
   action: string;
+  rationale: string;
   confidence: number;
+  addressed_friction_types?: string[];
 }
 
-export interface FrictionEvent {
-  friction_type: string;
-  span_ref: StepRef;
-  user_intention: string;
+export interface FrictionType {
+  type_name: string;
   description: string;
   severity: number;
+  example_refs: StepRef[];
   friction_cost: FrictionCost;
 }
 
@@ -256,7 +257,7 @@ export interface FrictionAnalysisResult {
   user_profile?: string | null;
   summary: string;
   mitigations: Mitigation[];
-  friction_events: FrictionEvent[];
+  friction_types: FrictionType[];
   session_ids: string[];
   skipped_session_ids: string[];
   warnings?: string[];

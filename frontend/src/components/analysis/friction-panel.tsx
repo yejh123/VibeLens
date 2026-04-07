@@ -2,7 +2,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
-
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -17,6 +17,7 @@ import {
   Sparkles,
   Target,
   User,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "../../app";
@@ -25,12 +26,13 @@ import type {
   AnalysisJobStatus,
   CostEstimate,
   FrictionAnalysisResult,
-  FrictionEvent,
+  FrictionCost,
+  FrictionType,
   LLMStatus,
   Mitigation,
 } from "../../types";
 import { formatCost, formatDuration, formatTokens } from "../../utils";
-import { SEVERITY_COLORS, SESSION_ID_SHORT, SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from "../../styles";
+import { SEVERITY_COLORS, SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from "../../styles";
 import { DemoBanner } from "../demo-banner";
 import { AnalysisWelcomePage } from "../analysis-welcome";
 import { LoadingSpinner, LoadingSpinnerRings } from "../loading-spinner";
@@ -67,12 +69,6 @@ const FRICTION_TYPE_LABELS: Record<string, string> = {
   "destructive-action": "Made Unwanted Changes",
   "slow-progress": "Too Slow",
   "abandoned-task": "You Gave Up",
-};
-
-const CONFIDENCE_STYLES: Record<string, string> = {
-  high: "bg-emerald-500/20 border-emerald-500/30",
-  medium: "bg-amber-500/20 border-amber-500/30",
-  low: "bg-zinc-500/20 border-zinc-500/30",
 };
 
 function confidenceLevel(c: number): "high" | "medium" | "low" {
@@ -201,6 +197,26 @@ export function FrictionPanel({ checkedIds, activeJobId, onJobIdChange }: Fricti
   const handleHistorySelect = useCallback((loaded: FrictionAnalysisResult) => {
     setResult(loaded);
   }, []);
+
+  // In demo mode, auto-load the most recent analysis so users see results immediately
+  const demoLoadedRef = useRef(false);
+  useEffect(() => {
+    if (appMode !== "demo" || demoLoadedRef.current) return;
+    demoLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetchWithToken("/api/analysis/friction/history");
+        if (!res.ok) return;
+        const history: { analysis_id: string }[] = await res.json();
+        if (history.length === 0) return;
+        const loadRes = await fetchWithToken(`/api/analysis/friction/${history[0].analysis_id}`);
+        if (!loadRes.ok) return;
+        handleHistorySelect(await loadRes.json());
+      } catch {
+        /* best-effort — fall back to welcome page */
+      }
+    })();
+  }, [appMode, fetchWithToken, handleHistorySelect]);
 
   const handleNewAnalysis = useCallback(() => {
     setResult(null);
@@ -373,11 +389,13 @@ export function FrictionPanel({ checkedIds, activeJobId, onJobIdChange }: Fricti
           {result.warnings && result.warnings.length > 0 && (
             <WarningsBanner warnings={result.warnings} />
           )}
-          <SummarySection summary={result.summary} userProfile={result.user_profile} />
+          <SummaryCard summary={result.summary} userProfile={result.user_profile} />
           {result.mitigations.length > 0 && (
-            <MitigationsSection mitigations={result.mitigations} />
+            <MitigationsSection mitigations={result.mitigations} frictionTypes={result.friction_types} />
           )}
-          <EventsSection events={result.friction_events} />
+          {result.friction_types.length > 0 && (
+            <FrictionTypesSection frictionTypes={result.friction_types} />
+          )}
           <AnalysisMeta result={result} />
         </div>
       </div>
@@ -393,7 +411,7 @@ function ResultHeader({
   result: FrictionAnalysisResult;
   onNew: () => void;
 }) {
-  const eventCount = result.friction_events.length;
+  const tipCount = result.mitigations.length;
   const sessionCount = result.session_ids.length;
 
   return (
@@ -402,10 +420,10 @@ function ResultHeader({
         <Activity className="w-6 h-6 text-amber-400" />
         <div>
           <h2 className="text-xl font-bold text-zinc-100">
-            {result.title || "Friction Analysis"}
+            {result.title || "Productivity Tips"}
           </h2>
           <p className="text-sm text-zinc-400">
-            {eventCount} issue{eventCount !== 1 ? "s" : ""} across {sessionCount} session{sessionCount !== 1 ? "s" : ""}
+            {tipCount} productivity tip{tipCount !== 1 ? "s" : ""} across {sessionCount} session{sessionCount !== 1 ? "s" : ""}
             {result.skipped_session_ids.length > 0 && (
               <span className="text-zinc-500">
                 {" "}&middot; {result.skipped_session_ids.length} skipped
@@ -416,16 +434,16 @@ function ResultHeader({
       </div>
       <button
         onClick={onNew}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700 rounded-md transition"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:text-white bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/40 rounded-lg transition"
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="w-3.5 h-3.5" />
         New
       </button>
     </div>
   );
 }
 
-function SummarySection({
+function SummaryCard({
   summary,
   userProfile,
 }: {
@@ -433,14 +451,20 @@ function SummarySection({
   userProfile?: string | null;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5">
-        <BulletText text={summary} className="text-sm text-zinc-200 leading-relaxed" />
+    <div className="border border-zinc-700/40 rounded-xl bg-zinc-900/60 overflow-hidden">
+      <div className="px-5 pt-4 pb-4">
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="p-1.5 rounded-lg bg-zinc-700/30">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+          </div>
+          <h3 className="text-sm font-semibold text-zinc-100">Summary</h3>
+        </div>
+        <BulletText text={summary} className="text-sm text-zinc-200 leading-relaxed pl-[2.375rem]" />
       </div>
       {userProfile && (
-        <div className="bg-gradient-to-r from-amber-950/30 to-zinc-900/60 border border-amber-700/30 rounded-xl p-5">
+        <div className="px-5 pt-4 pb-4 border-t border-zinc-700/40">
           <div className="flex items-center gap-2 mb-2.5">
-            <div className="p-1.5 rounded-lg bg-amber-600/15">
+            <div className="p-1.5 rounded-lg bg-zinc-700/30">
               <User className="w-4 h-4 text-amber-400" />
             </div>
             <h3 className="text-sm font-semibold text-zinc-100">User Profile</h3>
@@ -452,212 +476,242 @@ function SummarySection({
   );
 }
 
-function MitigationsSection({ mitigations }: { mitigations: Mitigation[] }) {
+function SectionHeader({
+  icon,
+  title,
+  tooltip,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  tooltip: string;
+}) {
+  return (
+    <Tooltip text={tooltip}>
+      <div className="flex items-center gap-2 mb-3 cursor-help">
+        <span className="text-amber-400">{icon}</span>
+        <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
+      </div>
+    </Tooltip>
+  );
+}
+
+function MitigationsSection({ mitigations, frictionTypes }: { mitigations: Mitigation[]; frictionTypes: FrictionType[] }) {
   const sorted = [...mitigations].sort((a, b) => b.confidence - a.confidence);
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb className="w-5 h-5 text-amber-400" />
-        <Tooltip text="Concrete steps you can take to avoid these issues in the future">
-          <h3 className="text-base font-semibold text-zinc-100">Recommended Actions</h3>
-        </Tooltip>
-      </div>
-      <div className="space-y-2.5">
-        {sorted.map((m, i) => (
-          <MitigationCard key={i} mitigation={m} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MitigationCard({ mitigation }: { mitigation: Mitigation }) {
-  const level = confidenceLevel(mitigation.confidence);
-  const styleClass = CONFIDENCE_STYLES[level];
-  const pct = Math.round(mitigation.confidence * 100);
-
-  return (
-    <div className={`rounded-xl border p-4 transition-all hover:border-zinc-600 ${styleClass}`}>
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <p className="text-[0.9375rem] font-semibold text-zinc-100">{mitigation.title}</p>
-        <Tooltip text="How confident we are this will help">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-16 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  level === "high" ? "bg-emerald-400" : level === "medium" ? "bg-amber-400" : "bg-zinc-500"
-                }`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="text-xs text-zinc-500">{pct}%</span>
-          </div>
-        </Tooltip>
-      </div>
-      <BulletText text={mitigation.action} className="text-sm text-zinc-200 leading-relaxed" />
-    </div>
-  );
-}
-
-function EventsSection({ events }: { events: FrictionEvent[] }) {
-  // Group events by friction_type
-  const eventsByType = new Map<string, FrictionEvent[]>();
-  for (const event of events) {
-    const list = eventsByType.get(event.friction_type) ?? [];
-    list.push(event);
-    eventsByType.set(event.friction_type, list);
-  }
-
-  // Sort groups by max severity descending
-  const sortedGroups = [...eventsByType.entries()].sort(([, a], [, b]) => {
-    const maxA = Math.max(...a.map((e) => e.severity));
-    const maxB = Math.max(...b.map((e) => e.severity));
-    return maxB - maxA;
-  });
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className="w-5 h-5 text-amber-400" />
-        <Tooltip text="Moments where you were dissatisfied with the agent's behavior">
-          <h3 className="text-base font-semibold text-zinc-100">Issues Found</h3>
-        </Tooltip>
-      </div>
+      <SectionHeader
+        icon={<Lightbulb className="w-5 h-5" />}
+        title="Productivity Tips"
+        tooltip="Concrete steps you can take to avoid these issues in the future"
+      />
       <div className="space-y-3">
-        {sortedGroups.map(([frictionType, evts], groupIndex) => (
-          <FrictionTypeGroup key={frictionType} frictionType={frictionType} events={evts} isFirstGroup={groupIndex === 0} />
+        {sorted.map((m, i) => (
+          <MitigationCard key={i} mitigation={m} frictionTypes={frictionTypes} />
         ))}
       </div>
     </div>
   );
 }
 
-function FrictionTypeGroup({
-  frictionType,
-  events,
-  isFirstGroup = false,
-}: {
-  frictionType: string;
-  events: FrictionEvent[];
-  isFirstGroup?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const sortedEvents = [...events].sort((a, b) => b.severity - a.severity);
-  const maxSeverity = sortedEvents[0]?.severity ?? 0;
-  const label = FRICTION_TYPE_LABELS[frictionType] ?? frictionType;
+function ConfidenceBar({ confidence }: { confidence: number }) {
+  const pct = Math.round(confidence * 100);
+  const level = confidenceLevel(confidence);
+  const barColor = level === "high" ? "bg-amber-500" : level === "medium" ? "bg-amber-500" : "bg-zinc-600";
+  const textColor = level === "high" ? "text-amber-400" : level === "medium" ? "text-amber-400" : "text-zinc-500";
 
   return (
-    <div className="border border-zinc-700/60 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-2.5 bg-zinc-800/50 hover:bg-zinc-800 transition text-left"
-      >
-        {expanded ? (
-          <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
-        )}
-        <Target className="w-4 h-4 text-amber-400 shrink-0" />
-        <span className="text-sm font-medium text-zinc-200">{label}</span>
-        <SeverityBadge severity={maxSeverity} />
-        <span className="text-xs text-zinc-500 ml-auto">
-          {events.length} issue{events.length !== 1 ? "s" : ""}
-        </span>
-      </button>
-      {expanded && (
-        <div className="divide-y divide-zinc-700/60">
-          {sortedEvents.map((event, i) => (
-            <EventCard key={`${event.span_ref.session_id}-${event.span_ref.start_step_id}`} event={event} defaultExpanded={isFirstGroup && i === 0} />
-          ))}
+    <Tooltip text={`${pct}% confidence`}>
+      <div className="flex items-center gap-2 cursor-help">
+        <div className="w-16 h-1.5 rounded-full bg-zinc-700/60 overflow-hidden">
+          <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className={`text-xs font-semibold ${textColor} tabular-nums`}>{pct}%</span>
+      </div>
+    </Tooltip>
+  );
+}
+
+function MitigationCard({ mitigation, frictionTypes }: { mitigation: Mitigation; frictionTypes: FrictionType[] }) {
+  const [typesExpanded, setTypesExpanded] = useState(false);
+
+  const addressedTypes = mitigation.addressed_friction_types ?? [];
+  const matchedTypes = frictionTypes.filter((ft) =>
+    addressedTypes.includes(ft.type_name)
+  );
+
+  return (
+    <div className="border border-amber-700/30 rounded-xl bg-amber-950/10 overflow-hidden">
+      {/* Header: Title + Confidence */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base font-bold text-zinc-100">{mitigation.title}</span>
+            {mitigation.confidence > 0 && <ConfidenceBar confidence={mitigation.confidence} />}
+          </div>
+        </div>
+        <BulletText text={mitigation.action} className="text-sm text-zinc-300 leading-relaxed mt-1.5" />
+      </div>
+
+      {/* Rationale */}
+      {mitigation.rationale && (
+        <div className="px-5 py-3 border-t border-amber-700/20">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-sm font-semibold text-amber-300 uppercase tracking-wide">Why This is Useful</span>
+          </div>
+          <BulletText text={mitigation.rationale} className="text-sm text-zinc-200 leading-relaxed" />
+        </div>
+      )}
+
+      {/* Addressed Friction Types */}
+      {matchedTypes.length > 0 && (
+        <div className="px-5 py-3 border-t border-amber-700/20">
+          <button
+            onClick={() => setTypesExpanded(!typesExpanded)}
+            className="flex items-center gap-1.5 text-xs hover:opacity-80 transition"
+          >
+            {typesExpanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
+              : <ChevronRight className="w-3.5 h-3.5 text-amber-400" />}
+            <Target className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-sm font-semibold text-amber-300 uppercase tracking-wide">Addressed Issues</span>
+            <span className="text-zinc-500">({matchedTypes.length})</span>
+          </button>
+          {typesExpanded && (
+            <div className="mt-2.5 space-y-3">
+              {matchedTypes.map((ft) => (
+                <div key={ft.type_name} className="border-l-2 border-amber-700/30 pl-3 space-y-1.5">
+                  <h6 className="text-base font-semibold text-zinc-100">
+                    {FRICTION_TYPE_LABELS[ft.type_name] ?? ft.type_name}
+                  </h6>
+                  <BulletText text={ft.description} className="text-sm text-zinc-300 leading-relaxed" />
+                  <FrictionRefList refs={ft.example_refs} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function EventCard({ event, defaultExpanded = false }: { event: FrictionEvent; defaultExpanded?: boolean }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-
-  const handleGoToStep = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      const url = `${window.location.origin}?session=${event.span_ref.session_id}&step=${event.span_ref.start_step_id}`;
-      window.open(url, "_blank");
-    },
-    [event.span_ref.session_id, event.span_ref.start_step_id]
-  );
+function FrictionTypesSection({ frictionTypes }: { frictionTypes: FrictionType[] }) {
+  const sorted = [...frictionTypes].sort((a, b) => b.severity - a.severity);
 
   return (
-    <div className="px-4 py-3.5">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full text-left"
-      >
-        <div className="flex items-start gap-2">
-          <div className="mt-0.5 shrink-0">
-            {expanded ? (
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <SeverityBadge severity={event.severity} />
-              <Tooltip text={`Session: ${event.span_ref.session_id}`} className="min-w-0">
-                <span className="text-xs text-zinc-500 font-mono">
-                  {event.span_ref.session_id.slice(0, SESSION_ID_SHORT)}
-                </span>
-              </Tooltip>
-              <button
-                onClick={handleGoToStep}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm text-zinc-400 hover:text-cyan-400 hover:bg-cyan-900/20 rounded transition"
-                title="Open this step in a new tab"
-              >
-                <ArrowUpRight className="w-4 h-4" />
-                <span>Jump</span>
-              </button>
-            </div>
-            <p className="text-sm text-zinc-200 leading-relaxed font-medium">
-              {event.user_intention}
-            </p>
-            {event.description && (
-              <BulletText text={event.description} className={`text-sm text-zinc-400 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`} />
-            )}
-            {expanded && (
-              <div className="mt-2">
-                <CostBadges cost={event.friction_cost} />
-              </div>
-            )}
-          </div>
-        </div>
-      </button>
+    <div>
+      <SectionHeader
+        icon={<AlertTriangle className="w-5 h-5" />}
+        title="Issues Found"
+        tooltip="Moments where you were dissatisfied with the agent's behavior"
+      />
+      <div className="space-y-3">
+        {sorted.map((ft) => (
+          <FrictionTypeCard key={ft.type_name} frictionType={ft} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function CostBadges({ cost }: { cost: FrictionEvent["friction_cost"] }) {
+function FrictionTypeCard({ frictionType }: { frictionType: FrictionType }) {
+  const [expanded, setExpanded] = useState(false);
+  const label = FRICTION_TYPE_LABELS[frictionType.type_name] ?? frictionType.type_name;
+
+  return (
+    <div
+      onClick={() => setExpanded((v) => !v)}
+      className="border border-zinc-700/60 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600/60 transition-all"
+    >
+      <div className="px-4 py-3 space-y-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <SeverityBadge severity={frictionType.severity} />
+          <h6 className="text-base font-semibold text-zinc-100">{label}</h6>
+          <div className="ml-auto shrink-0">
+            {expanded
+              ? <ChevronDown className="w-4 h-4 text-zinc-500" />
+              : <ChevronRight className="w-4 h-4 text-zinc-500" />}
+          </div>
+        </div>
+        <BulletText text={frictionType.description} className="text-sm text-zinc-300 leading-relaxed" />
+      </div>
+      {expanded && (
+        <div className="px-4 pb-3.5 space-y-2.5 border-t border-zinc-700/30 pt-3 mx-3 mb-1">
+          <CostBadges cost={frictionType.friction_cost} />
+          <FrictionRefList refs={frictionType.example_refs} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FrictionRefList({ refs }: { refs: FrictionType["example_refs"] }) {
+  if (refs.length === 0) return null;
+  return (
+    <Tooltip text="Session steps where this issue appears">
+      <div className="flex items-center gap-2 flex-wrap cursor-help">
+        <div className="flex items-center gap-1.5 text-sm">
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          <span className="font-semibold text-cyan-400">Reference:</span>
+        </div>
+        {refs.map((ref, i) => (
+          <FrictionStepButton key={`${ref.session_id}-${ref.start_step_id}-${i}`} ref_={ref} />
+        ))}
+      </div>
+    </Tooltip>
+  );
+}
+
+function FrictionStepButton({ ref_ }: { ref_: FrictionType["example_refs"][number] }) {
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const url = `${window.location.origin}?session=${ref_.session_id}&step=${ref_.start_step_id}`;
+      window.open(url, "_blank");
+    },
+    [ref_.session_id, ref_.start_step_id],
+  );
+
+  return (
+    <Tooltip text="Open step in session viewer">
+      <button
+        onClick={handleClick}
+        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-zinc-700/50 text-zinc-300 hover:bg-amber-900/40 hover:text-amber-300 transition font-mono border border-zinc-600/30 hover:border-amber-700/30"
+      >
+        {ref_.start_step_id.slice(0, 8)}
+        <ArrowUpRight className="w-3 h-3" />
+      </button>
+    </Tooltip>
+  );
+}
+
+function CostBadges({ cost }: { cost: FrictionCost }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Tooltip text="Number of agent interactions affected by this issue">
-        <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
-          <Footprints className="w-3.5 h-3.5 text-rose-400" />
+      <div className="flex items-center gap-1.5 text-sm">
+        <Zap className="w-4 h-4 text-amber-400" />
+        <span className="font-semibold text-amber-400">Impact:</span>
+      </div>
+      <Tooltip text="Steps affected by this issue">
+        <span className="inline-flex items-center gap-1.5 text-sm text-zinc-400 cursor-help">
+          <Footprints className="w-4 h-4 text-rose-400" />
           {cost.affected_steps} step{cost.affected_steps !== 1 ? "s" : ""}
         </span>
       </Tooltip>
       {cost.affected_time_seconds != null && (
-        <Tooltip text="How long this issue lasted">
-          <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
-            <Clock className="w-3.5 h-3.5 text-sky-400" />
+        <Tooltip text="Duration affected">
+          <span className="inline-flex items-center gap-1.5 text-sm text-zinc-400 cursor-help">
+            <Clock className="w-4 h-4 text-sky-400" />
             {formatDuration(cost.affected_time_seconds)}
           </span>
         </Tooltip>
       )}
       {cost.affected_tokens != null && (
-        <Tooltip text="Tokens consumed during this issue">
-          <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
-            <Coins className="w-3.5 h-3.5 text-amber-400" />
+        <Tooltip text="Tokens affected">
+          <span className="inline-flex items-center gap-1.5 text-sm text-zinc-400 cursor-help">
+            <Coins className="w-4 h-4 text-amber-400" />
             {formatTokens(cost.affected_tokens)}
           </span>
         </Tooltip>
