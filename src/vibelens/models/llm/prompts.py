@@ -1,5 +1,6 @@
 """Analysis prompt template model for LLM-powered session analysis."""
 
+import copy
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, Template
@@ -36,13 +37,15 @@ class AnalysisPrompt(BaseModel):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    task_id: str = Field(
-        description="Unique identifier for this analysis type (e.g. 'highlights')."
-    )
+    task_id: str = Field(description="Unique identifier for this analysis type.")
     system_template: Template = Field(description="Jinja2 template for the system prompt.")
     user_template: Template = Field(description="Jinja2 template for the user prompt.")
     output_model: type[BaseModel] = Field(
         description="Pydantic model class for parsing structured LLM output."
+    )
+    exclude_fields: frozenset[str] = Field(
+        default_factory=frozenset,
+        description="Field names to strip from the JSON schema sent to the LLM.",
     )
 
     def render_system(self, **kwargs: object) -> str:
@@ -66,3 +69,35 @@ class AnalysisPrompt(BaseModel):
             Rendered user prompt string.
         """
         return self.user_template.render(**kwargs)
+
+    def output_json_schema(self) -> dict:
+        """Return JSON schema for output_model, stripping exclude_fields.
+
+        Strips excluded fields from both top-level properties and any
+        nested model definitions under $defs.
+
+        Returns:
+            JSON schema dict with excluded fields removed.
+        """
+        schema = copy.deepcopy(self.output_model.model_json_schema())
+        if not self.exclude_fields:
+            return schema
+        _strip_fields(schema, self.exclude_fields)
+        for def_schema in schema.get("$defs", {}).values():
+            _strip_fields(def_schema, self.exclude_fields)
+        return schema
+
+
+def _strip_fields(schema: dict, fields: frozenset[str]) -> None:
+    """Remove field names from a JSON schema's properties and required list.
+
+    Args:
+        schema: A JSON schema dict with properties/required keys.
+        fields: Field names to remove.
+    """
+    props = schema.get("properties", {})
+    for field_name in fields:
+        props.pop(field_name, None)
+    required = schema.get("required")
+    if required is not None:
+        schema["required"] = [r for r in required if r not in fields]

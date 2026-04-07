@@ -27,7 +27,9 @@ class SkillAnalysisResult(BaseModel):
     skipped_session_ids: list[str] = Field(
         default_factory=list, description="Session IDs that could not be loaded."
     )
-    title: str = Field(default="", description="LLM-generated analysis title, 5-10 words.")
+    title: str = Field(
+        default="", description="Clear, reader-friendly analysis title. Max 8 words."
+    )
     workflow_patterns: list[WorkflowPattern] = Field(
         default_factory=list, description="Detected workflow patterns from trajectory analysis."
     )
@@ -40,18 +42,23 @@ class SkillAnalysisResult(BaseModel):
     evolutions: list[SkillEvolution] = Field(
         default_factory=list, description="Evolution suggestions (evolution mode)."
     )
-    summary: str = Field(description="Overall analysis summary.")
-    user_profile: str = Field(default="", description="Detected user workflow style.")
-    warnings: list[str] = Field(
-        default_factory=list, description="Non-fatal issues encountered during analysis."
+    summary: str = Field(
+        description=(
+            "One-sentence conclusion followed by 2-4 bullet points "
+            "starting with '- '. Max 100 words."
+        )
     )
+    user_profile: str = Field(default="", description="Detected user workflow style.")
     backend_id: BackendType = Field(description="Inference backend used.")
     model: str = Field(description="Model identifier.")
+    created_at: str = Field(description="ISO timestamp of analysis completion.")
+    batch_count: int = Field(default=1, description="Number of LLM batches used.")
     metrics: Metrics = Field(
         default_factory=Metrics, description="Token usage and cost from the inference step."
+    )
+    warnings: list[str] = Field(
+        default_factory=list, description="Non-fatal issues encountered during analysis."
     )
     duration_seconds: float | None = Field(
         default=None, description="Wall-clock analysis duration in seconds."
     )
-    batch_count: int = Field(default=1, description="Number of LLM batches used.")
-    created_at: str = Field(description="ISO timestamp of analysis completion.")

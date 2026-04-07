@@ -79,7 +79,7 @@ def estimate_skill_retrieval(
 
     batches = build_batches(context_set.contexts)
     system_prompt = SKILL_RETRIEVAL_PROMPT.render_system(
-        **build_system_kwargs(SKILL_RETRIEVAL_PROMPT.output_model, backend)
+        **build_system_kwargs(SKILL_RETRIEVAL_PROMPT, backend)
     )
     batch_token_counts = [count_tokens(format_batch_digest(batch)) for batch in batches]
 
@@ -204,7 +204,7 @@ async def _infer_skill_retrieval_batch(
         candidates = _prefilter_skill_retrieval_candidates(candidates, digest)
 
     prompt = SKILL_RETRIEVAL_PROMPT
-    system_kwargs = build_system_kwargs(prompt.output_model, backend)
+    system_kwargs = build_system_kwargs(prompt, backend)
     system_prompt = prompt.render_system(**system_kwargs)
 
     # Truncate digest to fit context budget
@@ -228,7 +228,7 @@ async def _infer_skill_retrieval_batch(
         user=user_prompt,
         max_tokens=SKILL_RETRIEVAL_OUTPUT_TOKENS,
         timeout=SKILL_RETRIEVAL_TIMEOUT_SECONDS,
-        json_schema=prompt.output_model.model_json_schema(),
+        json_schema=prompt.output_json_schema(),
     )
 
     if batch_index == 0:
@@ -269,7 +269,6 @@ async def _synthesize_skill_retrieval(
                 {
                     "title": p.title,
                     "description": p.description,
-                    "gap": p.gap,
                     "example_refs": [ref.model_dump(exclude_none=True) for ref in p.example_refs],
                 }
                 for p in output.workflow_patterns
@@ -288,7 +287,7 @@ async def _synthesize_skill_retrieval(
     ]
 
     prompt = SKILL_RETRIEVAL_SYNTHESIS_PROMPT
-    system_kwargs = build_system_kwargs(prompt.output_model, backend)
+    system_kwargs = build_system_kwargs(prompt, backend)
     system_prompt = prompt.render_system(**system_kwargs)
     user_prompt = prompt.render_user(
         batch_count=len(batch_results), session_count=session_count, batch_results=batch_data
@@ -299,7 +298,7 @@ async def _synthesize_skill_retrieval(
         user=user_prompt,
         max_tokens=SKILL_RETRIEVAL_SYNTHESIS_OUTPUT_TOKENS,
         timeout=SKILL_RETRIEVAL_TIMEOUT_SECONDS,
-        json_schema=prompt.output_model.model_json_schema(),
+        json_schema=prompt.output_json_schema(),
     )
 
     save_analysis_log(log_dir, "retrieval_synthesis_system.txt", system_prompt)
@@ -403,6 +402,27 @@ def _extract_skill_retrieval_keywords(digest: str) -> set[str]:
     return keywords
 
 
+def _load_skill_descriptions() -> dict[str, str]:
+    """Load skill name-to-summary mapping from the featured skills catalog.
+
+    Returns:
+        Dict mapping skill slug to its summary text.
+    """
+    if not FEATURED_SKILLS_PATH.is_file():
+        return {}
+    try:
+        raw = FEATURED_SKILLS_PATH.read_text(encoding="utf-8")
+        catalog = json.loads(raw)
+        return {
+            entry.get("slug", entry.get("name", "")): entry["summary"]
+            for entry in catalog.get("skills", [])
+            if entry.get("summary")
+        }
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Failed to load featured skills catalog for descriptions")
+        return {}
+
+
 def _build_skill_retrieval_result(
     validated_patterns: list[WorkflowPattern],
     llm_output: SkillRetrievalOutput,
@@ -415,6 +435,10 @@ def _build_skill_retrieval_result(
     duration_seconds: float | None = None,
 ) -> SkillAnalysisResult:
     """Build a SkillAnalysisResult for retrieval mode."""
+    all_descriptions = _load_skill_descriptions()
+    for rec in llm_output.recommendations:
+        rec.description = all_descriptions.get(rec.skill_name, "")
+
     return SkillAnalysisResult(
         mode=SkillMode.RETRIEVAL,
         title=llm_output.title,

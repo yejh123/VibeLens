@@ -29,13 +29,13 @@ class FinalMetrics(BaseModel):
     total_completion_tokens: int | None = Field(
         default=None, description="Sum of all completion tokens across all steps."
     )
-    total_cache_write: int = Field(
-        default=0,
-        description="[VibeLens] Total tokens written into the prompt cache (Anthropic-specific).",
-    )
     total_cache_read: int = Field(
         default=0,
         description="[VibeLens] Total tokens read from the prompt cache (Anthropic-specific).",
+    )
+    total_cache_write: int = Field(
+        default=0,
+        description="[VibeLens] Total tokens written into the prompt cache (Anthropic-specific).",
     )
     total_cost_usd: float | None = Field(
         default=None,

@@ -9,10 +9,7 @@ from vibelens.deps import get_skill_analysis_store, is_demo_mode, is_test_mode
 from vibelens.models.skill import SkillAnalysisResult
 from vibelens.schemas.analysis import AnalysisJobResponse, AnalysisJobStatus
 from vibelens.schemas.cost_estimate import CostEstimateResponse
-from vibelens.schemas.skills import (
-    SkillAnalysisMeta,
-    SkillAnalysisRequest,
-)
+from vibelens.schemas.skills import SkillAnalysisMeta, SkillAnalysisRequest
 from vibelens.services.job_tracker import (
     cancel_job,
     get_job,
@@ -20,10 +17,7 @@ from vibelens.services.job_tracker import (
     mark_failed,
     submit_job,
 )
-from vibelens.services.skill import (
-    analyze_skills,
-    estimate_skill_analysis,
-)
+from vibelens.services.skill import analyze_skills, estimate_skill_analysis
 from vibelens.services.skill.mock import build_mock_skill_result
 from vibelens.utils.log import get_logger
 
@@ -45,7 +39,6 @@ async def _run_skill_analysis(
     except Exception as exc:
         mark_failed(job_id, f"{type(exc).__name__}: {exc}")
         logger.exception("Skill analysis job %s failed", job_id)
-
 
 
 @router.post("/estimate")
@@ -114,7 +107,6 @@ async def skill_analysis(
         raise HTTPException(status_code=status, detail=str(exc)) from exc
 
     return AnalysisJobResponse(job_id=job_id, status="running")
-
 
 
 @router.get("/jobs/{job_id}")

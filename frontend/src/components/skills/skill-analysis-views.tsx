@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
-  FileCode,
   GitBranch,
   Lightbulb,
   Loader2,
@@ -19,7 +18,6 @@ import {
   Timer,
   TrendingUp,
   User,
-  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type {
@@ -32,6 +30,7 @@ import type {
   StepRef,
   WorkflowPattern,
 } from "../../types";
+import { BulletText } from "../bullet-text";
 import { DemoBanner } from "../demo-banner";
 import { Tooltip } from "../tooltip";
 import { WarningsBanner } from "../warnings-banner";
@@ -112,6 +111,7 @@ export function AnalysisResultView({
       {activeTab === "retrieve" && result.recommendations.length > 0 && (
         <RecommendationSection
           recommendations={result.recommendations}
+          workflowPatterns={result.workflow_patterns}
           fetchWithToken={fetchWithToken}
           agentSources={agentSources}
         />
@@ -121,6 +121,7 @@ export function AnalysisResultView({
       {activeTab === "create" && result.creations.length > 0 && (
         <CreationSection
           skills={result.creations}
+          workflowPatterns={result.workflow_patterns}
           fetchWithToken={fetchWithToken}
           agentSources={agentSources}
         />
@@ -130,6 +131,7 @@ export function AnalysisResultView({
       {activeTab === "evolve" && result.evolutions.length > 0 && (
         <EvolutionSection
           suggestions={result.evolutions}
+          workflowPatterns={result.workflow_patterns}
           fetchWithToken={fetchWithToken}
           agentSources={agentSources}
         />
@@ -188,19 +190,27 @@ function ResultHeader({
 
 function SummaryCard({ summary, userProfile }: { summary: string; userProfile: string }) {
   return (
-    <div className="space-y-4">
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5">
-        <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+    <div className="border border-zinc-700/40 rounded-xl bg-zinc-900/60 overflow-hidden">
+      {/* Summary */}
+      <div className="px-5 pt-4 pb-4">
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="p-1.5 rounded-lg bg-zinc-700/30">
+            <Sparkles className="w-4 h-4 text-teal-400" />
+          </div>
+          <h3 className="text-sm font-semibold text-zinc-100">Summary</h3>
+        </div>
+        <BulletText text={summary} className="text-sm text-zinc-200 leading-relaxed pl-[2.375rem]" />
       </div>
+      {/* User Profile */}
       {userProfile && (
-        <div className="bg-gradient-to-r from-violet-950/30 to-zinc-900/60 border border-violet-700/30 rounded-xl p-5">
+        <div className="px-5 pt-4 pb-4 border-t border-zinc-700/40">
           <div className="flex items-center gap-2 mb-2.5">
-            <div className="p-1.5 rounded-lg bg-violet-600/15">
-              <User className="w-4 h-4 text-violet-400" />
+            <div className="p-1.5 rounded-lg bg-zinc-700/30">
+              <User className="w-4 h-4 text-teal-400" />
             </div>
             <h3 className="text-sm font-semibold text-zinc-100">User Profile</h3>
           </div>
-          <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{userProfile}</p>
+          <BulletText text={userProfile} className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]" />
         </div>
       )}
     </div>
@@ -300,7 +310,7 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
               </span>
             </Tooltip>
           </div>
-          <p className="text-sm text-zinc-300 leading-relaxed mt-1">{pattern.description}</p>
+          <BulletText text={pattern.description} className="text-sm text-zinc-300 leading-relaxed mt-1" />
         </div>
         <div className="shrink-0 mt-1">
           {expanded
@@ -310,18 +320,6 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
       </button>
       {expanded && (
         <div className="px-5 pb-4 pl-[3.25rem] space-y-4 border-t border-zinc-700/30 pt-4 mx-3 mb-1">
-          {/* Gap */}
-          <div className="rounded-lg bg-amber-950/15 border border-amber-800/20 px-4 py-3">
-            <Tooltip text="Automation gap in this workflow">
-              <div className="flex items-center gap-1.5 text-xs text-amber-400/80 mb-1.5 cursor-help">
-                <Zap className="w-3.5 h-3.5" />
-                <span className="font-semibold uppercase tracking-wider">Gap</span>
-              </div>
-            </Tooltip>
-            <p className="text-sm text-amber-200/80 leading-relaxed">{pattern.gap}</p>
-          </div>
-
-          {/* Example Steps */}
           <StepRefList refs={pattern.example_refs} />
         </div>
       )}
@@ -332,20 +330,17 @@ function PatternCard({ pattern, index }: { pattern: WorkflowPattern; index: numb
 function StepRefList({ refs }: { refs: StepRef[] }) {
   if (refs.length === 0) return null;
   return (
-    <div>
-      <Tooltip text="Session steps where this pattern appears">
-        <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-2 cursor-help">
-          <BookOpen className="w-3.5 h-3.5" />
-          <span className="font-semibold">Evidence</span>
-          <span className="text-zinc-600">({refs.length} step{refs.length !== 1 ? "s" : ""})</span>
+    <Tooltip text="Session steps where this pattern appears">
+      <div className="flex items-center gap-2 flex-wrap cursor-help">
+        <div className="flex items-center gap-1.5 text-xs">
+          <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="font-semibold text-cyan-400">Reference:</span>
         </div>
-      </Tooltip>
-      <div className="flex items-center gap-2 flex-wrap">
         {refs.map((stepRef, i) => (
           <JumpToStepButton key={i} stepRef={stepRef} />
         ))}
       </div>
-    </div>
+    </Tooltip>
   );
 }
 
@@ -376,10 +371,12 @@ function JumpToStepButton({ stepRef }: { stepRef: StepRef }) {
 
 function RecommendationSection({
   recommendations,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   recommendations: SkillRecommendation[];
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
@@ -387,7 +384,7 @@ function RecommendationSection({
     <section>
       <SectionHeader
         icon={<Search className="w-5 h-5" />}
-        title="Discovered Skills"
+        title="Recommended Skills"
         tooltip="Catalog skills matching your workflow"
       />
       <div className="space-y-3">
@@ -395,6 +392,7 @@ function RecommendationSection({
           <RecommendationCard
             key={rec.skill_name}
             rec={rec}
+            workflowPatterns={workflowPatterns}
             fetchWithToken={fetchWithToken}
             agentSources={agentSources}
           />
@@ -406,10 +404,12 @@ function RecommendationSection({
 
 function RecommendationCard({
   rec,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   rec: SkillRecommendation;
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
@@ -417,13 +417,11 @@ function RecommendationCard({
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [patternsExpanded, setPatternsExpanded] = useState(false);
 
-  const confidencePct = Math.round(rec.confidence * 100);
-  const isHigh = rec.confidence >= CONFIDENCE_THRESHOLDS.HIGH;
-  const isMedium = rec.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM;
-  const barColor = isHigh ? "bg-emerald-500" : isMedium ? "bg-amber-500" : "bg-zinc-600";
-  const textColor = isHigh ? "text-emerald-400" : isMedium ? "text-amber-400" : "text-zinc-500";
-  const borderColor = isHigh ? "border-emerald-700/30" : isMedium ? "border-amber-700/30" : "border-zinc-700/50";
+  const matchedPatterns = workflowPatterns.filter((p) =>
+    rec.addressed_patterns.includes(p.title),
+  );
 
   const handlePreview = useCallback(async () => {
     setShowPreview(true);
@@ -459,24 +457,15 @@ function RecommendationCard({
   }, [fetchWithToken, rec.skill_name]);
 
   return (
-    <div className={`border ${borderColor} rounded-xl bg-zinc-800/40 overflow-hidden`}>
-      <div className="px-5 py-4">
-        <div className="flex items-center justify-between mb-2.5">
+    <div className="border border-teal-700/30 rounded-xl bg-teal-950/10 overflow-hidden">
+      {/* Header: Name + Confidence + Action */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className={`p-1.5 rounded-lg ${isHigh ? "bg-emerald-600/15" : isMedium ? "bg-amber-600/15" : "bg-zinc-700/40"}`}>
-              <Lightbulb className={`w-4 h-4 ${textColor}`} />
-            </div>
             <span className="font-mono text-sm font-bold text-zinc-100">{rec.skill_name}</span>
+            {rec.confidence > 0 && <ConfidenceBar confidence={rec.confidence} accentColor="teal" />}
           </div>
           <div className="flex items-center gap-2.5">
-            <Tooltip text={`${confidencePct}% match to your patterns`}>
-              <div className="flex items-center gap-2 cursor-help">
-                <div className="w-16 h-1.5 rounded-full bg-zinc-700/60 overflow-hidden">
-                  <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${confidencePct}%` }} />
-                </div>
-                <span className={`text-xs font-semibold ${textColor} tabular-nums`}>{confidencePct}%</span>
-              </div>
-            </Tooltip>
             {installed ? (
               <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-300 bg-teal-900/30 rounded-lg border border-teal-700/20">
                 <Check className="w-3.5 h-3.5" /> Installed
@@ -494,8 +483,47 @@ function RecommendationCard({
             )}
           </div>
         </div>
-        <p className="text-sm text-zinc-400 leading-relaxed pl-[2.375rem]">{rec.rationale}</p>
+        {rec.description && (
+          <p className="text-sm text-zinc-300 leading-relaxed mt-1.5">{rec.description}</p>
+        )}
       </div>
+
+      {/* Why This is Useful */}
+      <div className="px-5 py-3 border-t border-teal-700/20">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Lightbulb className="w-3.5 h-3.5 text-teal-400" />
+          <span className="text-xs font-semibold text-teal-300 uppercase tracking-wide">Why This is Useful</span>
+        </div>
+        <BulletText text={rec.rationale} className="text-sm text-zinc-200 leading-relaxed" />
+      </div>
+
+      {/* Toggleable Addressed Workflow Patterns */}
+      {matchedPatterns.length > 0 && (
+        <div className="px-5 py-3 border-t border-teal-700/20">
+          <button
+            onClick={() => setPatternsExpanded(!patternsExpanded)}
+            className="flex items-center gap-1.5 text-xs hover:opacity-80 transition"
+          >
+            {patternsExpanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-teal-400" />
+              : <ChevronRight className="w-3.5 h-3.5 text-teal-400" />}
+            <Target className="w-3.5 h-3.5 text-teal-400" />
+            <span className="font-semibold text-teal-300 uppercase tracking-wide">Addressed Workflow Patterns</span>
+            <span className="text-zinc-500">({matchedPatterns.length})</span>
+          </button>
+          {patternsExpanded && (
+            <div className="mt-2.5 space-y-3">
+              {matchedPatterns.map((p, i) => (
+                <div key={i} className="border-l-2 border-teal-700/30 pl-3 space-y-1.5">
+                  <h6 className="text-sm font-semibold text-zinc-100">{p.title}</h6>
+                  <BulletText text={p.description} className="text-sm text-zinc-300 leading-relaxed" />
+                  <StepRefList refs={p.example_refs} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {showPreview && (
         <SkillPreviewDialog
           skillName={rec.skill_name}
@@ -514,10 +542,12 @@ function RecommendationCard({
 
 function CreationSection({
   skills,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   skills: SkillCreation[];
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
@@ -534,6 +564,7 @@ function CreationSection({
           <CreatedSkillCard
             key={skill.name}
             skill={skill}
+            workflowPatterns={workflowPatterns}
             fetchWithToken={fetchWithToken}
             agentSources={agentSources}
           />
@@ -543,17 +574,19 @@ function CreationSection({
   );
 }
 
-function ConfidenceBar({ confidence, accentColor = "emerald" }: { confidence: number; accentColor?: "emerald" | "amber" }) {
+function ConfidenceBar({ confidence, accentColor = "emerald" }: { confidence: number; accentColor?: "emerald" | "amber" | "teal" }) {
   const pct = Math.round(confidence * 100);
   const isHigh = confidence >= CONFIDENCE_THRESHOLDS.HIGH;
   const isMedium = confidence >= CONFIDENCE_THRESHOLDS.MEDIUM;
 
-  const barColor = isHigh
-    ? (accentColor === "amber" ? "bg-amber-500" : "bg-emerald-500")
-    : isMedium ? "bg-amber-500" : "bg-zinc-600";
-  const textColor = isHigh
-    ? (accentColor === "amber" ? "text-amber-400" : "text-emerald-400")
-    : isMedium ? "text-amber-400" : "text-zinc-500";
+  const HIGH_COLORS: Record<string, { bar: string; text: string }> = {
+    emerald: { bar: "bg-emerald-500", text: "text-emerald-400" },
+    amber: { bar: "bg-amber-500", text: "text-amber-400" },
+    teal: { bar: "bg-teal-500", text: "text-teal-400" },
+  };
+  const high = HIGH_COLORS[accentColor];
+  const barColor = isHigh ? high.bar : isMedium ? "bg-amber-500" : "bg-zinc-600";
+  const textColor = isHigh ? high.text : isMedium ? "text-amber-400" : "text-zinc-500";
 
   return (
     <Tooltip text={`${pct}% confidence`}>
@@ -569,16 +602,23 @@ function ConfidenceBar({ confidence, accentColor = "emerald" }: { confidence: nu
 
 function CreatedSkillCard({
   skill,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   skill: SkillCreation;
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
   const [showPreview, setShowPreview] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [editedContent, setEditedContent] = useState(skill.skill_md_content);
+  const [patternsExpanded, setPatternsExpanded] = useState(false);
+
+  const matchedPatterns = workflowPatterns.filter((p) =>
+    skill.addressed_patterns?.includes(p.title),
+  );
 
   const handleInstall = useCallback(
     async (content: string, targets: string[]) => {
@@ -608,12 +648,10 @@ function CreatedSkillCard({
 
   return (
     <div className="border border-emerald-700/30 rounded-xl bg-emerald-950/15 overflow-hidden">
-      <div className="px-5 py-4">
-        <div className="flex items-center justify-between mb-2.5">
+      {/* Header: Name + Confidence + Action */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-emerald-600/15">
-              <FileCode className="w-4 h-4 text-emerald-400" />
-            </div>
             <span className="font-mono text-sm font-bold text-zinc-100">{skill.name}</span>
             {skill.confidence > 0 && <ConfidenceBar confidence={skill.confidence} />}
           </div>
@@ -635,15 +673,45 @@ function CreatedSkillCard({
             )}
           </div>
         </div>
-        <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{skill.description}</p>
-        <div className="mt-2.5 pl-[2.375rem]">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Lightbulb className="w-3 h-3 text-emerald-500/60 shrink-0" />
-            <span className="text-xs font-semibold text-emerald-400/70">Why this is useful</span>
-          </div>
-          <p className="text-sm text-emerald-300/80 leading-relaxed pl-[1.125rem]">{skill.rationale}</p>
-        </div>
+        <BulletText text={skill.description} className="text-sm text-zinc-300 leading-relaxed mt-1.5" />
       </div>
+
+      {/* Why This is Useful */}
+      <div className="px-5 py-3 border-t border-emerald-700/20">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Lightbulb className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wide">Why This is Useful</span>
+        </div>
+        <BulletText text={skill.rationale} className="text-sm text-zinc-200 leading-relaxed" />
+      </div>
+
+      {/* Toggleable Addressed Workflow Patterns */}
+      {matchedPatterns.length > 0 && (
+        <div className="px-5 py-3 border-t border-emerald-700/20">
+          <button
+            onClick={() => setPatternsExpanded(!patternsExpanded)}
+            className="flex items-center gap-1.5 text-xs hover:opacity-80 transition"
+          >
+            {patternsExpanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+              : <ChevronRight className="w-3.5 h-3.5 text-emerald-400" />}
+            <Target className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-semibold text-emerald-300 uppercase tracking-wide">Addressed Workflow Patterns</span>
+            <span className="text-zinc-500">({matchedPatterns.length})</span>
+          </button>
+          {patternsExpanded && (
+            <div className="mt-2.5 space-y-3">
+              {matchedPatterns.map((p, i) => (
+                <div key={i} className="border-l-2 border-emerald-700/30 pl-3 space-y-1.5">
+                  <h6 className="text-sm font-semibold text-zinc-100">{p.title}</h6>
+                  <BulletText text={p.description} className="text-sm text-zinc-300 leading-relaxed" />
+                  <StepRefList refs={p.example_refs} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {showPreview && (
         <SkillPreviewDialog
           skillName={skill.name}
@@ -662,10 +730,12 @@ function CreatedSkillCard({
 
 function EvolutionSection({
   suggestions,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   suggestions: SkillEvolution[];
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
@@ -682,6 +752,7 @@ function EvolutionSection({
           <EvolutionCard
             key={sug.skill_name}
             suggestion={sug}
+            workflowPatterns={workflowPatterns}
             fetchWithToken={fetchWithToken}
             agentSources={agentSources}
           />
@@ -693,15 +764,22 @@ function EvolutionSection({
 
 function EvolutionCard({
   suggestion,
+  workflowPatterns,
   fetchWithToken,
   agentSources,
 }: {
   suggestion: SkillEvolution;
+  workflowPatterns: WorkflowPattern[];
   fetchWithToken: (url: string, init?: RequestInit) => Promise<Response>;
   agentSources: SkillSourceInfo[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [patternsExpanded, setPatternsExpanded] = useState(false);
+
+  const matchedPatterns = workflowPatterns.filter((p) =>
+    suggestion.addressed_patterns?.includes(p.title),
+  );
   const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [mergedContent, setMergedContent] = useState<string | null>(null);
   const [loadingOriginal, setLoadingOriginal] = useState(false);
@@ -774,12 +852,10 @@ function EvolutionCard({
 
   return (
     <div className="border border-amber-700/30 rounded-xl bg-amber-950/15 overflow-hidden">
-      <div className="flex items-start px-5 py-4">
-        <button onClick={handleExpand} className="flex-1 min-w-0 text-left">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="p-1.5 rounded-lg bg-amber-600/15">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-            </div>
+      {/* Header: Name + Badges + Confidence + Action */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
             <span className="font-mono text-sm font-bold text-zinc-100">{suggestion.skill_name}</span>
             <Tooltip text={`${suggestion.edits.length} edit${suggestion.edits.length !== 1 ? "s" : ""} suggested`}>
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-300 border border-amber-700/20 cursor-help">
@@ -789,46 +865,93 @@ function EvolutionCard({
             </Tooltip>
             {suggestion.confidence > 0 && <ConfidenceBar confidence={suggestion.confidence} accentColor="amber" />}
           </div>
-          <p className="text-sm text-zinc-100 leading-relaxed pl-[2.375rem]">{suggestion.rationale}</p>
-        </button>
-        <div className="flex items-center gap-2 shrink-0 ml-3">
-          {updated ? (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-amber-900/30 rounded-lg border border-amber-700/20">
-              <Check className="w-3.5 h-3.5" /> Updated
-            </span>
-          ) : (
-            <Tooltip text="Preview merged result">
-              <button
-                onClick={handlePreview}
-                disabled={loadingOriginal}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition disabled:opacity-50"
-              >
-                {loadingOriginal
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Eye className="w-3.5 h-3.5" />}
-                Preview &amp; Update
-              </button>
-            </Tooltip>
-          )}
-          {fetchError && (
-            <span className="text-xs text-red-400">{fetchError}</span>
-          )}
-          <button onClick={handleExpand} className="p-1 text-zinc-500 hover:text-zinc-300 transition">
-            {expanded
-              ? <ChevronDown className="w-4 h-4" />
-              : <ChevronRight className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-2.5">
+            {updated ? (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-amber-900/30 rounded-lg border border-amber-700/20">
+                <Check className="w-3.5 h-3.5" /> Updated
+              </span>
+            ) : (
+              <Tooltip text="Preview merged result">
+                <button
+                  onClick={handlePreview}
+                  disabled={loadingOriginal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition disabled:opacity-50"
+                >
+                  {loadingOriginal
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Eye className="w-3.5 h-3.5" />}
+                  Preview &amp; Update
+                </button>
+              </Tooltip>
+            )}
+            {fetchError && <span className="text-xs text-red-400">{fetchError}</span>}
+          </div>
         </div>
+        {suggestion.description && (
+          <p className="text-sm text-zinc-300 leading-relaxed mt-1.5">{suggestion.description}</p>
+        )}
       </div>
-      {expanded && suggestion.edits.length > 0 && (
-        <div className="border-t border-amber-800/20 px-5 py-4 bg-zinc-900/20 space-y-4">
-          <EvolutionDiffView
-            skillName={suggestion.skill_name}
-            edits={suggestion.edits}
-            originalContent={originalContent ?? undefined}
-          />
+
+      {/* Why This is Useful */}
+      <div className="px-5 py-3 border-t border-amber-700/20">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-semibold text-amber-300 uppercase tracking-wide">Why This is Useful</span>
+        </div>
+        <BulletText text={suggestion.rationale} className="text-sm text-zinc-200 leading-relaxed" />
+      </div>
+
+      {/* Toggleable Addressed Workflow Patterns */}
+      {matchedPatterns.length > 0 && (
+        <div className="px-5 py-3 border-t border-amber-700/20">
+          <button
+            onClick={() => setPatternsExpanded(!patternsExpanded)}
+            className="flex items-center gap-1.5 text-xs hover:opacity-80 transition"
+          >
+            {patternsExpanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
+              : <ChevronRight className="w-3.5 h-3.5 text-amber-400" />}
+            <Target className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-semibold text-amber-300 uppercase tracking-wide">Addressed Workflow Patterns</span>
+            <span className="text-zinc-500">({matchedPatterns.length})</span>
+          </button>
+          {patternsExpanded && (
+            <div className="mt-2.5 space-y-3">
+              {matchedPatterns.map((p, i) => (
+                <div key={i} className="border-l-2 border-amber-700/30 pl-3 space-y-1.5">
+                  <h6 className="text-sm font-semibold text-zinc-100">{p.title}</h6>
+                  <BulletText text={p.description} className="text-sm text-zinc-300 leading-relaxed" />
+                  <StepRefList refs={p.example_refs} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Toggleable Proposed Edits */}
+      <div className="px-5 py-3 border-t border-amber-700/20">
+        <button
+          onClick={handleExpand}
+          className="flex items-center gap-1.5 text-xs hover:opacity-80 transition"
+        >
+          {expanded
+            ? <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
+            : <ChevronRight className="w-3.5 h-3.5 text-amber-400" />}
+          <Pencil className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-semibold text-amber-300 uppercase tracking-wide">Proposed Edits</span>
+          <span className="text-zinc-500">({suggestion.edits.length})</span>
+        </button>
+        {expanded && suggestion.edits.length > 0 && (
+          <div className="mt-2.5">
+            <EvolutionDiffView
+              skillName={suggestion.skill_name}
+              edits={suggestion.edits}
+              originalContent={originalContent ?? undefined}
+            />
+          </div>
+        )}
+      </div>
       {showPreview && mergedContent !== null && (
         <SkillPreviewDialog
           skillName={suggestion.skill_name}

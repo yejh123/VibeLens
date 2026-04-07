@@ -13,16 +13,15 @@ These are the user's installed skills. Propose improvements only for skills in t
 For every workflow pattern, provide:
 - `title`: Short, readable pattern name.
 - `description`: What the pattern does and when it occurs.
-- `gap`: Why the current skill coverage is insufficient.
 - `example_refs`: StepRef objects with `session_id` and `start_step_id` pointing to real occurrences. Optionally include `end_step_id` for multi-step ranges.
 
 For every proposal, provide:
 - `skill_name`: Name of the existing skill to improve.
-- `rationale`: Why this skill should be evolved.
+- `rationale`: One-sentence conclusion on why evolution is needed + 1-2 bullet points starting with '- '. Max 50 words.
 - `suggested_changes`: High-level description of proposed changes.
 - `addressed_patterns`: List of pattern titles this proposal addresses.
 - `relevant_session_indices`: 0-indexed session indices with evidence.
 
 After patterns and proposals, provide:
-- `summary`: Narrative overview of skill gaps and improvement opportunities.
+- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
 - `user_profile`: Brief description of the user's working style and preferences.

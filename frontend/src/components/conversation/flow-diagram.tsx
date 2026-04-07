@@ -195,8 +195,8 @@ function UserAnchor({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className={`font-mono text-[11px] font-semibold ${indexText}`}>
-              #{data.promptIndex}
+            <span className={`font-mono text-[11px] font-semibold px-1.5 py-0.5 rounded ${indexText} bg-zinc-700/50`}>
+              User #{data.promptIndex}
             </span>
             {isAuto && (
               <span className="text-[9px] uppercase tracking-wider text-amber-500/60 font-semibold">
@@ -231,7 +231,7 @@ function PhaseSection({
           <span className={`text-[11px] font-bold uppercase tracking-[0.14em] ${style.label}`}>
             {phase.phase}
           </span>
-          <span className="text-[10px] text-zinc-500 font-medium">
+          <span className="text-[10px] text-zinc-300 font-medium">
             {phase.cards.length} step{phase.cards.length !== 1 ? "s" : ""}
           </span>
         </div>

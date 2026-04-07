@@ -9,9 +9,10 @@ interface SubAgentBlockProps {
   trajectory: Trajectory;
   allTrajectories: Trajectory[];
   concise?: boolean;
+  index?: number;
 }
 
-export function SubAgentBlock({ trajectory, allTrajectories, concise }: SubAgentBlockProps) {
+export function SubAgentBlock({ trajectory, allTrajectories, concise, index }: SubAgentBlockProps) {
   const [open, setOpen] = useState(false);
 
   const steps = trajectory.steps || [];
@@ -30,8 +31,9 @@ export function SubAgentBlock({ trajectory, allTrajectories, concise }: SubAgent
     [allTrajectories, trajectory.session_id]
   );
 
-  const label = trajectory.session_id.slice(0, SESSION_ID_MEDIUM);
-  const preview = `${stepCount} steps • ${toolCallCount} tools`;
+  const shortId = trajectory.session_id.slice(0, SESSION_ID_MEDIUM);
+  const label = index != null ? `Sub-Agent #${index} (${shortId})` : `Sub-Agent (${shortId})`;
+  const preview = `${stepCount} steps · ${toolCallCount} tools`;
 
   return (
     <CollapsiblePill
@@ -43,7 +45,7 @@ export function SubAgentBlock({ trajectory, allTrajectories, concise }: SubAgent
       className="bg-violet-500/10 border-violet-500/30 text-violet-300"
     >
       <div className="ml-3 pl-3 py-2 space-y-2">
-        <div className="flex items-center gap-3 text-[10px] text-violet-400 px-1 pb-1">
+        <div className="flex items-center gap-3 text-[10px] text-violet-300 px-1 pb-1">
           <span className="flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
             {stepCount}

@@ -196,7 +196,7 @@ async def _infer_friction_analysis_batch(
     digest = format_batch_digest(batch)
     session_count = len(batch.contexts)
 
-    system_kwargs = build_system_kwargs(FRICTION_ANALYSIS_PROMPT.output_model, backend)
+    system_kwargs = build_system_kwargs(FRICTION_ANALYSIS_PROMPT, backend)
     system_prompt = FRICTION_ANALYSIS_PROMPT.render_system(**system_kwargs)
 
     non_digest_overhead = FRICTION_ANALYSIS_PROMPT.render_user(
@@ -213,7 +213,7 @@ async def _infer_friction_analysis_batch(
         user=user_prompt,
         max_tokens=FRICTION_OUTPUT_TOKENS,
         timeout=FRICTION_TIMEOUT_SECONDS,
-        json_schema=FRICTION_ANALYSIS_PROMPT.output_model.model_json_schema(),
+        json_schema=FRICTION_ANALYSIS_PROMPT.output_json_schema(),
     )
 
     if batch_index == 0:
@@ -277,7 +277,7 @@ async def _synthesize_friction_analysis(
         for output, _ in batch_results
     ]
 
-    system_kwargs = build_system_kwargs(FRICTION_SYNTHESIS_PROMPT.output_model, backend)
+    system_kwargs = build_system_kwargs(FRICTION_SYNTHESIS_PROMPT, backend)
     system_prompt = FRICTION_SYNTHESIS_PROMPT.render_system(**system_kwargs)
     user_prompt = FRICTION_SYNTHESIS_PROMPT.render_user(
         batch_count=len(batch_results), session_count=session_count, batch_results=batch_data
@@ -288,7 +288,7 @@ async def _synthesize_friction_analysis(
         user=user_prompt,
         max_tokens=SYNTHESIS_OUTPUT_TOKENS,
         timeout=SYNTHESIS_TIMEOUT_SECONDS,
-        json_schema=FRICTION_SYNTHESIS_PROMPT.output_model.model_json_schema(),
+        json_schema=FRICTION_SYNTHESIS_PROMPT.output_json_schema(),
     )
 
     save_analysis_log(log_dir, "synthesis_system.txt", system_prompt)

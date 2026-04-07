@@ -52,9 +52,18 @@ class Mitigation(BaseModel):
 class FrictionAnalysisOutput(BaseModel):
     """LLM output model for one batch (and synthesis)."""
 
-    title: str = Field(description="Short title for the analysis (max 10 words).")
-    user_profile: str = Field(description="User's working style and project focus (max 50 words).")
-    summary: str = Field(description="Narrative overview of friction (max 80 words).")
+    title: str = Field(
+        description="Clear, reader-friendly title capturing the main theme. Max 8 words."
+    )
+    user_profile: str = Field(
+        description="User's working style and project focus (max 50 words)."
+    )
+    summary: str = Field(
+        description=(
+            "One-sentence conclusion followed by 2-4 bullet points "
+            "starting with '- '. Max 100 words."
+        )
+    )
     friction_events: list[FrictionEvent] = Field(
         default_factory=list, description="0-5 friction events."
     )
@@ -69,11 +78,19 @@ class FrictionAnalysisResult(BaseModel):
     analysis_id: str | None = Field(
         default=None, description="Persistence ID. Set when the result is saved to disk."
     )
-    title: str | None = Field(default=None, description="Short title from LLM.")
+    title: str | None = Field(
+        default=None,
+        description="Clear, reader-friendly title from LLM. Max 8 words.",
+    )
     user_profile: str | None = Field(
         default=None, description="User's working style and project focus."
     )
-    summary: str = Field(description="Narrative overview of friction across all sessions.")
+    summary: str = Field(
+        description=(
+            "One-sentence conclusion followed by 2-4 bullet points "
+            "starting with '- '. Max 100 words."
+        )
+    )
     mitigations: list[Mitigation] = Field(
         default_factory=list, description="Actionable recommendations sorted by confidence."
     )

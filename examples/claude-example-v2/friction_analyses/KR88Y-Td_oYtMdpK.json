@@ -2,7 +2,7 @@
   "analysis_id": "KR88Y-Td_oYtMdpK",
   "title": "Irrelevant Images and Broken Modal Interactions",
   "user_profile": "Frontend developer building a polished static recipe book website. Iterates through visual feedback and expects working interactive elements on first deployment.",
-  "summary": "Analysis of 1 session found 3 friction events where the user expressed dissatisfaction. Primary friction came from placeholder images that didn't match recipe content and a modal close button that was non-functional after deployment. A minor friction arose from the agent's verbose planning phase before the user interrupted to start implementation.",
+  "summary": "Agent shipped broken interactions and irrelevant content in a recipe site build.\n- Placeholder images from picsum.photos showed random landscapes instead of food\n- Modal close button had no event listener, trapping users in detail view\n- Extended plan-mode exploration delayed implementation until user interrupted",
   "mitigations": [
     {
       "title": "Use content-relevant images",

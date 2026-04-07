@@ -37,6 +37,7 @@ import { LoadingSpinner, LoadingSpinnerRings } from "../loading-spinner";
 import { CostEstimateDialog } from "../cost-estimate-dialog";
 import { Tooltip } from "../tooltip";
 import { FrictionHistory } from "./friction-history";
+import { BulletText } from "../bullet-text";
 import { WarningsBanner } from "../warnings-banner";
 
 const SEVERITY_LABELS: Record<number, string> = {
@@ -434,7 +435,7 @@ function SummarySection({
   return (
     <div className="space-y-4">
       <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-5">
-        <p className="text-sm text-zinc-200 leading-relaxed">{summary}</p>
+        <BulletText text={summary} className="text-sm text-zinc-200 leading-relaxed" />
       </div>
       {userProfile && (
         <div className="bg-gradient-to-r from-amber-950/30 to-zinc-900/60 border border-amber-700/30 rounded-xl p-5">
@@ -444,7 +445,7 @@ function SummarySection({
             </div>
             <h3 className="text-sm font-semibold text-zinc-100">User Profile</h3>
           </div>
-          <p className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]">{userProfile}</p>
+          <BulletText text={userProfile} className="text-sm text-zinc-300 leading-relaxed pl-[2.375rem]" />
         </div>
       )}
     </div>
@@ -494,7 +495,7 @@ function MitigationCard({ mitigation }: { mitigation: Mitigation }) {
           </div>
         </Tooltip>
       </div>
-      <p className="text-sm text-zinc-200 leading-relaxed">{mitigation.action}</p>
+      <BulletText text={mitigation.action} className="text-sm text-zinc-200 leading-relaxed" />
     </div>
   );
 }
@@ -622,9 +623,7 @@ function EventCard({ event, defaultExpanded = false }: { event: FrictionEvent; d
               {event.user_intention}
             </p>
             {event.description && (
-              <p className={`text-sm text-zinc-400 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
-                {event.description}
-              </p>
+              <BulletText text={event.description} className={`text-sm text-zinc-400 mt-1 leading-relaxed ${expanded ? "" : "line-clamp-2"}`} />
             )}
             {expanded && (
               <div className="mt-2">

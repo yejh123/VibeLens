@@ -360,13 +360,13 @@ export type SkillMode = "retrieval" | "creation" | "evolution";
 export interface WorkflowPattern {
   title: string;
   description: string;
-  gap: string;
   example_refs: StepRef[];
   frequency: number;
 }
 
 export interface SkillRecommendation {
   skill_name: string;
+  description: string;
   rationale: string;
   addressed_patterns: string[];
   confidence: number;
@@ -378,6 +378,7 @@ export interface SkillCreation {
   skill_md_content: string;
   rationale: string;
   tools_used: string[];
+  addressed_patterns: string[];
   confidence: number;
 }
 
@@ -389,8 +390,10 @@ export interface SkillEdit {
 
 export interface SkillEvolution {
   skill_name: string;
+  description: string;
   edits: SkillEdit[];
   rationale: string;
+  addressed_patterns: string[];
   confidence: number;
 }
 

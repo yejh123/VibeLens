@@ -99,13 +99,13 @@ def estimate_skill_creation(
 
     # Proposal phase tokens
     proposal_system = SKILL_CREATION_PROPOSAL_PROMPT.render_system(
-        **build_system_kwargs(SKILL_CREATION_PROPOSAL_PROMPT.output_model, backend)
+        **build_system_kwargs(SKILL_CREATION_PROPOSAL_PROMPT, backend)
     )
     batch_token_counts = [count_tokens(format_batch_digest(batch)) for batch in batches]
 
     # Deep generation phase tokens (estimated per-call)
     generate_system = SKILL_CREATION_GENERATE_PROMPT.render_system(
-        **build_system_kwargs(SKILL_CREATION_GENERATE_PROMPT.output_model, backend)
+        **build_system_kwargs(SKILL_CREATION_GENERATE_PROMPT, backend)
     )
     digest = build_digest_from_contexts(context_set)
     deep_input_tokens = count_tokens(generate_system) + count_tokens(digest)
@@ -354,7 +354,7 @@ async def _infer_skill_creation(
     digest = build_digest_from_contexts(context_set)
     installed_skills = gather_installed_skills()
 
-    system_kwargs = build_system_kwargs(SKILL_CREATION_GENERATE_PROMPT.output_model, backend)
+    system_kwargs = build_system_kwargs(SKILL_CREATION_GENERATE_PROMPT, backend)
     system_prompt = SKILL_CREATION_GENERATE_PROMPT.render_system(**system_kwargs)
 
     # Truncate digest to fit context budget
@@ -382,7 +382,7 @@ async def _infer_skill_creation(
         user=user_prompt,
         max_tokens=SKILL_CREATION_GENERATE_OUTPUT_TOKENS,
         timeout=SKILL_CREATION_GENERATE_TIMEOUT_SECONDS,
-        json_schema=SKILL_CREATION_GENERATE_PROMPT.output_model.model_json_schema(),
+        json_schema=SKILL_CREATION_GENERATE_PROMPT.output_json_schema(),
     )
 
     if log_dir is None:
@@ -398,6 +398,7 @@ async def _infer_skill_creation(
 
     creation = parse_llm_output(result.text, SkillCreation, "deep creation")
     creation.confidence = proposal_confidence
+    creation.addressed_patterns = addressed_patterns
     cost = result.cost_usd or 0.0
     return creation, cost
 
@@ -424,7 +425,7 @@ async def _infer_skill_creation_proposal_batch(
     digest = format_batch_digest(batch)
     session_count = len(batch.contexts)
 
-    system_kwargs = build_system_kwargs(SKILL_CREATION_PROPOSAL_PROMPT.output_model, backend)
+    system_kwargs = build_system_kwargs(SKILL_CREATION_PROPOSAL_PROMPT, backend)
     system_prompt = SKILL_CREATION_PROPOSAL_PROMPT.render_system(**system_kwargs)
 
     # Truncate digest to fit context budget
@@ -446,7 +447,7 @@ async def _infer_skill_creation_proposal_batch(
         user=user_prompt,
         max_tokens=SKILL_CREATION_PROPOSAL_OUTPUT_TOKENS,
         timeout=SKILL_CREATION_PROPOSAL_TIMEOUT_SECONDS,
-        json_schema=SKILL_CREATION_PROPOSAL_PROMPT.output_model.model_json_schema(),
+        json_schema=SKILL_CREATION_PROPOSAL_PROMPT.output_json_schema(),
     )
 
     if batch_index == 0:
@@ -487,7 +488,6 @@ async def _synthesize_skill_creation_proposals(
                 {
                     "title": p.title,
                     "description": p.description,
-                    "gap": p.gap,
                     "example_refs": [ref.model_dump(exclude_none=True) for ref in p.example_refs],
                 }
                 for p in output.workflow_patterns
@@ -506,7 +506,7 @@ async def _synthesize_skill_creation_proposals(
     ]
 
     synthesis_prompt = SKILL_CREATION_PROPOSAL_SYNTHESIS_PROMPT
-    system_kwargs = build_system_kwargs(synthesis_prompt.output_model, backend)
+    system_kwargs = build_system_kwargs(synthesis_prompt, backend)
     system_prompt = synthesis_prompt.render_system(**system_kwargs)
     user_prompt = synthesis_prompt.render_user(
         batch_count=len(batch_results), session_count=session_count, batch_results=batch_data
@@ -517,7 +517,7 @@ async def _synthesize_skill_creation_proposals(
         user=user_prompt,
         max_tokens=SKILL_CREATION_SYNTHESIS_OUTPUT_TOKENS,
         timeout=SKILL_CREATION_SYNTHESIS_TIMEOUT_SECONDS,
-        json_schema=synthesis_prompt.output_model.model_json_schema(),
+        json_schema=synthesis_prompt.output_json_schema(),
     )
 
     save_analysis_log(log_dir, "proposal_synthesis_system.txt", system_prompt)

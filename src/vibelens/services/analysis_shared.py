@@ -10,13 +10,12 @@ import json
 from collections.abc import Coroutine
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from vibelens.deps import get_inference_backend
 from vibelens.llm.backend import InferenceBackend, InferenceError
 from vibelens.llm.tokenizer import count_tokens
 from vibelens.models.context import SessionContext, SessionContextBatch
 from vibelens.models.llm.inference import BackendType
+from vibelens.models.llm.prompts import AnalysisPrompt
 from vibelens.services.context_extraction import extract_session_context
 from vibelens.services.context_params import PRESET_DETAIL, ContextParams
 from vibelens.services.session.store_resolver import (
@@ -147,19 +146,17 @@ You are running as a headless analysis backend. Follow these rules strictly:
 CONTEXT_TOKEN_BUDGET = 100_000
 
 
-def build_system_kwargs(output_model: type[BaseModel], backend: InferenceBackend) -> dict[str, str]:
+def build_system_kwargs(prompt: AnalysisPrompt, backend: InferenceBackend) -> dict[str, str]:
     """Build common kwargs for render_system(): output_schema + backend_rules.
 
     Args:
-        output_model: Pydantic model class for the output schema.
+        prompt: AnalysisPrompt with output_model and optional exclude_fields.
         backend: Active inference backend.
 
     Returns:
         Dict with output_schema and backend_rules keys.
     """
-    kwargs: dict[str, str] = {
-        "output_schema": json.dumps(output_model.model_json_schema(), indent=2)
-    }
+    kwargs: dict[str, str] = {"output_schema": json.dumps(prompt.output_json_schema(), indent=2)}
     if backend.backend_id != BackendType.LITELLM:
         kwargs["backend_rules"] = CLI_BACKEND_RULES
     else:

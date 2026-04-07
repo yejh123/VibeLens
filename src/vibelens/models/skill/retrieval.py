@@ -9,8 +9,15 @@ class SkillRecommendation(BaseModel):
     """A skill recommended from the catalog, matched to detected patterns."""
 
     skill_name: str = Field(description="Name of the recommended skill.")
+    description: str = Field(
+        default="",
+        description="Short description of what this skill does. Set by the service layer.",
+    )
     rationale: str = Field(
-        description="Why this skill fits the detected patterns. 1-2 sentences, under 40 words."
+        description=(
+            "One-sentence conclusion on why this fits, followed by "
+            "1-2 bullet points starting with '- '. Max 50 words."
+        )
     )
     addressed_patterns: list[str] = Field(
         default_factory=list,
@@ -23,7 +30,8 @@ class SkillRetrievalOutput(BaseModel):
     """LLM output for retrieval-mode skill analysis."""
 
     title: str = Field(
-        default="", description="Concise 5-10 word title summarizing the analysis findings."
+        default="",
+        description="Clear, reader-friendly title capturing the main finding. Max 8 words.",
     )
     user_profile: str = Field(
         default="",
@@ -37,7 +45,8 @@ class SkillRetrievalOutput(BaseModel):
     )
     summary: str = Field(
         description=(
-            "Concise analysis overview for readers of all expertise levels. Under 100 words."
+            "One-sentence conclusion followed by 2-4 bullet points starting with '- '. "
+            "Accessible to all expertise levels. Max 100 words."
         )
     )
     recommendations: list[SkillRecommendation] = Field(

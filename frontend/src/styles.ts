@@ -23,7 +23,7 @@ export const PHASE_STYLE: Record<string, { border: string; label: string; dot: s
   debugging: { border: "border-l-red-400", label: "text-red-400", dot: "bg-red-400", bg: "bg-red-500/[0.03]" },
   verification: { border: "border-l-amber-400", label: "text-amber-400", dot: "bg-amber-400", bg: "bg-amber-500/[0.03]" },
   planning: { border: "border-l-violet-400", label: "text-violet-400", dot: "bg-violet-400", bg: "bg-violet-500/[0.03]" },
-  mixed: { border: "border-l-zinc-500", label: "text-zinc-400", dot: "bg-zinc-500", bg: "bg-zinc-500/[0.02]" },
+  mixed: { border: "border-l-indigo-400", label: "text-indigo-400", dot: "bg-indigo-400", bg: "bg-indigo-500/[0.03]" },
 };
 
 // Tool category colors — shared between flow-diagram, flow-layout

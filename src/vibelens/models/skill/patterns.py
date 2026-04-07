@@ -18,7 +18,7 @@ class SkillMode(StrEnum):
 class WorkflowPattern(BaseModel):
     """A recurring workflow pattern detected from trajectory analysis.
 
-    The LLM generates title, description, gap, and example_refs.
+    The LLM generates title, description, and example_refs.
     frequency is computed from the number of example_refs.
     """
 
@@ -27,9 +27,6 @@ class WorkflowPattern(BaseModel):
     )
     description: str = Field(
         description="What this pattern does and when it occurs. 1-2 sentences, under 40 words."
-    )
-    gap: str = Field(
-        description="Why this is suboptimal or repetitive. 1 sentence, under 30 words."
     )
     example_refs: list[StepRef] = Field(
         default_factory=list, description="Step references where this pattern was observed."

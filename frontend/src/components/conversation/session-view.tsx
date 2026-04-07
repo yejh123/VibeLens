@@ -213,6 +213,13 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
     return { map, orphans };
   }, [main, subAgents]);
 
+  // Map sub-agent session_id → 1-based display index (chronological order)
+  const subAgentIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    subAgents.forEach((sub, i) => map.set(sub.session_id, i + 1));
+    return map;
+  }, [subAgents]);
+
   const steps = (main?.steps || []) as Step[];
 
   const userStepIds = useMemo(() => {
@@ -673,6 +680,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
                                     trajectory={sub}
                                     allTrajectories={trajectories}
                                     concise={isConcise}
+                                    index={subAgentIndexMap.get(sub.session_id)}
                                   />
                                 </div>
                               ))}
@@ -693,6 +701,7 @@ export function SessionView({ sessionId, sharedTrajectories, shareToken, onNavig
                         trajectory={sub}
                         allTrajectories={trajectories}
                         concise={isConcise}
+                        index={subAgentIndexMap.get(sub.session_id)}
                       />
                     </div>
                   ))}

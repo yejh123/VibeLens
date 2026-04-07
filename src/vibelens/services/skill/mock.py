@@ -56,11 +56,10 @@ def build_mock_skill_result(session_ids: list[str], mode: SkillMode) -> SkillAna
         creations=creations,
         evolutions=evolutions,
         summary=(
-            f"Analyzed {len(loaded_ids)} sessions and detected {len(patterns)} "
-            f"recurring workflow patterns. The most frequent pattern involves "
-            f"search-then-read-then-edit sequences that could be automated with skills. "
-            f"Several test-driven development loops and file scaffolding patterns were also "
-            f"identified as strong candidates for skill automation."
+            f"Strong automation candidates found across {len(loaded_ids)} sessions.\n"
+            f"- {len(patterns)} recurring workflow patterns detected\n"
+            "- Search-read-edit sequences are the most frequent and automatable\n"
+            "- Test-fix loops and file scaffolding also benefit from skill automation"
         ),
         user_profile=(
             "Developer focused on Python/TypeScript full-stack projects. "
@@ -74,7 +73,6 @@ def build_mock_skill_result(session_ids: list[str], mode: SkillMode) -> SkillAna
         metrics=Metrics(cost_usd=0.035),
         created_at=datetime.now(UTC).isoformat(),
     )
-
 
 
 MAX_MOCK_SESSIONS = 5
@@ -122,10 +120,6 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Grep for a pattern, read the matching file, then edit it. "
                 "This three-step sequence appears whenever code modifications are needed."
             ),
-            gap=(
-                "Manual three-step workflow repeated across sessions. "
-                "Could be a single skill that searches, reads context, and applies edits."
-            ),
             example_refs=all_refs[:6],
         ),
         WorkflowPattern(
@@ -133,10 +127,6 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
             description=(
                 "Run tests, read failure output, apply fix, re-run tests. "
                 "Iterative debugging cycle until all tests pass."
-            ),
-            gap=(
-                "Repetitive cycle consumes context window and developer attention. "
-                "A skill could automate the read-fix-verify loop."
             ),
             example_refs=all_refs[:3],
         ),
@@ -146,10 +136,6 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Create file with boilerplate structure, add standard imports, "
                 "then run the linter. Identical scaffolding repeated for every new module."
             ),
-            gap=(
-                "Boilerplate structure is identical across files. "
-                "A skill could generate the full scaffold in one step."
-            ),
             example_refs=all_refs[1:3] if len(all_refs) > 1 else all_refs[:1],
         ),
         WorkflowPattern(
@@ -158,10 +144,6 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
                 "Check outdated packages, read changelogs, update version constraints, "
                 "run tests, and fix any breaking changes. Multi-step process per dependency."
             ),
-            gap=(
-                "Each dependency upgrade requires 4-5 manual steps. "
-                "Batching multiple upgrades amplifies the effort."
-            ),
             example_refs=all_refs[:1],
         ),
         WorkflowPattern(
@@ -169,10 +151,6 @@ def _build_mock_patterns(pool: dict[str, list[str]]) -> list[WorkflowPattern]:
             description=(
                 "Read config files, add feature flags, update environment templates, "
                 "and modify conditional logic in multiple source files."
-            ),
-            gap=(
-                "Feature toggles touch config, env templates, and source code. "
-                "Easy to miss one location, causing inconsistencies."
             ),
             example_refs=all_refs[2:6] if len(all_refs) > 2 else all_refs,
         ),
@@ -184,36 +162,54 @@ def _build_mock_recommendations() -> list[SkillRecommendation]:
     return [
         SkillRecommendation(
             skill_name="smart-refactor",
+            description=(
+                "Intelligently refactor code by searching, reading,"
+                " and editing files in one coordinated step."
+            ),
             rationale=(
-                "Automates the search-read-edit pattern with intelligent code refactoring. "
-                "Matches your most frequent workflow pattern with high confidence."
+                "Strong match for your most frequent workflow.\n"
+                "- Automates the search-read-edit pattern with intelligent refactoring\n"
+                "- Eliminates 3-step manual sequence per code change"
             ),
             addressed_patterns=["Search-Read-Edit Cycle"],
             confidence=0.92,
         ),
         SkillRecommendation(
             skill_name="test-driven-fix",
+            description=(
+                "Diagnose test failures and apply targeted fixes"
+                " by reading test output and identifying root causes."
+            ),
             rationale=(
-                "Automates the test-fix-verify loop with structured error analysis. "
-                "Reads test output, identifies root cause, and applies targeted fixes."
+                "Directly addresses your test-fix loops.\n"
+                "- Reads test output and identifies root cause automatically\n"
+                "- Applies targeted fixes without manual diagnosis steps"
             ),
             addressed_patterns=["Test-Fix Loop"],
             confidence=0.78,
         ),
         SkillRecommendation(
             skill_name="project-scaffold",
+            description=(
+                "Generate standard project file structure"
+                " with imports, docstrings, and boilerplate."
+            ),
             rationale=(
-                "Generates standard project file scaffolding with imports and docstrings. "
-                "Partially matches your file creation patterns."
+                "Partial match for file creation patterns.\n"
+                "- Generates standard scaffolding with imports and docstrings"
             ),
             addressed_patterns=["New File Scaffolding"],
             confidence=0.61,
         ),
         SkillRecommendation(
             skill_name="dep-updater",
+            description=(
+                "Automate dependency version upgrades"
+                " with changelog analysis and compatibility checks."
+            ),
             rationale=(
-                "Automates dependency version bumps with changelog analysis. "
-                "Low match -- your upgrade pattern is infrequent."
+                "Low match due to infrequent upgrade pattern.\n"
+                "- Automates dependency version bumps with changelog analysis"
             ),
             addressed_patterns=["Dependency Upgrade Workflow"],
             confidence=0.35,
@@ -240,10 +236,12 @@ def _build_mock_creations() -> list[SkillCreation]:
                 "4. Run the linter after creation\n"
             ),
             rationale=(
-                "Detected repeated file creation with identical boilerplate structure "
-                "across 3 sessions. Automating this saves ~2 minutes per new file."
+                "Repeated boilerplate detected across 3 sessions.\n"
+                "- Identical file structure created manually each time\n"
+                "- Automating saves ~2 minutes per new file"
             ),
             tools_used=[],
+            addressed_patterns=["New File Scaffolding"],
         ),
         SkillCreation(
             name="search-and-replace",
@@ -263,10 +261,11 @@ def _build_mock_creations() -> list[SkillCreation]:
                 "5. Summarize changes made\n"
             ),
             rationale=(
-                "Your search-read-edit cycle is the most frequent pattern. "
-                "This skill packages it into a single, repeatable workflow."
+                "Most frequent pattern in your sessions.\n"
+                "- Packages search-read-edit into a single repeatable workflow"
             ),
             tools_used=[],
+            addressed_patterns=["Search-Read-Edit Cycle"],
         ),
         SkillCreation(
             name="test-fix-loop",
@@ -286,10 +285,11 @@ def _build_mock_creations() -> list[SkillCreation]:
                 "6. If still failing, repeat from step 2 (max 3 iterations)\n"
             ),
             rationale=(
-                "Test-fix loops consumed significant context in 2 sessions. "
-                "Automating the diagnosis step alone would save ~40% of iterations."
+                "Test-fix loops consumed significant context in 2 sessions.\n"
+                "- Automating the diagnosis step saves ~40% of iterations"
             ),
             tools_used=[],
+            addressed_patterns=["Test-Fix Loop"],
         ),
     ]
 
@@ -306,6 +306,7 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
         evolutions.append(
             SkillEvolution(
                 skill_name=first_skill.name,
+                description=first_skill.description or first_skill.name,
                 edits=[
                     SkillEdit(
                         old_string="",
@@ -321,10 +322,11 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
                     ),
                 ],
                 rationale=(
-                    f"Skill '{first_skill.name}' could benefit from additional "
-                    f"instructions based on observed usage patterns. "
-                    f"Adding linting and search capabilities would align it with your workflow."
+                    f"Skill '{first_skill.name}' needs alignment with observed usage.\n"
+                    "- Adding linting catches errors earlier in the workflow\n"
+                    "- Search capabilities match your grep-first patterns"
                 ),
+                addressed_patterns=["Search-Read-Edit Cycle", "Test-Fix Loop"],
             )
         )
 
@@ -333,6 +335,7 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
         evolutions.append(
             SkillEvolution(
                 skill_name=second_skill.name,
+                description=second_skill.description or second_skill.name,
                 edits=[
                     SkillEdit(
                         old_string="Step 3: Manual verification\n",
@@ -344,9 +347,11 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
                     ),
                 ],
                 rationale=(
-                    f"Skill '{second_skill.name}' has redundant steps and reads too many files. "
-                    f"Streamlining it would reduce context usage by ~30%."
+                    f"Skill '{second_skill.name}' wastes context on redundant steps.\n"
+                    "- Removing manual verification step saves a full turn\n"
+                    "- Reading only modified files reduces context usage by ~30%"
                 ),
+                addressed_patterns=["New File Scaffolding"],
             )
         )
 
@@ -354,6 +359,7 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
         evolutions.append(
             SkillEvolution(
                 skill_name="example-skill",
+                description="Example skill for demonstrating evolution analysis.",
                 edits=[
                     SkillEdit(
                         old_string="",
@@ -361,9 +367,10 @@ def _build_mock_evolutions() -> list[SkillEvolution]:
                     ),
                 ],
                 rationale=(
-                    "No installed skills found. This is an example suggestion showing "
-                    "how evolution analysis would improve your skills."
+                    "No installed skills found.\n"
+                    "- This is an example showing how evolution analysis works"
                 ),
+                addressed_patterns=["Config-Driven Feature Toggle"],
             )
         )
 

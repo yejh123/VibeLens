@@ -8,11 +8,11 @@ The reader is a developer who used a coding agent and wants to understand where 
 
 Produce a JSON object with:
 
-1. **title**: A short, descriptive title (max 10 words) capturing the dominant friction theme. Examples: "Repeated Misunderstandings in Refactoring Sessions", "Agent Scope Violations Across Test Writing".
+1. **title**: A clear, reader-friendly title (max 8 words) capturing the dominant friction theme. Examples: "Scope Violations Across Test Writing", "Repeated Misunderstandings During Refactoring".
 
 2. **user_profile**: A concise summary of the user's working style and project focus (max 50 words). Merge profiles from all batches into one coherent description.
 
-3. **summary**: A high-level overview (max 80 words) of what went wrong and the key takeaway. Focus on the 1-2 biggest patterns, not every detail. Write for someone who cannot remember every interaction. Never reference batches, chunks, or internal processing.
+3. **summary**: One-sentence conclusion followed by 2-4 bullet points starting with '- '. Max 100 words. Focus on the 1-2 biggest patterns, not every detail. Write for someone who cannot remember every interaction. Never reference batches, chunks, or internal processing.
 
 4. **friction_events**: Deduplicated and merged list of the most important friction events across all batches. Keep at most 5. Prefer higher severity and recurring patterns. If two events from different batches describe the same issue, merge them (keep the most representative span_ref).
 
@@ -22,9 +22,9 @@ Produce a JSON object with:
 
 **CRITICAL: Your entire response must be a single JSON object starting with `{` and ending with `}`. Do NOT wrap it in ```json code fences. No markdown, no prose, no explanation before or after — only raw JSON.**
 
-- `title`: Max 10 words. Be specific, not generic.
+- `title`: Max 8 words. Clear, reader-friendly, specific.
 - `user_profile`: Max 50 words. Coherent merged profile.
-- `summary`: Max 80 words. High-level, no implementation details.
+- `summary`: One-sentence conclusion + 2-4 bullet points. Max 100 words.
 - `friction_events`: At most 5, ordered by severity descending.
 - `mitigations`: 0-5 items, ordered by confidence descending.
 

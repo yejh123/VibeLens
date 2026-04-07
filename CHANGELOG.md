@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.23] - 2026-04-07
+
+### Changed
+- **Structured output format for all LLM analysis**: Summary, rationale, and description fields across friction, retrieval, creation, and evolution models now require "one-sentence conclusion + bullet points" format with explicit word limits, replacing free-form prose.
+- **Title field descriptions tightened**: All LLM-generated titles capped at 8 words with "clear, reader-friendly" guidance.
+- **Skill description propagated to recommendations and evolutions**: `SkillRecommendation` and `SkillEvolution` now carry a `description` field; `SkillCreation` gains `addressed_patterns`.
+- **`WorkflowPattern.gap` removed**: Redundant with pattern description; removed from model, types, templates, and UI.
+- **Skill analysis views redesigned**: Summary and user profile merged into a single card with divider. Purple/violet theme replaced with zinc/teal to match recommendation cards. Workflow pattern cards now expandable inline within each skill card.
+- **Prompt templates refined**: All skill and friction Jinja2 templates updated for tighter output constraints, consistent bullet-point formatting, and reduced verbosity.
+- **Model field ordering**: `SkillAnalysisResult` and `SkillEvolution` fields reordered for logical grouping (metadata, content, metrics, warnings).
+- **`SkillEdit` model relocated**: Moved after `SkillEvolutionProposalResult` for better reading order in `evolution.py`.
+- **Demo examples updated**: Friction and skill analysis example JSONs in `examples/claude-example-v2/` refreshed to match new model shapes.
+
+### Fixed
+- **Friction panel UI**: Mitigation `title` field added to model and displayed in friction cards. User profile card styling and confidence score placement improved.
+- **Sub-agent block and flow diagram**: Minor layout and color adjustments for readability.
+- **Collapsible pill**: Styling tweak for consistent appearance.
+
 ## [0.9.22] - 2026-04-06
 
 ### Added

@@ -19,7 +19,6 @@ Analyze the provided session transcripts to:
 - A pattern must appear at least 2 times across sessions to be reported.
 - Every pattern MUST have a short, readable `title` (e.g. "Search-Read-Edit Cycle", "Test-Fix Loop").
 - Every pattern MUST have a `description` with more detail about what the pattern involves.
-- Every pattern MUST have a `gap` explaining why automation would help.
 - `example_refs` must reference real step IDs from the session data. Never fabricate.
 - NEVER reference sessions by ID, index, or UUID in text fields (summary, description, rationale, user_profile). Describe patterns in general terms that readers can understand without session context.
 
@@ -27,7 +26,7 @@ Analyze the provided session transcripts to:
 
 - Generate at most 3 proposals, prioritized by frequency and pain severity.
 - Each proposal must directly address one or more detected patterns.
-- Proposals need only: `skill_name` (kebab-case), `description` (one-line trigger), `rationale`, and `addressed_patterns` (list of pattern titles).
+- Proposals need only: `skill_name` (kebab-case), `description` (specific trigger description stating what the skill does and when it activates), `rationale` (one-sentence conclusion + 1-2 bullet points), and `addressed_patterns` (list of pattern titles).
 - Do not generate proposals that duplicate already-installed functionality.
 - Focus on specificity: "test-fix-loop" is better than "general-helper".
 

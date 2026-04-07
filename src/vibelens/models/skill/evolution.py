@@ -11,7 +11,12 @@ class SkillEvolutionProposal(BaseModel):
     """A lightweight evolution proposal before deep editing."""
 
     skill_name: str = Field(description="Existing skill to evolve.")
-    rationale: str = Field(description="Why this skill should be evolved.")
+    rationale: str = Field(
+        description=(
+            "One-sentence conclusion on why evolution is needed, "
+            "followed by 1-2 bullet points starting with '- '. Max 50 words."
+        )
+    )
     suggested_changes: str = Field(description="High-level description of proposed changes.")
     addressed_patterns: list[str] = Field(
         default_factory=list,
@@ -30,7 +35,8 @@ class SkillEvolutionProposalOutput(BaseModel):
     """LLM output from the evolution proposal step."""
 
     title: str = Field(
-        default="", description="Concise 5-10 word title summarizing the analysis findings."
+        default="",
+        description="Clear, reader-friendly title capturing the main finding. Max 8 words.",
     )
     user_profile: str = Field(
         default="",
@@ -44,26 +50,13 @@ class SkillEvolutionProposalOutput(BaseModel):
     )
     summary: str = Field(
         description=(
-            "Concise analysis overview for readers of all expertise levels. Under 100 words."
+            "One-sentence conclusion followed by 2-4 bullet points starting with '- '. "
+            "Accessible to all expertise levels. Max 100 words."
         )
     )
     proposals: list[SkillEvolutionProposal] = Field(
         default_factory=list, description="Evolution proposals for existing skills."
     )
-
-
-class SkillEdit(BaseModel):
-    """A single edit to an existing skill definition.
-
-    Uses old_string/new_string like the Edit tool:
-    - Replace: old_string="original text", new_string="new text"
-    - Delete: old_string="text to remove", new_string=""
-    - Add/append: old_string="" (empty), new_string="text to add"
-    """
-
-    old_string: str = Field(description="Text to find in the skill. Empty string for append.")
-    new_string: str = Field(description="Replacement text. Empty string for deletion.")
-    replace_all: bool = Field(default=False, description="Replace all occurrences if True.")
 
 
 class SkillEvolutionProposalResult(BaseModel):
@@ -96,6 +89,20 @@ class SkillEvolutionProposalResult(BaseModel):
     )
 
 
+class SkillEdit(BaseModel):
+    """A single edit to an existing skill definition.
+
+    Uses old_string/new_string like the Edit tool:
+    - Replace: old_string="original text", new_string="new text"
+    - Delete: old_string="text to remove", new_string=""
+    - Add/append: old_string="" (empty), new_string="text to add"
+    """
+
+    old_string: str = Field(description="Text to find in the skill. Empty string for append.")
+    new_string: str = Field(description="Replacement text. Empty string for deletion.")
+    replace_all: bool = Field(default=False, description="Replace all occurrences if True.")
+
+
 class SkillEvolution(BaseModel):
     """A suggested improvement to an existing installed skill.
 
@@ -104,8 +111,21 @@ class SkillEvolution(BaseModel):
     """
 
     skill_name: str = Field(description="Name of the existing skill to evolve.")
+    description: str = Field(
+        default="",
+        description="Short description of the skill being evolved. Set by the service layer.",
+    )
     edits: list[SkillEdit] = Field(description="Ordered list of granular edits to apply.")
-    rationale: str = Field(description="Why these edits improve the skill.")
+    rationale: str = Field(
+        description=(
+            "One-sentence conclusion followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        )
+    )
+    addressed_patterns: list[str] = Field(
+        default_factory=list,
+        description="Titles of workflow patterns addressed by this evolution.",
+    )
     confidence: float = Field(
         default=0.0,
         description=(

@@ -42,10 +42,11 @@ def build_mock_friction_result(session_ids: list[str]) -> FrictionAnalysisResult
             "Prefers incremental changes over rewrites."
         ),
         summary=(
-            f"Analysis of {session_count} session{'s' if session_count != 1 else ''} "
-            f"found {len(events)} friction events where users expressed dissatisfaction. "
-            "Most friction stemmed from the agent misunderstanding user intent and "
-            "producing code that didn't match requirements."
+            f"Agent frequently misunderstood intent across "
+            f"{session_count} session{'s' if session_count != 1 else ''}.\n"
+            f"- {len(events)} friction events detected, mostly from scope violations\n"
+            "- Repeated pattern of editing files not mentioned in the request\n"
+            "- User had to correct or revert changes multiple times"
         ),
         mitigations=[
             Mitigation(

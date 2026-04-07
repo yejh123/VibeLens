@@ -11,7 +11,7 @@ Merge retrieval results from {{ batch_count }} batches analyzing {{ session_coun
 
 ### Workflow Patterns
 {% for pattern in batch.workflow_patterns %}
-- **{{ pattern.title }}**: {{ pattern.description }} (gap: {{ pattern.gap }})
+- **{{ pattern.title }}**: {{ pattern.description }}
 {% endfor %}
 
 ### Recommendations
@@ -24,5 +24,5 @@ Merge retrieval results from {{ batch_count }} batches analyzing {{ session_coun
 Produce a single merged result with:
 - `workflow_patterns`: Deduplicated patterns with merged example_refs.
 - `recommendations`: Top 1-10 recommendations ranked by confidence and frequency.
-- `summary`: Unified narrative overview.
+- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
 - `user_profile`: Merged user profile.

@@ -99,13 +99,13 @@ def estimate_skill_evolution(
 
     # Proposal phase tokens
     proposal_system = SKILL_EVOLUTION_PROPOSAL_PROMPT.render_system(
-        **build_system_kwargs(SKILL_EVOLUTION_PROPOSAL_PROMPT.output_model, backend)
+        **build_system_kwargs(SKILL_EVOLUTION_PROPOSAL_PROMPT, backend)
     )
     batch_token_counts = [count_tokens(format_batch_digest(batch)) for batch in batches]
 
     # Deep edit phase tokens (estimated per-call)
     edit_system = SKILL_EVOLUTION_EDIT_PROMPT.render_system(
-        **build_system_kwargs(SKILL_EVOLUTION_EDIT_PROMPT.output_model, backend)
+        **build_system_kwargs(SKILL_EVOLUTION_EDIT_PROMPT, backend)
     )
     digest = build_digest_from_contexts(context_set)
     deep_input_tokens = count_tokens(edit_system) + count_tokens(digest)
@@ -174,6 +174,7 @@ async def analyze_skill_evolution(
                 skill_name=p.skill_name,
                 rationale=p.rationale,
                 suggested_changes=p.suggested_changes,
+                addressed_patterns=p.addressed_patterns,
                 session_ids=relevant_ids,
                 session_token=session_token,
                 proposal_confidence=p.confidence,
@@ -197,6 +198,12 @@ async def analyze_skill_evolution(
                 name = proposal_result.proposal_output.proposals[idx].skill_name
                 edit_warnings.append(f"Deep edit failed for '{name}': {result}")
                 logger.warning("Deep edit failed for proposal '%s': %s", name, result)
+
+    # Populate description on each evolution from installed skill metadata
+    installed_skills = gather_installed_skills()
+    skill_desc_map = {s["name"]: s["description"] for s in installed_skills}
+    for evo in evolutions:
+        evo.description = skill_desc_map.get(evo.skill_name, "")
 
     duration = round(time.monotonic() - start_time, 2)
     proposal_output = proposal_result.proposal_output
@@ -308,6 +315,7 @@ async def _infer_skill_evolution(
     skill_name: str,
     rationale: str,
     suggested_changes: str,
+    addressed_patterns: list[str],
     session_ids: list[str],
     session_token: str | None = None,
     proposal_confidence: float = 0.0,
@@ -320,6 +328,7 @@ async def _infer_skill_evolution(
         skill_name: Name of the installed skill to evolve.
         rationale: Why this skill should be evolved.
         suggested_changes: High-level description of proposed changes.
+        addressed_patterns: Pattern titles this evolution addresses.
         session_ids: Sessions to use as evidence.
         session_token: Browser tab token for upload scoping.
         proposal_confidence: Confidence from proposal step (0.0-1.0).
@@ -343,7 +352,7 @@ async def _infer_skill_evolution(
 
     digest = build_digest_from_contexts(context_set)
 
-    system_kwargs = build_system_kwargs(SKILL_EVOLUTION_EDIT_PROMPT.output_model, backend)
+    system_kwargs = build_system_kwargs(SKILL_EVOLUTION_EDIT_PROMPT, backend)
     system_prompt = SKILL_EVOLUTION_EDIT_PROMPT.render_system(**system_kwargs)
 
     # Truncate digest to fit context budget
@@ -369,7 +378,7 @@ async def _infer_skill_evolution(
         user=user_prompt,
         max_tokens=SKILL_EVOLUTION_EDIT_OUTPUT_TOKENS,
         timeout=SKILL_EVOLUTION_EDIT_TIMEOUT_SECONDS,
-        json_schema=SKILL_EVOLUTION_EDIT_PROMPT.output_model.model_json_schema(),
+        json_schema=SKILL_EVOLUTION_EDIT_PROMPT.output_json_schema(),
     )
 
     if log_dir is None:
@@ -385,6 +394,7 @@ async def _infer_skill_evolution(
 
     evolution = parse_llm_output(result.text, SkillEvolution, "deep edit")
     evolution.confidence = proposal_confidence
+    evolution.addressed_patterns = addressed_patterns
     cost = result.cost_usd or 0.0
     return evolution, cost
 
@@ -412,7 +422,7 @@ async def _infer_skill_evolution_proposal_batch(
     session_count = len(batch.contexts)
 
     prompt = SKILL_EVOLUTION_PROPOSAL_PROMPT
-    system_kwargs = build_system_kwargs(prompt.output_model, backend)
+    system_kwargs = build_system_kwargs(prompt, backend)
     system_prompt = prompt.render_system(**system_kwargs)
 
     # Truncate digest to fit context budget
@@ -434,7 +444,7 @@ async def _infer_skill_evolution_proposal_batch(
         user=user_prompt,
         max_tokens=SKILL_EVOLUTION_PROPOSAL_OUTPUT_TOKENS,
         timeout=SKILL_EVOLUTION_PROPOSAL_TIMEOUT_SECONDS,
-        json_schema=prompt.output_model.model_json_schema(),
+        json_schema=prompt.output_json_schema(),
     )
 
     if batch_index == 0:
@@ -477,7 +487,6 @@ async def _synthesize_skill_evolution_proposals(
                 {
                     "title": p.title,
                     "description": p.description,
-                    "gap": p.gap,
                     "example_refs": [ref.model_dump(exclude_none=True) for ref in p.example_refs],
                 }
                 for p in output.workflow_patterns
@@ -496,7 +505,7 @@ async def _synthesize_skill_evolution_proposals(
     ]
 
     prompt = SKILL_EVOLUTION_PROPOSAL_SYNTHESIS_PROMPT
-    system_kwargs = build_system_kwargs(prompt.output_model, backend)
+    system_kwargs = build_system_kwargs(prompt, backend)
     system_prompt = prompt.render_system(**system_kwargs)
     user_prompt = prompt.render_user(
         batch_count=len(batch_results), session_count=session_count, batch_results=batch_data
@@ -507,7 +516,7 @@ async def _synthesize_skill_evolution_proposals(
         user=user_prompt,
         max_tokens=SKILL_EVOLUTION_SYNTHESIS_OUTPUT_TOKENS,
         timeout=SKILL_EVOLUTION_SYNTHESIS_TIMEOUT_SECONDS,
-        json_schema=prompt.output_model.model_json_schema(),
+        json_schema=prompt.output_json_schema(),
     )
 
     save_analysis_log(log_dir, "evolution_proposal_synthesis_system.txt", system_prompt)

@@ -167,7 +167,7 @@ export function PromptNavPanel({
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <User className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
                       <span className={`font-mono font-semibold text-xs ${labelColor}`}>
-                        Prompt #{anchor.promptIndex}
+                        User #{anchor.promptIndex}
                       </span>
                       {isAuto && (
                         <span className="text-[9px] uppercase tracking-wider text-amber-500/50 font-semibold">
@@ -325,7 +325,7 @@ export function PromptNavPanel({
                         isActive ? "text-cyan-300" : "text-cyan-400/70 group-hover:text-cyan-300"
                       }`}
                     >
-                      Prompt #{entry.turnNumber}
+                      User #{entry.turnNumber}
                     </span>
                   </div>
                   <p

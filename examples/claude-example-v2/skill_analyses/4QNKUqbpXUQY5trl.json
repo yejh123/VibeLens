@@ -5,12 +5,11 @@
     "09f6e57d-e9cb-4d80-83b5-644b06ba5050"
   ],
   "skipped_session_ids": [],
-  "title": "Frontend Design and Testing Skills for Static Site Workflows",
+  "title": "Frontend Design and Testing Skill Gaps",
   "workflow_patterns": [
     {
       "title": "Plan Mode for Project Scaffolding",
       "description": "User requests a feature, agent enters plan mode, explores the directory, launches a Plan sub-agent, writes a detailed implementation plan, and exits for user approval before coding.",
-      "gap": "Plan exploration and plan writing repeat boilerplate structure each time; no reusable scaffold template for static-site projects.",
       "example_refs": [
         {
           "session_id": "09f6e57d-e9cb-4d80-83b5-644b06ba5050",
@@ -23,7 +22,6 @@
     {
       "title": "Parallel Multi-File Creation",
       "description": "Agent creates multiple CSS and JS files in parallel batches, following a predefined directory layout from the plan. Design token architecture with variables.css referenced across all style files.",
-      "gap": "Each file is written individually. No templating or scaffolding to generate a standard project skeleton in one step.",
       "example_refs": [
         {
           "session_id": "09f6e57d-e9cb-4d80-83b5-644b06ba5050",
@@ -36,7 +34,6 @@
     {
       "title": "Screenshot-Feedback-Fix Cycle",
       "description": "Agent deploys site locally, takes Playwright screenshot, user reviews and reports issues (wrong images, broken modal), agent fixes and re-screenshots to verify.",
-      "gap": "Each iteration requires writing Playwright scripts manually. No pre-deployment interaction checklist to catch common bugs.",
       "example_refs": [
         {
           "session_id": "09f6e57d-e9cb-4d80-83b5-644b06ba5050",
@@ -54,7 +51,6 @@
     {
       "title": "Asset Discovery via Sub-Agent Research",
       "description": "Agent delegates image URL research to a general-purpose sub-agent performing web searches, then integrates results back into source files via targeted edits.",
-      "gap": "Research results require manual integration. No structured handoff for discovered asset URLs.",
       "example_refs": [
         {
           "session_id": "09f6e57d-e9cb-4d80-83b5-644b06ba5050",
@@ -70,6 +66,7 @@
   "evolutions": [
     {
       "skill_name": "frontend-design",
+      "description": "Build polished frontend interfaces with dark themes, animations, and responsive CSS grid layouts.",
       "edits": [
         {
           "old_string": "",
@@ -77,11 +74,16 @@
           "replace_all": false
         }
       ],
-      "rationale": "The session reveals that the frontend-design skill lacks guidance for CSS architecture in static sites (design tokens, file splitting) and misses a pre-deployment checklist for interactive elements. The user hit a modal close bug that would have been caught with an interaction checklist. Adding CSS architecture patterns and an interactive element verification checklist prevents these issues in future static site projects.",
+      "rationale": "Frontend-design skill lacks static site CSS architecture guidance.\n- Missing design token file-splitting patterns\n- No pre-deployment checklist for interactive elements (modal close bug would have been caught)",
+      "addressed_patterns": [
+        "Parallel Multi-File Creation",
+        "Screenshot-Feedback-Fix Cycle"
+      ],
       "confidence": 0.85
     },
     {
       "skill_name": "webapp-testing",
+      "description": "Automated Playwright testing with screenshot comparison for web application visual verification.",
       "edits": [
         {
           "old_string": "",
@@ -89,11 +91,14 @@
           "replace_all": false
         }
       ],
-      "rationale": "The session demonstrates a screenshot-feedback-fix pattern where the user had to request screenshots manually and report bugs reactively. The webapp-testing skill should include a reusable Playwright screenshot template, console error capture, multi-viewport verification, and basic interaction smoke tests so common issues like broken modal close buttons are caught before user review.",
+      "rationale": "Webapp-testing skill lacks structured visual review workflow.\n- Needs reusable Playwright screenshot template with console error capture\n- Missing interaction smoke tests that would catch modal close bugs pre-review",
+      "addressed_patterns": [
+        "Screenshot-Feedback-Fix Cycle"
+      ],
       "confidence": 0.80
     }
   ],
-  "summary": "Session builds a static recipe book website with plan-driven scaffolding, parallel file creation, and iterative visual refinement. Analysis identifies two evolution opportunities for existing skills: frontend-design needs CSS architecture patterns for static sites and an interactive element checklist (the modal close bug would have been caught), while webapp-testing needs a structured visual review workflow with reusable Playwright templates, console error capture, and interaction smoke tests to reduce manual screenshot-feedback iterations.",
+  "summary": "Two installed skills need targeted improvements based on static site workflow.\n- Frontend-design lacks CSS architecture patterns and an interactive element checklist\n- Webapp-testing needs structured Playwright templates and interaction smoke tests\n- Both gaps caused real friction: broken modal close and manual screenshot iteration",
   "user_profile": "Frontend developer building polished static websites. Uses plan mode for scoping, iterates through visual screenshots, and expects production-quality design. Hits UI interaction bugs that systematic testing could prevent.",
   "warnings": [],
   "backend_id": "claude-cli",

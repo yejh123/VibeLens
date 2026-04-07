@@ -20,7 +20,6 @@ Analyze the provided session transcripts to:
 - A pattern must appear at least 2 times across sessions to be reported.
 - Every pattern MUST have a short, readable `title` (e.g. "Search-Read-Edit Cycle", "Test-Fix Loop"). This is shown to users as the pattern heading.
 - Every pattern MUST have a `description` with more detail about what the pattern involves.
-- Every pattern MUST have a `gap` explaining why automation would help.
 - `example_refs` must reference real step IDs from the session data. Never fabricate.
 - Each `example_ref` needs `session_id` and `start_step_id` pointing to a real step. Optionally include `end_step_id` for multi-step ranges.
 - NEVER reference sessions by ID, index, or UUID in text fields (summary, description, rationale, user_profile). Describe patterns in general terms that readers can understand without session context.

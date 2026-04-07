@@ -12,10 +12,17 @@ class SkillCreationProposal(BaseModel):
 
     skill_name: str = Field(description="Proposed skill name in kebab-case.")
     description: str = Field(
-        description="One-line trigger description for the YAML frontmatter. Under 20 words."
+        description=(
+            "Specific trigger description for YAML frontmatter. "
+            "State what the skill does AND when it activates. "
+            "Include trigger phrases the user would say. Max 30 words."
+        )
     )
     rationale: str = Field(
-        description="Why this skill would improve the workflow. 1-2 sentences, under 40 words."
+        description=(
+            "One-sentence conclusion followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        )
     )
     addressed_patterns: list[str] = Field(
         default_factory=list,
@@ -39,7 +46,8 @@ class SkillCreationProposalOutput(BaseModel):
     """
 
     title: str = Field(
-        default="", description="Concise 5-10 word title summarizing the analysis findings."
+        default="",
+        description="Clear, reader-friendly title capturing the main finding. Max 8 words.",
     )
     user_profile: str = Field(
         default="",
@@ -53,7 +61,8 @@ class SkillCreationProposalOutput(BaseModel):
     )
     summary: str = Field(
         description=(
-            "Concise analysis overview for readers of all expertise levels. Under 100 words."
+            "One-sentence conclusion followed by 2-4 bullet points starting with '- '. "
+            "Accessible to all expertise levels. Max 100 words."
         )
     )
     proposals: list[SkillCreationProposal] = Field(
@@ -99,12 +108,27 @@ class SkillCreation(BaseModel):
     """
 
     name: str = Field(description="Skill name in kebab-case.")
-    description: str = Field(description="Trigger description for the YAML frontmatter.")
+    description: str = Field(
+        description=(
+            "Specific trigger description for YAML frontmatter. "
+            "State what the skill does AND when it activates. "
+            "Include trigger phrases. Max 30 words."
+        )
+    )
     skill_md_content: str = Field(description="Full SKILL.md content including YAML frontmatter.")
-    rationale: str = Field(description="Why this skill improves the user's workflow.")
+    rationale: str = Field(
+        description=(
+            "One-sentence conclusion followed by 1-2 bullet points "
+            "starting with '- '. Max 50 words."
+        )
+    )
     tools_used: list[str] = Field(
         default_factory=list,
         description="Tool names referenced in the skill (e.g. Read, Edit, Bash).",
+    )
+    addressed_patterns: list[str] = Field(
+        default_factory=list,
+        description="Titles of workflow patterns addressed by this skill.",
     )
     confidence: float = Field(
         default=0.0,

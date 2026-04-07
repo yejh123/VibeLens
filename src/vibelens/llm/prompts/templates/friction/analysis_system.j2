@@ -100,11 +100,11 @@ Each mitigation must be structured with:
 
 **CRITICAL: Your entire response must be a single JSON object. No markdown, no prose, no explanation — only raw JSON.**
 
-- `title`: Short title for the analysis (max 10 words)
+- `title`: Clear, reader-friendly title capturing the main theme (max 8 words)
 - `user_profile`: User's working style and project focus (max 50 words)
 - `friction_events[].user_intention`: What the user wanted (max 15 words, NO step IDs)
 - `friction_events[].description`: Why the agent failed (max 20 words, or empty if self-evident)
-- `summary`: Narrative overview of friction (max 80 words). Be terse.
+- `summary`: One-sentence conclusion + 2-4 bullet points starting with '- '. Max 100 words.
 - `mitigations[].title`: Short heading (max 8 words)
 - `mitigations[].action`: Specific, actionable recommendation (max 30 words)
 - `mitigations[].confidence`: 0.0-1.0 confidence this will help
