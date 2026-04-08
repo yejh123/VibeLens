@@ -27,7 +27,7 @@ function HistoryCard({
   onSelect: () => void;
   onDelete: () => void;
 }) {
-  const { isDemo, guardAction, showInstallDialog, setShowInstallDialog } = useDemoGuard();
+  const { guardAction, showInstallDialog, setShowInstallDialog } = useDemoGuard();
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -68,7 +68,7 @@ function HistoryCard({
               <Layers className="w-2.5 h-2.5" />
               {meta.session_ids.length} session{meta.session_ids.length !== 1 ? "s" : ""}
             </span>
-            {isDemo && (
+            {meta.model.startsWith("mock/") && (
               <span className="px-1.5 py-0.5 rounded border text-[10px] font-medium bg-amber-900/30 border-amber-700/30 text-amber-400">
                 Example
               </span>

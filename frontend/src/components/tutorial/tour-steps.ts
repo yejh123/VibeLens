@@ -14,7 +14,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: "sidebar-header",
     title: "Welcome to VibeLens",
     content:
-      "See what your coding agents are doing. Browse conversations from Claude Code, Codex, Gemini, and other agent CLIs.",
+      "VibeLens helps you understand how your AI coding agents work. Browse past conversations from Claude Code, Codex, Gemini, and more.",
     placement: "right",
     icon: "eye",
   },
@@ -23,52 +23,61 @@ export const TOUR_STEPS: TourStep[] = [
     target: "session-list",
     title: "Your Sessions",
     content:
-      "Your agent sessions show up here automatically. Use the search bar, filter by agent, or group by project.",
+      "All your agent sessions appear here. Search, filter by agent type, or group by project to find what you need.",
     placement: "right",
     icon: "list",
   },
   {
+    id: "conversation",
+    target: "conversation-tab",
+    title: "Conversation",
+    content:
+      "Open any session to read it turn by turn. See what was asked, how the agent responded, and what tools it used.",
+    placement: "bottom",
+    icon: "message",
+  },
+  {
     id: "view-modes",
     target: "view-modes",
-    title: "Three Ways to Read",
+    title: "Three View Modes",
     content:
-      "Concise shows only the highlights. Detail shows every step. Workflow breaks sessions into phases with tool-call patterns.",
+      "Concise shows just the key messages. Detail shows everything. Workflow maps out each phase of work visually.",
     placement: "bottom",
     icon: "layout",
   },
   {
     id: "dashboard",
     target: "dashboard-tab",
-    title: "Analytics Dashboard",
+    title: "Dashboard",
     content:
-      "Stats across all your sessions: activity heatmaps, token usage, tool distribution, and cost breakdown. No API key needed.",
+      "See the big picture: activity over time, token usage, most-used tools, and cost breakdown across all sessions.",
     placement: "bottom",
     icon: "bar-chart",
-  },
-  {
-    id: "productivity-tips",
-    target: "productivity-tips-tab",
-    title: "Productivity Tips",
-    content:
-      "Analyzes your sessions to find wasted effort and recurring mistakes. You get concrete suggestions on how to work more effectively with your agent. Requires LLM call.",
-    placement: "bottom",
-    icon: "lightbulb",
   },
   {
     id: "personalization",
     target: "personalization-tab",
     title: "Personalization",
     content:
-      "Learns your coding patterns and creates reusable skills — instruction files that teach your agent how you prefer to work. Requires LLM call.",
+      "Create reusable skills from your coding patterns. These teach your agent how you prefer to work, so it gets better over time.",
     placement: "bottom",
     icon: "wand",
   },
   {
+    id: "productivity-tips",
+    target: "productivity-tips-tab",
+    title: "Productivity Tips",
+    content:
+      "Find wasted effort and repeated mistakes in your sessions. Get practical tips to work more effectively with your agent.",
+    placement: "bottom",
+    icon: "lightbulb",
+  },
+  {
     id: "upload",
     target: "upload-button",
-    title: "Upload Your Sessions",
+    title: "Upload Sessions",
     content:
-      "Click Upload to add your own agent sessions. Pick your agent type, run a quick command, and drag in the ZIP file.",
+      "Add your own sessions here. Pick your agent type, run a quick export command, and drag in the file.",
     placement: "right",
     icon: "upload",
     mode: "demo",

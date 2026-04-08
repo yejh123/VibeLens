@@ -390,10 +390,11 @@ export function App() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setRefreshKey((k) => k + 1)}
-                  className="text-zinc-500 hover:text-zinc-300 transition"
+                  disabled={sessionsLoading}
+                  className="text-zinc-500 hover:text-zinc-300 transition disabled:opacity-50"
                   title="Refresh sessions"
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className={`w-4 h-4 ${sessionsLoading ? "animate-spin" : ""}`} />
                 </button>
                 <button
                   onClick={() => setSidebarOpen(false)}
@@ -451,6 +452,7 @@ export function App() {
               )}
               <Tooltip text="Browse individual agent sessions step by step.">
                 <button
+                  data-tour="conversation-tab"
                   onClick={() => setMainView("browse")}
                   className={`min-w-[100px] text-center px-4 py-1.5 text-sm font-semibold rounded-md transition ${
                     mainView === "browse"

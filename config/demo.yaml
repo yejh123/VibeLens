@@ -15,14 +15,14 @@ demo:
   skill_analysis_dir: "examples/recipe-book/skill_analyses"
 
 donation:
-  dir: ~/.vibelens/donations-v2
+  dir: ~/.vibelens/donations
 
 server:
   host: 0.0.0.0                      # Bind to all interfaces for public access
   port: 12001
 
 upload:
-  dir: ~/.vibelens/uploads-v2
+  dir: ~/.vibelens/uploads
   max_zip_bytes: 10737418240         # 10 GB
   max_extracted_bytes: 21474836480   # 20 GB
   max_file_count: 10000

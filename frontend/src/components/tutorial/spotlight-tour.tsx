@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   BarChart3,
   Lightbulb,
+  MessageSquare,
   Upload,
   Wand2,
   ChevronLeft,
@@ -21,6 +22,7 @@ const TRANSITION_DURATION = "0.3s";
 const ICON_MAP: Record<string, React.ReactNode> = {
   eye: <Eye className="w-5 h-5 text-cyan-400" />,
   list: <List className="w-5 h-5 text-cyan-400" />,
+  message: <MessageSquare className="w-5 h-5 text-indigo-400" />,
   layout: <LayoutGrid className="w-5 h-5 text-cyan-400" />,
   "bar-chart": <BarChart3 className="w-5 h-5 text-cyan-400" />,
   lightbulb: <Lightbulb className="w-5 h-5 text-amber-400" />,
@@ -105,6 +107,8 @@ export function SpotlightTour({ onComplete, appMode }: SpotlightTourProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track navigation direction so missing targets skip the right way
+  const directionRef = useRef<"forward" | "backward">("forward");
 
   const currentStep = steps[currentIdx] as TourStep | undefined;
 
@@ -114,12 +118,21 @@ export function SpotlightTour({ onComplete, appMode }: SpotlightTourProps) {
     if (rect) {
       setTargetRect(rect);
     } else {
-      // Target not found, auto-advance
-      if (currentIdx < steps.length - 1) {
-        setCurrentIdx((i) => i + 1);
+      // Target not found — skip in the current navigation direction
+      if (directionRef.current === "backward") {
+        if (currentIdx > 0) {
+          setCurrentIdx((i) => i - 1);
+        } else {
+          directionRef.current = "forward";
+          setCurrentIdx((i) => i + 1);
+        }
       } else {
-        markTourSeen();
-        onComplete();
+        if (currentIdx < steps.length - 1) {
+          setCurrentIdx((i) => i + 1);
+        } else {
+          markTourSeen();
+          onComplete();
+        }
       }
     }
   }, [currentStep, currentIdx, steps.length, onComplete]);
@@ -159,6 +172,7 @@ export function SpotlightTour({ onComplete, appMode }: SpotlightTourProps) {
   });
 
   const handleNext = () => {
+    directionRef.current = "forward";
     if (currentIdx >= steps.length - 1) {
       markTourSeen();
       onComplete();
@@ -168,6 +182,7 @@ export function SpotlightTour({ onComplete, appMode }: SpotlightTourProps) {
   };
 
   const handleBack = () => {
+    directionRef.current = "backward";
     if (currentIdx > 0) {
       setCurrentIdx((i) => i - 1);
     }

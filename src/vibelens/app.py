@@ -17,6 +17,7 @@ from vibelens.deps import (
     get_central_skill_store,
     get_codex_skill_store,
     get_example_store,
+    get_friction_store,
     get_llm_config,
     get_skill_analysis_store,
     get_skill_store,
@@ -150,12 +151,11 @@ async def _async_warm_cache() -> None:
 def _lightweight_startup(settings) -> None:
     """Run lightweight startup tasks in a background thread.
 
-    Skill import and mock seeding are fast and don't involve heavy
+    Skill import and example seeding are fast and don't involve heavy
     JSON parsing, so a thread is fine.
     """
     _load_agent_skills_into_central_store()
-    if settings.app_mode in (AppMode.TEST, AppMode.DEMO):
-        _seed_mock_skill_history()
+    _seed_example_analyses()
 
 
 def _load_agent_skills_into_central_store() -> None:
@@ -185,37 +185,57 @@ def _load_agent_skills_into_central_store() -> None:
         logger.info("Total skills imported into central store: %d", total_imported)
 
 
-def _seed_mock_skill_history() -> None:
-    """Pre-populate skill analysis history with one record per mode.
+def _seed_example_analyses() -> None:
+    """Pre-populate analysis history with example entries.
 
-    Picks the first 3 available session IDs from the trajectory store
-    and generates mock analysis results for retrieval, creation, and
-    evolution modes so the History sidebar has sample entries.
+    Seeds both skill and friction analysis stores so users can see
+    what results look like before running their own analyses.
+    Skips seeding if the respective store already has records.
     """
-    from vibelens.models.skill import SkillMode
-    from vibelens.services.skill.mock import build_mock_skill_result
-
-    analysis_store = get_skill_analysis_store()
-
-    # Skip seeding if history already has records
-    if analysis_store.list_analyses():
-        return
-
     from vibelens.services.session.store_resolver import list_all_metadata
 
     metadata = list_all_metadata()
     session_ids = [m["session_id"] for m in metadata if "session_id" in m][:3]
     if not session_ids:
-        logger.info("No sessions available to seed skill analysis history")
+        logger.info("No sessions available to seed example analyses")
+        return
+
+    _seed_skill_examples(session_ids)
+    _seed_friction_examples(session_ids)
+
+
+def _seed_skill_examples(session_ids: list[str]) -> None:
+    """Seed one example skill analysis per mode (retrieval, creation, evolution)."""
+    from vibelens.models.skill import SkillMode
+    from vibelens.services.skill.mock import build_mock_skill_result
+
+    store = get_skill_analysis_store()
+    if store.list_analyses():
         return
 
     for mode in (SkillMode.RETRIEVAL, SkillMode.CREATION, SkillMode.EVOLUTION):
         try:
             result = build_mock_skill_result(session_ids, mode)
-            analysis_store.save(result)
-            logger.info("Seeded mock skill analysis history: mode=%s", mode)
+            store.save(result)
+            logger.info("Seeded example skill analysis: mode=%s", mode)
         except Exception:
-            logger.warning("Failed to seed mock skill analysis for mode=%s", mode, exc_info=True)
+            logger.warning("Failed to seed skill example for mode=%s", mode, exc_info=True)
+
+
+def _seed_friction_examples(session_ids: list[str]) -> None:
+    """Seed one example friction analysis."""
+    from vibelens.services.friction.mock import build_mock_friction_result
+
+    store = get_friction_store()
+    if store.list_analyses():
+        return
+
+    try:
+        result = build_mock_friction_result(session_ids)
+        store.save(result)
+        logger.info("Seeded example friction analysis")
+    except Exception:
+        logger.warning("Failed to seed friction example", exc_info=True)
 
 
 def _log_startup_summary(settings, store) -> None:

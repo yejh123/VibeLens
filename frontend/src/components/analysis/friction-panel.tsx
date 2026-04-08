@@ -429,9 +429,16 @@ function ResultHeader({
       <div className="flex items-center gap-3">
         <Activity className="w-6 h-6 text-amber-400" />
         <div>
-          <h2 className="text-xl font-bold text-zinc-100">
-            {result.title || "Productivity Tips"}
-          </h2>
+          <div className="flex items-center gap-2.5">
+            {result.backend_id === "mock" && (
+              <span className="px-2 py-0.5 rounded border text-[11px] font-semibold bg-amber-900/30 border-amber-700/30 text-amber-400">
+                Example
+              </span>
+            )}
+            <h2 className="text-xl font-bold text-zinc-100">
+              {result.title || "Productivity Tips"}
+            </h2>
+          </div>
           <p className="text-sm text-zinc-400">
             {tipCount} productivity tip{tipCount !== 1 ? "s" : ""} across {sessionCount} session{sessionCount !== 1 ? "s" : ""}
             {result.skipped_session_ids.length > 0 && (
@@ -442,7 +449,7 @@ function ResultHeader({
           </p>
         </div>
       </div>
-      <Tooltip text="Analyze new sessions">
+      <Tooltip text="Analyze your own sessions">
         <button
           onClick={onNew}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:text-white bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/40 rounded-lg transition"

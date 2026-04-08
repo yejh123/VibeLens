@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.28] - 2026-04-08
+
+### Changed
+- **Donate consent dialog redesign**: Each consent item now has a colored icon, card layout, and a highlighted research team banner. Wider modal, Heart icon in header and Donate button.
+- **Example badge on mock results**: Friction and skill analysis result headers show an "Example" badge when `backend_id` is `mock`, replacing the demo-mode-only badge on history cards.
+- **History "Example" badge logic**: Friction and skill history cards now show "Example" based on `model.startsWith("mock/")` instead of `isDemo`, so real analyses in demo mode are not mislabeled.
+- **"Analyze your own sessions" tooltip**: New button tooltip on friction and skill result headers replaces generic "Analyze new sessions".
+- **Seed example friction analysis**: App startup now seeds a mock friction analysis alongside skill analyses, so new users see example results in the Productivity Tips history.
+- **Tutorial tour improvements**: Reworded all tour step titles and descriptions for clarity. Added "Conversation" step targeting the browse tab. Reordered Personalization before Productivity Tips. Back-navigation now correctly skips missing targets instead of always advancing forward.
+- **Refresh button loading state**: Session list refresh button is disabled and spins while loading.
+- **Config path cleanup**: Demo config uses `~/.vibelens/donations` and `~/.vibelens/uploads` (removed `-v2` suffix).
+
 ## [0.9.27] - 2026-04-08
 
 ### Fixed
