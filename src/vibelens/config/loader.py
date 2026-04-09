@@ -43,6 +43,9 @@ YAML_FIELD_MAP: dict[str, dict[str, str]] = {
         "friction_dir": "friction_dir",
         "skill_analysis_dir": "skill_analysis_dir",
     },
+    "examples": {
+        "sessions": "demo_example_sessions",
+    },
     "donation": {
         "url": "donation_url",
         "dir": "donation_dir",

@@ -489,20 +489,18 @@ def _store_single_session(
         store.root.name,
     )
 
-    return [{
-        "session_id": main.session_id,
-        "trajectory_count": len(trajectories),
-        "step_count": step_count,
-        "source_file": file_path.name,
-    }]
+    return [
+        {
+            "session_id": main.session_id,
+            "trajectory_count": len(trajectories),
+            "step_count": step_count,
+            "source_file": file_path.name,
+        }
+    ]
 
 
 def _store_multi_sessions(
-    mains: list,
-    file_path: Path,
-    store: DiskStore,
-    anonymizer: RuleAnonymizer,
-    result: UploadResult,
+    mains: list, file_path: Path, store: DiskStore, anonymizer: RuleAnonymizer, result: UploadResult
 ) -> list[dict]:
     """Anonymize and store each main trajectory independently.
 
@@ -535,12 +533,14 @@ def _store_multi_sessions(
         step_count = len(anon_traj.steps)
         result.sessions_parsed += 1
         result.steps_stored += step_count
-        details.append({
-            "session_id": anon_traj.session_id,
-            "trajectory_count": 1,
-            "step_count": step_count,
-            "source_file": file_path.name,
-        })
+        details.append(
+            {
+                "session_id": anon_traj.session_id,
+                "trajectory_count": 1,
+                "step_count": step_count,
+                "source_file": file_path.name,
+            }
+        )
 
     logger.info(
         "Stored %d sessions from multi-conversation file %s (upload %s)",

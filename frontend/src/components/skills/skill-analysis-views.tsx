@@ -180,7 +180,7 @@ function ResultHeader({
         <BarChart3 className="w-6 h-6 text-teal-400" />
         <div>
           <div className="flex items-center gap-2.5">
-            {result.backend_id === "mock" && (
+            {(result.is_example || result.backend_id === "mock") && (
               <span className="px-2 py-0.5 rounded border text-[11px] font-semibold bg-amber-900/30 border-amber-700/30 text-amber-400">
                 Example
               </span>

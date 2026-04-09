@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.29] - 2026-04-08
+
+### Added
+- **Example analyses in self-use mode**: Pre-built friction and skill analysis examples are now loaded alongside user analyses in self-use mode, not just demo mode. Configured via `examples.sessions` in `self-use.yaml`.
+- **`is_example` flag**: Added `is_example` field to `FrictionMeta` and `SkillAnalysisMeta` schemas. Injected during startup file copy so frontend can distinguish bundled examples from user-generated analyses.
+- **Example badge on result headers**: Friction and skill analysis result headers show an amber "Example" badge when viewing a bundled example analysis.
+
+### Changed
+- **Example badge logic**: History cards now use `is_example` flag (or `model.startsWith("mock/")` fallback) instead of demo-mode check, so badges appear correctly in both demo and self-use modes.
+- **Store resolver in self-use mode**: `list_all_metadata()`, `load_from_stores()`, `load_from_all_stores()`, and `get_metadata_from_stores()` now include example store sessions alongside user sessions in self-use mode.
+- **Example seeding refactored**: Startup copies pre-built analysis JSON files from `examples/recipe-book/` into user stores (appending to existing index), replacing the previous demo-only mock generation approach.
+- **Donation consent dialog redesign**: Wider modal with colored icons per consent item, card layout, cyan intro banner, and Heart icon in header and button.
+- **Refresh button feedback**: Session list refresh button shows spin animation and disabled state while loading.
+
 ## [0.9.28] - 2026-04-08
 
 ### Changed

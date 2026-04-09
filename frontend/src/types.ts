@@ -265,6 +265,7 @@ export interface FrictionAnalysisResult {
   duration_seconds: number | null;
   batch_count: number;
   created_at: string;
+  is_example?: boolean;
 }
 
 export interface FrictionMeta {
@@ -276,6 +277,7 @@ export interface FrictionMeta {
   cost_usd: number | null;
   batch_count: number;
   duration_seconds: number | null;
+  is_example?: boolean;
 }
 
 export interface CostEstimate {
@@ -412,6 +414,7 @@ export interface SkillAnalysisResult {
   metrics: { cost_usd: number | null };
   duration_seconds: number | null;
   created_at: string;
+  is_example?: boolean;
 }
 
 
@@ -424,6 +427,7 @@ export interface SkillAnalysisMeta {
   model: string;
   cost_usd: number | null;
   duration_seconds: number | null;
+  is_example?: boolean;
 }
 
 export interface AnalysisJobResponse {

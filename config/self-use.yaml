@@ -19,6 +19,9 @@ sources:
   codex_dir: ~/.codex
   gemini_dir: ~/.gemini
 
+examples:
+  sessions: "examples/recipe-book"
+
 upload:
   dir: ~/.vibelens/uploads
   max_zip_bytes: 209715200        # 200 MB

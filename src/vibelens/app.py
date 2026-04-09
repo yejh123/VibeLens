@@ -1,6 +1,8 @@
 """FastAPI application factory."""
 
 import asyncio
+import contextlib
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,9 +19,7 @@ from vibelens.deps import (
     get_central_skill_store,
     get_codex_skill_store,
     get_example_store,
-    get_friction_store,
     get_llm_config,
-    get_skill_analysis_store,
     get_skill_store,
     get_store,
     reconstruct_upload_registry,
@@ -38,6 +38,8 @@ from vibelens.utils import get_logger
 logger = get_logger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+JOB_CLEANUP_INTERVAL_SECONDS = 600
 
 
 @asynccontextmanager
@@ -58,12 +60,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     store.initialize()
     _log_startup_summary(settings, store)
 
-    if settings.app_mode == AppMode.DEMO:
+    # Load example sessions (demo: required, self: for example analyses)
+    if settings.example_session_paths:
         example_store = get_example_store()
         example_store.initialize()
         loaded = load_demo_examples(settings, example_store)
         if loaded:
-            logger.info("Loaded %d trajectory groups for demo mode", loaded)
+            logger.info("Loaded %d example trajectory groups", loaded)
+
+    if settings.app_mode == AppMode.DEMO:
         reconstruct_upload_registry()
 
     # Lightweight startup tasks in a thread (no heavy I/O)
@@ -90,9 +95,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     search_refresh_task.cancel()
     cleanup_task.cancel()
-
-
-JOB_CLEANUP_INTERVAL_SECONDS = 600
 
 
 async def _periodic_job_cleanup() -> None:
@@ -186,56 +188,81 @@ def _load_agent_skills_into_central_store() -> None:
 
 
 def _seed_example_analyses() -> None:
-    """Pre-populate analysis history with example entries.
+    """Copy pre-built example analyses into the user's analysis stores.
 
-    Seeds both skill and friction analysis stores so users can see
-    what results look like before running their own analyses.
-    Skips seeding if the respective store already has records.
+    Looks for bundled example analyses adjacent to the configured example
+    session paths (e.g. examples/recipe-book/friction_analyses/). Only
+    copies when the target store is empty to avoid overwriting user data.
     """
-    from vibelens.services.session.store_resolver import list_all_metadata
+    settings = load_settings()
+    for example_path in settings.example_session_paths:
+        if not example_path.is_dir():
+            continue
+        _copy_example_store(example_path / "friction_analyses", settings.friction_dir, "friction")
+        _copy_example_store(example_path / "skill_analyses", settings.skill_analysis_dir, "skill")
 
-    metadata = list_all_metadata()
-    session_ids = [m["session_id"] for m in metadata if "session_id" in m][:3]
-    if not session_ids:
-        logger.info("No sessions available to seed example analyses")
+
+def _copy_example_store(src_dir: Path, dst_dir: Path, label: str) -> None:
+    """Copy example analysis files from a bundled directory into the user store.
+
+    Appends example entries alongside any existing user analyses. Skips
+    individual files that already exist in the destination to avoid
+    overwriting user data or duplicating on repeated startups.
+
+    Args:
+        src_dir: Bundled example analyses directory.
+        dst_dir: User's analysis store directory.
+        label: Human-readable label for logging.
+    """
+    if not src_dir.is_dir():
         return
 
-    _seed_skill_examples(session_ids)
-    _seed_friction_examples(session_ids)
-
-
-def _seed_skill_examples(session_ids: list[str]) -> None:
-    """Seed one example skill analysis per mode (retrieval, creation, evolution)."""
-    from vibelens.models.skill import SkillMode
-    from vibelens.services.skill.mock import build_mock_skill_result
-
-    store = get_skill_analysis_store()
-    if store.list_analyses():
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    src_index = src_dir / "index.jsonl"
+    if not src_index.exists():
         return
 
-    for mode in (SkillMode.RETRIEVAL, SkillMode.CREATION, SkillMode.EVOLUTION):
-        try:
-            result = build_mock_skill_result(session_ids, mode)
-            store.save(result)
-            logger.info("Seeded example skill analysis: mode=%s", mode)
-        except Exception:
-            logger.warning("Failed to seed skill example for mode=%s", mode, exc_info=True)
+    # Copy result JSON files, injecting is_example flag for frontend display
+    copied = 0
+    for src_file in src_dir.iterdir():
+        if src_file.suffix == ".json" and not (dst_dir / src_file.name).exists():
+            with contextlib.suppress(json.JSONDecodeError, OSError):
+                data = json.loads(src_file.read_text(encoding="utf-8"))
+                data["is_example"] = True
+                (dst_dir / src_file.name).write_text(json.dumps(data, indent=2), encoding="utf-8")
+                copied += 1
 
-
-def _seed_friction_examples(session_ids: list[str]) -> None:
-    """Seed one example friction analysis."""
-    from vibelens.services.friction.mock import build_mock_friction_result
-
-    store = get_friction_store()
-    if store.list_analyses():
+    if copied == 0:
         return
 
-    try:
-        result = build_mock_friction_result(session_ids)
-        store.save(result)
-        logger.info("Seeded example friction analysis")
-    except Exception:
-        logger.warning("Failed to seed friction example", exc_info=True)
+    # Append new index entries (skip IDs already present)
+    existing_ids: set[str] = set()
+    dst_index = dst_dir / "index.jsonl"
+    if dst_index.exists():
+        for line in dst_index.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            with contextlib.suppress(json.JSONDecodeError, ValueError):
+                existing_ids.add(json.loads(line).get("analysis_id", ""))
+
+    new_lines = []
+    for line in src_index.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        with contextlib.suppress(json.JSONDecodeError, ValueError):
+            entry = json.loads(line)
+            if entry.get("analysis_id", "") not in existing_ids:
+                entry["is_example"] = True
+                new_lines.append(json.dumps(entry))
+
+    if new_lines:
+        with dst_index.open("a", encoding="utf-8") as f:
+            for line in new_lines:
+                f.write(line + "\n")
+
+    logger.info("Seeded %d example %s analysis files", copied, label)
 
 
 def _log_startup_summary(settings, store) -> None:

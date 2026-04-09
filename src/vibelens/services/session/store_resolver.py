@@ -23,10 +23,9 @@ logger = get_logger(__name__)
 def list_all_metadata(session_token: str | None = None) -> list[dict]:
     """Return metadata visible to the given session_token.
 
-    In self-use mode, returns metadata from the single LocalStore.
+    In self-use mode, returns metadata from LocalStore + example store.
     In demo mode:
-      - If the user has upload stores, returns only their uploaded sessions.
-      - Otherwise, returns example sessions.
+      - Returns user uploads (if any) + example sessions.
 
     Args:
         session_token: Browser tab UUID for per-user isolation.
@@ -35,7 +34,15 @@ def list_all_metadata(session_token: str | None = None) -> list[dict]:
         Combined metadata list from the user's active stores.
     """
     if not is_demo_mode():
-        return list(get_store().list_metadata())
+        metadata = list(get_store().list_metadata())
+        seen_ids = {m.get("session_id") for m in metadata if m.get("session_id")}
+        # Include example sessions alongside local sessions
+        for m in get_example_store().list_metadata():
+            sid = m.get("session_id")
+            if sid and sid not in seen_ids:
+                metadata.append(m)
+                seen_ids.add(sid)
+        return metadata
 
     # Always include example sessions in demo mode
     metadata: list[dict] = []
@@ -79,7 +86,10 @@ def load_from_stores(session_id: str, session_token: str | None = None) -> list 
         List of Trajectory objects, or None if not found in any store.
     """
     if not is_demo_mode():
-        return get_store().load(session_id)
+        result = get_store().load(session_id)
+        if result is not None:
+            return result
+        return get_example_store().load(session_id)
 
     # Search user's upload stores first
     for store in get_upload_stores(session_token):
@@ -105,7 +115,10 @@ def load_from_all_stores(session_id: str) -> list | None:
         List of Trajectory objects, or None if not found.
     """
     if not is_demo_mode():
-        return get_store().load(session_id)
+        result = get_store().load(session_id)
+        if result is not None:
+            return result
+        return get_example_store().load(session_id)
 
     for store in get_all_upload_stores():
         result = store.load(session_id)
@@ -126,7 +139,10 @@ def get_metadata_from_stores(session_id: str, session_token: str | None = None) 
         Metadata dict, or None if not found in any accessible store.
     """
     if not is_demo_mode():
-        return get_store().get_metadata(session_id)
+        meta = get_store().get_metadata(session_id)
+        if meta is not None:
+            return meta
+        return get_example_store().get_metadata(session_id)
 
     # Search user's upload stores first
     for store in get_upload_stores(session_token):

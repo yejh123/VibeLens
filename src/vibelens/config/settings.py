@@ -34,10 +34,7 @@ class Settings(BaseSettings):
         default="127.0.0.1", description="Network interface to bind the HTTP server to."
     )
     port: int = Field(default=12001, description="TCP port for the HTTP server.")
-    public_url: str = Field(
-        default="",
-        description="Public-facing base URL for shareable links (e.g. https://vibelens.chats-lab.org).",
-    )
+    public_url: str = Field(default="", description="Public-facing base URL for shareable links.")
 
     # Data sources
     claude_dir: Path = Field(
@@ -165,7 +162,6 @@ class Settings(BaseSettings):
         self.gemini_dir = self.gemini_dir.expanduser()
         self.openclaw_dir = self.openclaw_dir.expanduser()
         self.managed_skills_dir = self.managed_skills_dir.expanduser()
-        self.skills_dir = self.skills_dir.expanduser()
         self.share_dir = self.share_dir.expanduser()
         self.friction_dir = self.friction_dir.expanduser()
         self.skill_analysis_dir = self.skill_analysis_dir.expanduser()

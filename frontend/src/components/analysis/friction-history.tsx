@@ -140,7 +140,7 @@ function HistoryCard({
               <Layers className="w-2.5 h-2.5" />
               {item.session_ids.length} session{item.session_ids.length !== 1 ? "s" : ""}
             </span>
-            {item.model.startsWith("mock/") && (
+            {(item.is_example || item.model.startsWith("mock/")) && (
               <span className="px-1.5 py-0.5 rounded border text-[10px] font-medium bg-amber-900/30 border-amber-700/30 text-amber-400">
                 Example
               </span>
