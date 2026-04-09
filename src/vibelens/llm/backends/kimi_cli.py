@@ -20,7 +20,9 @@ References:
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the Kimi CLI, ordered cheapest-first
 KIMI_CLI_MODELS = ["kimi-k2.5", "kimi-k2"]
+# Cheapest model used when no model is explicitly configured
 KIMI_CLI_DEFAULT_MODEL = "kimi-k2.5"
 
 

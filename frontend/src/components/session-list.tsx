@@ -594,30 +594,22 @@ function AgentFilterDropdown({ value, agents, onChange }: { value: string; agent
 }
 
 function DonateButton({ onClick, disabled, tooltip }: { onClick: () => void; disabled: boolean; tooltip?: string }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => disabled && setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+  const button = (
+    <button
+      onClick={disabled ? undefined : onClick}
+      className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-sm font-semibold rounded border transition ${
+        disabled
+          ? "bg-rose-600/40 text-rose-200 border-rose-500/30 cursor-not-allowed opacity-60"
+          : "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-900/40"
+      }`}
     >
-      <button
-        onClick={disabled ? undefined : onClick}
-        className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-sm font-semibold rounded border transition ${
-          disabled
-            ? "bg-rose-600/40 text-rose-200 border-rose-500/30 cursor-not-allowed opacity-60"
-            : "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-900/40"
-        }`}
-      >
-        <Heart className="w-3.5 h-3.5" />
-        Donate Data
-      </button>
-      {showTooltip && tooltip && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-700 text-[11px] text-zinc-300 whitespace-nowrap shadow-lg pointer-events-none">
-          {tooltip}
-        </div>
-      )}
-    </div>
+      <Heart className="w-3.5 h-3.5" />
+      Donate Data
+    </button>
   );
+
+  if (disabled && tooltip) {
+    return <Tooltip text={tooltip} className="w-full">{button}</Tooltip>;
+  }
+  return button;
 }

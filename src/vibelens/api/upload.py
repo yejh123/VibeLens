@@ -4,7 +4,8 @@ from fastapi import APIRouter, Form, Header, HTTPException, UploadFile
 
 from vibelens.models.enums import AgentType
 from vibelens.schemas.upload import UploadResult
-from vibelens.services.upload.processor import get_upload_command, process_zip
+from vibelens.services.upload.commands import get_upload_command
+from vibelens.services.upload.processor import process_zip
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)

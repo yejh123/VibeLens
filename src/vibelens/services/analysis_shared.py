@@ -26,7 +26,9 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Time-to-live for analysis result caches (1 hour)
 CACHE_TTL_SECONDS = 3600
+# Maximum entries in each analysis result cache
 CACHE_MAXSIZE = 64
 
 
@@ -65,7 +67,7 @@ def extract_all_contexts(
     loaded_ids: list[str] = []
     skipped_ids: list[str] = []
 
-    for idx, sid in enumerate(session_ids):
+    for sid in session_ids:
         if get_metadata_from_stores(sid, session_token) is None:
             skipped_ids.append(sid)
             continue
@@ -79,7 +81,9 @@ def extract_all_contexts(
             skipped_ids.append(sid)
             continue
 
-        ctx = extract_session_context(trajectories, params, session_index=idx)
+        ctx = extract_session_context(
+            trajectory_group=trajectories, params=params, session_index=len(contexts)
+        )
         contexts.append(ctx)
         loaded_ids.append(sid)
 
@@ -131,6 +135,7 @@ def save_analysis_log(log_dir: Path, filename: str, content: str) -> None:
         logger.warning("Failed to save analysis log %s/%s: %s", log_dir, filename, exc)
 
 
+# Instructions appended to system prompts when using CLI backends
 CLI_BACKEND_RULES = """
 ## Backend Rules
 
@@ -143,6 +148,7 @@ You are running as a headless analysis backend. Follow these rules strictly:
 5. Start your response with `{` and end with `}`.
 """
 
+# Max tokens of session context to include in a single LLM prompt
 CONTEXT_TOKEN_BUDGET = 100_000
 
 

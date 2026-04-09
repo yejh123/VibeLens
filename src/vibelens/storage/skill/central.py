@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from vibelens.models.skill import SkillInfo, SkillSource, SkillSourceType
-from vibelens.storage.skill.base import SkillStore
+from vibelens.storage.skill.base import BaseSkillStore
 from vibelens.storage.skill.disk import (
     FRONTMATTER_DELIMITER,
     SKILL_FILENAME,
@@ -74,7 +74,7 @@ class CentralSkillStore(DiskSkillStore):
         )
 
     def import_skill_from(
-        self, source_store: "SkillStore", name: str, overwrite: bool = False
+        self, source_store: "BaseSkillStore", name: str, overwrite: bool = False
     ) -> SkillInfo | None:
         """Import a skill, injecting source provenance into frontmatter."""
         result = super().import_skill_from(source_store, name, overwrite=overwrite)
@@ -85,7 +85,7 @@ class CentralSkillStore(DiskSkillStore):
         self.invalidate_cache()
         return self.get_skill(name)
 
-    def _inject_source_metadata(self, name: str, source_store: "SkillStore") -> None:
+    def _inject_source_metadata(self, name: str, source_store: "BaseSkillStore") -> None:
         """Add source_type and source_path to SKILL.md frontmatter."""
         skill_file = self._skills_dir / name / SKILL_FILENAME
         if not skill_file.is_file():

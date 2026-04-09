@@ -12,12 +12,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from vibelens.utils.json_helpers import locked_jsonl_append, locked_jsonl_remove
+from vibelens.utils.json import locked_jsonl_append, locked_jsonl_remove
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Bytes of randomness for URL-safe analysis IDs (12 bytes → 16 chars)
 TOKEN_BYTES = 12
+# Append-only JSONL file listing all analyses in a store directory
 INDEX_FILENAME = "index.jsonl"
 
 

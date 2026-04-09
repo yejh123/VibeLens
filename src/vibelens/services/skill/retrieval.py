@@ -49,11 +49,16 @@ from vibelens.utils.log import clear_analysis_id, get_logger, set_analysis_id
 
 logger = get_logger(__name__)
 
+# JSON manifest of all skills available for recommendation
 FEATURED_SKILLS_PATH = Path(__file__).resolve().parents[4] / "featured-skills.json"
+# Skip keyword prefiltering when the catalog has fewer candidates than this
 CANDIDATE_PREFILTER_THRESHOLD = 200
+# Max candidates to pass to the LLM after keyword prefiltering
 PREFILTER_TOP_K = 100
+# Max output tokens for retrieval and synthesis LLM calls
 SKILL_RETRIEVAL_OUTPUT_TOKENS = 8192
 SKILL_RETRIEVAL_SYNTHESIS_OUTPUT_TOKENS = 8192
+# Timeout per retrieval LLM call (seconds)
 SKILL_RETRIEVAL_TIMEOUT_SECONDS = 300
 
 

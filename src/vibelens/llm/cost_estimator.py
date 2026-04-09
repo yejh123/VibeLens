@@ -24,6 +24,7 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Assumed input tokens for the synthesis step (batch summaries are small)
 SYNTHESIS_INPUT_TOKENS_ESTIMATE = 2000
 
 # Output ratio bounds — LLMs rarely produce max_tokens of output.

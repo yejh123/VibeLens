@@ -59,12 +59,14 @@ from vibelens.utils.log import clear_analysis_id, get_logger, set_analysis_id
 
 logger = get_logger(__name__)
 
+# LLM inference limits for each step of the skill evolution pipeline
 SKILL_EVOLUTION_PROPOSAL_OUTPUT_TOKENS = 4096
 SKILL_EVOLUTION_PROPOSAL_TIMEOUT_SECONDS = 300
 SKILL_EVOLUTION_SYNTHESIS_OUTPUT_TOKENS = 8192
 SKILL_EVOLUTION_SYNTHESIS_TIMEOUT_SECONDS = 300
 SKILL_EVOLUTION_EDIT_OUTPUT_TOKENS = 8192
 SKILL_EVOLUTION_EDIT_TIMEOUT_SECONDS = 300
+# Number of sequential LLM calls in the full pipeline (proposal → synthesis → edit)
 EXPECTED_DEEP_CALLS = 3
 
 

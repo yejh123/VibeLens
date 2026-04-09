@@ -19,6 +19,7 @@ References:
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the OpenClaw CLI, ordered cheapest-first
 OPENCLAW_CLI_MODELS = [
     "deepseek-v3",
     "gemini-2.5-flash",
@@ -28,6 +29,7 @@ OPENCLAW_CLI_MODELS = [
     "gpt-5.4-mini",
     "gpt-5.4",
 ]
+# Cheapest model used when no model is explicitly configured
 OPENCLAW_CLI_DEFAULT_MODEL = "deepseek-v3"
 
 

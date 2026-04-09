@@ -14,6 +14,7 @@ from pathlib import Path
 from vibelens.models.skill import SkillSourceType
 from vibelens.storage.skill.disk import DiskSkillStore
 
+# Maps each third-party agent to its default skills directory on macOS
 AGENT_SKILL_REGISTRY: dict[SkillSourceType, Path] = {
     SkillSourceType.CURSOR: Path.home() / ".cursor" / "skills",
     SkillSourceType.OPENCODE: Path.home() / ".config" / "opencode" / "skills",

@@ -16,16 +16,17 @@ from pathlib import Path
 
 from vibelens.ingest.parsers.parsed import ParsedTrajectoryParser
 from vibelens.models.trajectories import Trajectory
-from vibelens.storage.conversation.base import TrajectoryStore
+from vibelens.storage.trajectory.base import BaseTrajectoryStore
 from vibelens.utils import get_logger
-from vibelens.utils.json_helpers import locked_jsonl_append
+from vibelens.utils.json import locked_jsonl_append, read_jsonl
 
 logger = get_logger(__name__)
 
+# One-line-per-session JSONL index for fast listing without opening every JSON file
 INDEX_FILENAME = "index.jsonl"
 
 
-class DiskStore(TrajectoryStore):
+class DiskTrajectoryStore(BaseTrajectoryStore):
     """File-system trajectory store.
 
     Saves and loads trajectories as JSON files under a single root
@@ -120,7 +121,7 @@ class DiskStore(TrajectoryStore):
 
         for index_path in index_files:
             parent_dir = index_path.parent
-            entries = _iter_jsonl(index_path)
+            entries = read_jsonl(index_path)
             logger.debug("DiskStore._build_index: %s has %d entries", index_path, len(entries))
             for line in entries:
                 sid = line.get("session_id")
@@ -128,28 +129,3 @@ class DiskStore(TrajectoryStore):
                     continue
                 self._metadata_cache[sid] = line
                 self._index[sid] = (parent_dir / f"{sid}.json", self._parser)
-
-
-def _iter_jsonl(path: Path) -> list[dict]:
-    """Read a JSONL file and return parsed dicts, skipping invalid lines.
-
-    Args:
-        path: Path to the JSONL file.
-
-    Returns:
-        List of parsed JSON dicts.
-    """
-    results: list[dict] = []
-    try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    results.append(json.loads(stripped))
-                except json.JSONDecodeError:
-                    logger.warning("Skipping invalid JSON line in %s", path.name)
-    except OSError as exc:
-        logger.warning("Cannot read index file %s: %s", path, exc)
-    return results

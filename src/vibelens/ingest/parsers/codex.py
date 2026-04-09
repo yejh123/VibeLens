@@ -60,6 +60,7 @@ logger = get_logger(__name__)
 # instructions) since they are boilerplate and not user-facing conversation.
 RELEVANT_ROLES = {"user", "assistant"}
 
+# Cap the tool-result lookup map to avoid unbounded memory on huge sessions
 MAX_TOOL_RESULT_CACHE = 500
 
 # Matches the metadata prefix Codex prepends to tool outputs:

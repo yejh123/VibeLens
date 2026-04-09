@@ -11,6 +11,7 @@ and user prompts, avoiding duplication in stdin.
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the OpenCode CLI, ordered cheapest-first
 OPENCODE_CLI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
@@ -19,6 +20,7 @@ OPENCODE_CLI_MODELS = [
     "gpt-5.4-mini",
     "gpt-5.4",
 ]
+# Cheapest model used when no model is explicitly configured
 OPENCODE_CLI_DEFAULT_MODEL = "gemini-2.5-flash"
 
 

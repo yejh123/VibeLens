@@ -1,0 +1,312 @@
+"""Tests for LocalStore (read-only conversation storage backend)."""
+
+import json
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from vibelens.config import Settings
+from vibelens.storage.trajectory.local import LocalTrajectoryStore as LocalSource
+
+
+@pytest.fixture
+def test_settings(tmp_path):
+    """Create test settings with temporary Claude directory."""
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+
+    projects_dir = claude_dir / "projects"
+    projects_dir.mkdir()
+
+    test_project = projects_dir / "-Users-TestProject-Agent-Test"
+    test_project.mkdir()
+
+    return (
+        Settings(
+            claude_dir=claude_dir,
+            codex_dir=tmp_path / ".codex",
+            gemini_dir=tmp_path / ".gemini",
+            openclaw_dir=tmp_path / ".openclaw",
+        ),
+        claude_dir,
+        test_project,
+    )
+
+
+@pytest.fixture
+def sample_history(test_settings):
+    """Create sample history.jsonl with test data."""
+    _, claude_dir, test_project = test_settings
+
+    history_file = claude_dir / "history.jsonl"
+    sessions_data = [
+        {
+            "display": "How does caching work?",
+            "pastedContents": {},
+            "timestamp": 1707734674932,
+            "project": "/Users/TestProject/Agent-Test",
+            "sessionId": "session-001",
+        },
+        {
+            "display": "Explain JWT authentication",
+            "pastedContents": {},
+            "timestamp": 1707734680000,
+            "project": "/Users/TestProject/Agent-Test",
+            "sessionId": "session-002",
+        },
+    ]
+
+    with open(history_file, "w") as f:
+        for data in sessions_data:
+            f.write(json.dumps(data) + "\n")
+
+    return sessions_data
+
+
+@pytest.fixture
+def sample_sessions(test_settings, sample_history):
+    """Create sample session .jsonl files."""
+    _, _, test_project = test_settings
+
+    session_1_file = test_project / "session-001.jsonl"
+    session_1_data = [
+        {
+            "type": "user",
+            "uuid": "msg-001",
+            "sessionId": "session-001",
+            "timestamp": 1707734674932,
+            "message": {"role": "user", "content": "How does caching work?"},
+        },
+        {
+            "type": "assistant",
+            "uuid": "msg-002",
+            "sessionId": "session-001",
+            "timestamp": 1707734680000,
+            "message": {
+                "role": "assistant",
+                "model": "claude-opus-4-6",
+                "content": [{"type": "text", "text": "Caching stores frequently accessed data..."}],
+                "usage": {
+                    "input_tokens": 50,
+                    "output_tokens": 100,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+            },
+        },
+    ]
+
+    with open(session_1_file, "w") as f:
+        for data in session_1_data:
+            f.write(json.dumps(data) + "\n")
+
+    session_2_file = test_project / "session-002.jsonl"
+    session_2_data = [
+        {
+            "type": "user",
+            "uuid": "msg-003",
+            "sessionId": "session-002",
+            "timestamp": 1707734685000,
+            "message": {"role": "user", "content": "Explain JWT authentication"},
+        },
+        {
+            "type": "assistant",
+            "uuid": "msg-004",
+            "sessionId": "session-002",
+            "timestamp": 1707734690000,
+            "message": {
+                "role": "assistant",
+                "model": "claude-sonnet-4-6",
+                "content": [
+                    {"type": "text", "text": "Let me search for JWT documentation..."},
+                    {
+                        "type": "tool_use",
+                        "id": "tool-001",
+                        "name": "Read",
+                        "input": {"file_path": "/tmp/jwt-guide.md"},
+                        "caller": {"type": "direct"},
+                    },
+                ],
+                "usage": {
+                    "input_tokens": 100,
+                    "output_tokens": 200,
+                    "cache_creation_input_tokens": 50,
+                    "cache_read_input_tokens": 0,
+                },
+            },
+        },
+        {
+            "type": "user",
+            "uuid": "msg-005",
+            "sessionId": "session-002",
+            "timestamp": 1707734695000,
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-001",
+                        "content": "JWT is a stateless authentication mechanism...",
+                        "is_error": False,
+                    }
+                ],
+            },
+        },
+    ]
+
+    with open(session_2_file, "w") as f:
+        for data in session_2_data:
+            f.write(json.dumps(data) + "\n")
+
+    return {"session-001": session_1_data, "session-002": session_2_data}
+
+
+class TestDataParsing:
+    """Test session data parsing."""
+
+    def test_local_source_loads_index(self, test_settings, sample_history):
+        """Test LocalSource can load history index."""
+        settings, claude_dir, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        summaries = source.list_metadata()
+        assert len(summaries) == 0  # No sessions with files yet
+
+    def test_local_source_with_session_files(self, test_settings, sample_history, sample_sessions):
+        """Test LocalSource with actual session files."""
+        settings, claude_dir, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        summaries = source.list_metadata()
+        assert len(summaries) == 2
+        assert all(s["session_id"] in ["session-001", "session-002"] for s in summaries)
+
+    def test_get_trajectory_with_correct_metadata(
+        self, test_settings, sample_history, sample_sessions
+    ):
+        """Test trajectory metadata is correctly computed."""
+        settings, claude_dir, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        group = source.load("session-002")
+        assert group is not None
+        main_traj = group[0]
+        assert main_traj.session_id == "session-002"
+        # session-002 has 2 parsed steps (user + agent; relay message filtered)
+        assert len(main_traj.steps) == 2
+        assert main_traj.agent.model_name == "claude-sonnet-4-6"
+
+
+class TestLocalStoreABC:
+    """Test ABC methods on LocalStore."""
+
+    def test_exists_known_session(self, test_settings, sample_history, sample_sessions):
+        """exists() returns True for known sessions, False for unknown."""
+        settings, _, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        assert source.exists("session-001") is True
+        assert source.exists("session-002") is True
+        assert source.exists("nonexistent") is False
+        print("exists() correctly identifies known/unknown sessions")
+
+    def test_session_count(self, test_settings, sample_history, sample_sessions):
+        """session_count() matches len(list_metadata())."""
+        settings, _, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        count = source.session_count()
+        metadata_count = len(source.list_metadata())
+        assert count == metadata_count == 2
+        print(f"session_count() = {count}, matches list_metadata() length")
+
+    def test_save_raises(self, test_settings):
+        """save() raises NotImplementedError."""
+        settings, _, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        with pytest.raises(NotImplementedError, match="read-only"):
+            source.save([])
+        print("save() correctly raises NotImplementedError")
+
+    def test_get_metadata(self, test_settings, sample_history, sample_sessions):
+        """get_metadata() returns summary dict for known session, None for unknown."""
+        settings, _, _ = test_settings
+        source = LocalSource(settings=settings)
+
+        meta = source.get_metadata("session-001")
+        assert meta is not None
+        assert meta["session_id"] == "session-001"
+
+        assert source.get_metadata("nonexistent") is None
+        print("get_metadata() correctly returns metadata or None")
+
+
+class TestLocalStoreErrorHandling:
+    """Test error handling for LocalStore."""
+
+    def test_malformed_jsonl_line(self, test_settings):
+        """Test handling of malformed JSONL data."""
+        settings, claude_dir, test_project = test_settings
+
+        history_file = claude_dir / "history.jsonl"
+        with open(history_file, "w") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "display": "Test",
+                        "timestamp": 1707734674932,
+                        "project": "/Users/TestProject/Agent-Test",
+                        "sessionId": "session-bad",
+                    }
+                )
+                + "\n"
+            )
+
+        session_file = test_project / "session-bad.jsonl"
+        with open(session_file, "w") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "type": "user",
+                        "uuid": "msg-1",
+                        "sessionId": "session-bad",
+                        "message": {"role": "user", "content": "test"},
+                    }
+                )
+                + "\n"
+            )
+            f.write("INVALID JSON LINE\n")
+            f.write(
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "uuid": "msg-2",
+                        "sessionId": "session-bad",
+                        "message": {"role": "assistant", "content": "response"},
+                    }
+                )
+                + "\n"
+            )
+
+        source = LocalSource(settings=settings)
+
+        # Should still parse valid lines
+        group = source.load("session-bad")
+        assert group is not None
+
+    def test_empty_claude_directory(self):
+        """Test behavior with empty Claude directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir)
+            settings = Settings(
+                claude_dir=base / ".claude",
+                codex_dir=base / ".codex",
+                gemini_dir=base / ".gemini",
+                openclaw_dir=base / ".openclaw",
+            )
+            source = LocalSource(settings=settings)
+
+            summaries = source.list_metadata()
+            assert len(summaries) == 0

@@ -10,8 +10,11 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Max chars extracted from the first user message for the share title
 FIRST_MESSAGE_MAX_LENGTH = 120
+# Fallback title when no user message is available
 DEFAULT_SHARE_TITLE = "Shared Session"
+# JSON file tracking all shared session IDs under share_dir
 REGISTRY_FILENAME = "shared.json"
 
 

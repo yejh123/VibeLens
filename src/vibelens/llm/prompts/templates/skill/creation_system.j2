@@ -41,7 +41,15 @@ Step-by-step instructions...
 - The response must start with `{` and end with `}`.
 - NEVER reference sessions by ID, index, or UUID in text fields (description, rationale). Describe patterns in general terms that readers can understand without session context.
 - All text fields (`rationale`) MUST be concise, plain-language, and understandable by non-technical users. Avoid jargon and overly formal phrasing.
-- MANDATORY bullet format for `rationale`: one short sentence, then `\n- **Bold label**: explanation` bullets. No plain-text paragraphs.
+- MANDATORY format for `rationale`: one sentence (max 15 words), then `\n- ` bullets (max 10 words each). No plain-text paragraphs.
+
+## Examples
+
+Example rationale (good — one sentence then bullets):
+"This skill captures the test-fix workflow you repeat manually.\n- Observed 4 times across different sessions\n- Saves 3 manual steps each time tests fail"
+
+Example rationale (bad — plain paragraph, no bullets):
+"Based on the analysis, this skill would help automate the testing workflow by running tests, reading errors, and applying fixes automatically."
 
 ## Output Schema
 

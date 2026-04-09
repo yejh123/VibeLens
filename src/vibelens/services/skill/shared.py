@@ -17,11 +17,12 @@ from vibelens.llm.backend import InferenceError
 from vibelens.models.context import SessionContextBatch
 from vibelens.models.skill import SkillMode, WorkflowPattern
 from vibelens.services.analysis_shared import CACHE_MAXSIZE, CACHE_TTL_SECONDS
-from vibelens.utils.json_extract import extract_json
+from vibelens.utils.json import extract_json_from_llm_output
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Directory for detailed request/response skill analysis logs
 SKILL_LOG_DIR = Path("logs/skill")
 
 _cache: TTLCache = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
@@ -160,7 +161,7 @@ def parse_llm_output[ModelT: BaseModel](text: str, model_class: type[ModelT], la
     if not text or not text.strip():
         raise InferenceError(f"LLM returned empty response for {label}.")
 
-    json_str = extract_json(text)
+    json_str = extract_json_from_llm_output(text)
     try:
         data = json.loads(json_str)
         return model_class.model_validate(data)

@@ -5,6 +5,7 @@ SessionContextBatch wraps multiple session contexts with step-ref resolution,
 trajectory aggregation, and optional batching metadata for LLM calls.
 """
 
+import re
 from datetime import datetime
 from functools import cached_property
 
@@ -16,6 +17,8 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+_INDEX_TAG_RE = re.compile(r" \(index=\d+\)")
+
 
 class SessionContext(BaseModel):
     """Compressed context for one session, ready for LLM consumption."""
@@ -23,6 +26,9 @@ class SessionContext(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     session_id: str = Field(description="Real session UUID.")
+    session_index: int | None = Field(
+        default=None, description="0-based position in the analysis batch."
+    )
     project_path: str | None = Field(default=None, description="Project directory path.")
     context_text: str = Field(description="Compressed LLM-ready text representation.")
     trajectory_group: list[Trajectory] = Field(
@@ -87,6 +93,26 @@ class SessionContext(BaseModel):
                 ids.add(step.step_id)
         return ids
 
+    def reindex(self, new_index: int) -> None:
+        """Update session_index and rewrite the (index=N) tag in context_text.
+
+        Args:
+            new_index: New 0-based index for this session within a batch.
+        """
+        new_tag = f" (index={new_index})"
+        if self.session_index is not None:
+            old_tag = f" (index={self.session_index})"
+            self.context_text = self.context_text.replace(old_tag, new_tag, 1)
+        else:
+            # No existing tag — insert before the closing ===
+            self.context_text = _INDEX_TAG_RE.sub("", self.context_text, count=1)
+            self.context_text = self.context_text.replace(
+                f"=== SESSION: {self.session_id} ===",
+                f"=== SESSION: {self.session_id}{new_tag} ===",
+                1,
+            )
+        self.session_index = new_index
+
     def _resolve_index(self, step_id: str) -> str | None:
         """Resolve a step ID: map int-like strings via step_index2id, pass through UUIDs."""
         try:
@@ -135,6 +161,9 @@ class SessionContextBatch(BaseModel):
     def resolve_step_ref(self, ref: StepRef) -> StepRef | None:
         """Resolve and validate a step ref by delegating to the matching SessionContext.
 
+        Handles LLM outputs that use the batch index (e.g. '12') instead of
+        the real session UUID by falling back to _index_lookup.
+
         Args:
             ref: Step reference with session_id identifying the target context.
 
@@ -143,14 +172,33 @@ class SessionContextBatch(BaseModel):
         """
         ctx = self._context_lookup.get(ref.session_id)
         if ctx is None:
+            ctx = self._resolve_session_index(ref.session_id)
+        if ctx is None:
             logger.warning("Dropping ref: unknown session_id %r", ref.session_id)
             return None
-        return ctx.resolve_step_ref(ref)
+        resolved_ref = StepRef(
+            session_id=ctx.session_id,
+            start_step_id=ref.start_step_id,
+            end_step_id=ref.end_step_id,
+        )
+        return ctx.resolve_step_ref(resolved_ref)
 
     @cached_property
     def _context_lookup(self) -> dict[str, SessionContext]:
         """Session ID to SessionContext mapping for fast dispatch."""
         return {ctx.session_id: ctx for ctx in self.contexts}
+
+    @cached_property
+    def _index_lookup(self) -> dict[int, SessionContext]:
+        """Batch index to SessionContext mapping for resolving LLM index refs."""
+        return {ctx.session_index: ctx for ctx in self.contexts if ctx.session_index is not None}
+
+    def _resolve_session_index(self, session_id: str) -> SessionContext | None:
+        """Try to resolve a numeric session_id string as a batch index."""
+        try:
+            return self._index_lookup.get(int(session_id))
+        except (ValueError, TypeError):
+            return None
 
     def __len__(self) -> int:
         return len(self.contexts)

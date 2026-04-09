@@ -15,7 +15,9 @@ import re
 
 from vibelens.config.anonymize import MIN_BARE_USERNAME_LENGTH
 
+# Prefix prepended to hashed usernames (e.g. "user_a1b2c3d4")
 USER_HASH_PREFIX = "user_"
+# Hex digits kept from the SHA-256 hash for the username replacement
 HASH_HEX_LENGTH = 8
 
 # Separators used to join camelCase parts into name variants

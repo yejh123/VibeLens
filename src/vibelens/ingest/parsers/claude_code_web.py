@@ -36,6 +36,7 @@ from vibelens.utils import deterministic_id, get_logger, parse_iso_timestamp
 
 logger = get_logger(__name__)
 
+# The single JSON file containing all conversations in a claude.ai export ZIP
 CONVERSATIONS_FILENAME = "conversations.json"
 
 # Content block types to skip during parsing

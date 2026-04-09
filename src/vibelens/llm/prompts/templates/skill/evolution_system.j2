@@ -27,7 +27,15 @@ Generate precise edits for the given skill based on the proposal and session evi
 - The response must start with `{` and end with `}`.
 - NEVER reference sessions by ID, index, or UUID in text fields (rationale). Describe patterns in general terms.
 - All text fields (`rationale`) MUST be concise, plain-language, and understandable by non-technical users. Avoid jargon and overly formal phrasing.
-- MANDATORY bullet format for `rationale`: one short sentence, then `\n- **Bold label**: explanation` bullets. No plain-text paragraphs.
+- MANDATORY format for `rationale`: one sentence (max 15 words), then `\n- ` bullets (max 10 words each). No plain-text paragraphs.
+
+## Examples
+
+Example rationale (good — one sentence then bullets):
+"The skill lacks guidance on organizing style files.\n- Missing checklist would catch broken buttons\n- No image strategy led to wrong placeholders"
+
+Example rationale (bad — plain paragraph, no bullets):
+"The current skill definition does not include instructions for organizing CSS files into separate concerns or checking interactive elements before presenting to the user."
 
 ## Output Schema
 

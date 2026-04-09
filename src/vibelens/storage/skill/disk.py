@@ -10,10 +10,9 @@ Directory layout (shared across all agents):
     └── another-skill/
         └── SKILL.md
 
-Used directly for Claude Code, Cursor, Gemini CLI, and all other agents
-that follow the standard skills/<name>/SKILL.md layout. Subclassed by
-CodexSkillStore (adds .system/ scanning) and CentralSkillStore (adds
-source metadata injection).
+Used directly for Claude Code, Codex CLI, Cursor, Gemini CLI, and all
+other agents that follow the standard skills/<name>/SKILL.md layout.
+Subclassed by CentralSkillStore (adds source metadata injection).
 """
 
 import shutil
@@ -27,17 +26,22 @@ from vibelens.models.skill import (
     SkillSource,
     SkillSourceType,
 )
-from vibelens.storage.skill.base import SkillStore
+from vibelens.storage.skill.base import BaseSkillStore
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Required definition file inside each skill directory
 SKILL_FILENAME = "SKILL.md"
+
+# Optional subdirectories recognized inside a skill directory
 KNOWN_SUBDIRS = ("scripts", "references", "agents", "assets")
+
+# YAML frontmatter opening/closing marker in SKILL.md files
 FRONTMATTER_DELIMITER = "---"
 
 
-class DiskSkillStore(SkillStore):
+class DiskSkillStore(BaseSkillStore):
     """Concrete skill store backed by a directory of SKILL.md files.
 
     Constructor takes both skills_dir and source_type so any agent

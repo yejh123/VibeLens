@@ -16,9 +16,8 @@ discovered automatically via rglob.
 
 import asyncio
 import shutil
-from datetime import UTC, datetime
+from dataclasses import dataclass
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
 
@@ -27,160 +26,46 @@ from vibelens.deps import get_settings, is_demo_mode, register_upload_store
 from vibelens.ingest.anonymize.rule_anonymizer.anonymizer import RuleAnonymizer
 from vibelens.ingest.discovery import discover_session_files, get_parser
 from vibelens.ingest.parsers.base import BaseParser
-from vibelens.models.enums import AgentType
 from vibelens.schemas.upload import UploadResult
 from vibelens.services.dashboard.loader import (
     invalidate_cache as invalidate_dashboard_cache,
 )
 from vibelens.services.session.search import add_sessions_to_index
-from vibelens.storage.conversation.disk import DiskStore
+from vibelens.storage.trajectory.disk import DiskTrajectoryStore
 from vibelens.utils import get_logger
-from vibelens.utils.json_helpers import locked_jsonl_append
+from vibelens.utils.identifiers import generate_timestamped_id
+from vibelens.utils.json import locked_jsonl_append
+from vibelens.utils.timestamps import utc_now_iso
 from vibelens.utils.zip import extract_zip, validate_zip
 
 logger = get_logger(__name__)
 
-# Zip commands use `cd` to ensure the archive contains clean relative paths
-# (e.g. projects/...) instead of absolute paths (e.g. Users/name/.claude/projects/...).
-UPLOAD_COMMANDS: dict[str, dict[str, dict[str, str]]] = {
-    AgentType.CLAUDE_CODE: {
-        "macos": {
-            "command": (
-                "cd ~/.claude && zip -r ~/Desktop/claude-data.zip projects/"
-                " -x '**/._*' '**/__MACOSX/*'"
-            ),
-            "description": "Output: ~/Desktop/claude-data.zip",
-        },
-        "linux": {
-            "command": "cd ~/.claude && zip -r ~/Desktop/claude-data.zip projects/",
-            "description": "Output: ~/Desktop/claude-data.zip",
-        },
-        "windows": {
-            "command": (
-                "cd $env:USERPROFILE\\.claude; Compress-Archive -Path projects\\*"
-                " -DestinationPath $env:USERPROFILE\\Desktop\\claude-data.zip"
-            ),
-            "description": "Output: Desktop\\claude-data.zip",
-        },
-    },
-    AgentType.CODEX: {
-        "macos": {
-            "command": (
-                "cd ~/.codex && zip -r ~/Desktop/codex-data.zip sessions/"
-                " -x '**/._*' '**/__MACOSX/*'"
-            ),
-            "description": "Output: ~/Desktop/codex-data.zip",
-        },
-        "linux": {
-            "command": "cd ~/.codex && zip -r ~/Desktop/codex-data.zip sessions/",
-            "description": "Output: ~/Desktop/codex-data.zip",
-        },
-        "windows": {
-            "command": (
-                "cd $env:USERPROFILE\\.codex; Compress-Archive -Path sessions\\*"
-                " -DestinationPath $env:USERPROFILE\\Desktop\\codex-data.zip"
-            ),
-            "description": "Output: Desktop\\codex-data.zip",
-        },
-    },
-    AgentType.GEMINI: {
-        "macos": {
-            "command": (
-                "cd ~/.gemini && zip -r ~/Desktop/gemini-data.zip tmp/"
-                " -i '*.json' -i '.project_root'"
-            ),
-            "description": "Output: ~/Desktop/gemini-data.zip",
-        },
-        "linux": {
-            "command": (
-                "cd ~/.gemini && zip -r ~/Desktop/gemini-data.zip tmp/"
-                " -i '*.json' -i '.project_root'"
-            ),
-            "description": "Output: ~/Desktop/gemini-data.zip",
-        },
-        "windows": {
-            "command": (
-                "cd $env:USERPROFILE\\.gemini; Compress-Archive -Path tmp\\*"
-                " -DestinationPath $env:USERPROFILE\\Desktop\\gemini-data.zip"
-            ),
-            "description": "Output: Desktop\\gemini-data.zip",
-        },
-    },
-    AgentType.CLAUDE_CODE_WEB: {
-        "macos": {
-            "command": "# Export from claude.ai > Settings > Export Data",
-            "description": "Upload the zip downloaded from claude.ai",
-        },
-        "linux": {
-            "command": "# Export from claude.ai > Settings > Export Data",
-            "description": "Upload the zip downloaded from claude.ai",
-        },
-        "windows": {
-            "command": "# Export from claude.ai > Settings > Export Data",
-            "description": "Upload the zip downloaded from claude.ai",
-        },
-    },
-}
-
-UPLOAD_ID_TIME_FORMAT = "%Y%m%d%H%M%S"
-SHORT_UUID_LENGTH = 4
+# Temp directory name for ZIP extraction (deleted after parsing)
 EXTRACTED_SUBDIR = "_extracted"
+# Append-only log of all uploads under the upload directory
 METADATA_FILENAME = "metadata.jsonl"
 
 
-def get_upload_command(agent_type: str, os_platform: str) -> dict:
-    """Look up the CLI command for zipping an agent's data directory.
+@dataclass
+class _ProcessingContext:
+    """Groups processing dependencies passed through the parse-store pipeline."""
 
-    Args:
-        agent_type: Agent CLI identifier (claude_code, codex, gemini).
-        os_platform: Operating system (macos, linux, windows).
-
-    Returns:
-        Dict with 'command' and 'description' keys.
-
-    Raises:
-        HTTPException: If agent_type or os_platform is invalid.
-    """
-    try:
-        agent = AgentType(agent_type)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown agent_type: {agent_type}") from None
-
-    platform_commands = UPLOAD_COMMANDS.get(agent)
-    if not platform_commands:
-        raise HTTPException(status_code=400, detail=f"No commands for agent: {agent}")
-
-    result = platform_commands.get(os_platform)
-    if not result:
-        raise HTTPException(status_code=400, detail=f"Unknown os_platform: {os_platform}")
-    return result
+    store: DiskTrajectoryStore
+    parser: BaseParser
+    anonymizer: RuleAnonymizer
+    result: UploadResult
 
 
-def generate_upload_id() -> str:
-    """Create a unique upload identifier.
-
-    Returns:
-        String in format ``{YYYYMMDDHHMMSS}_{short_uuid}``.
-    """
-    timestamp = datetime.now(UTC).strftime(UPLOAD_ID_TIME_FORMAT)
-    short_uuid = uuid4().hex[:SHORT_UUID_LENGTH]
-    return f"{timestamp}_{short_uuid}"
-
-
-async def receive_zip(
-    file: UploadFile, upload_dir: Path, upload_id: str, max_bytes: int, chunk_size: int
-) -> Path:
+async def receive_zip(file: UploadFile, dest_dir: Path) -> Path:
     """Stream an uploaded zip file to disk.
 
-    Writes to ``{upload_dir}/{upload_id}/{upload_id}.zip``, reading in
-    fixed-size chunks to keep memory bounded.
+    Writes to ``{dest_dir}/{dest_dir.name}.zip``, reading in
+    fixed-size chunks to keep memory bounded. Reads size limits
+    from application settings.
 
     Args:
         file: The uploaded file from FastAPI.
-        upload_dir: Base upload storage directory (settings.upload_dir).
-        upload_id: Unique identifier for this upload.
-        max_bytes: Maximum file size allowed.
-        chunk_size: Read chunk size in bytes.
+        dest_dir: Directory to store the zip (created if missing).
 
     Returns:
         Path to the saved zip file.
@@ -188,54 +73,46 @@ async def receive_zip(
     Raises:
         HTTPException: If file exceeds size limit.
     """
-    dest_dir = upload_dir / upload_id
+    settings = get_settings()
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    zip_path = dest_dir / f"{upload_id}.zip"
+    zip_path = dest_dir / f"{dest_dir.name}.zip"
     total_written = 0
 
     with open(zip_path, "wb") as f:
         while True:
-            chunk = await file.read(chunk_size)
+            chunk = await file.read(settings.stream_chunk_size)
             if not chunk:
                 break
             total_written += len(chunk)
-            if total_written > max_bytes:
+            if total_written > settings.max_zip_bytes:
                 zip_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=400, detail=f"File exceeds {max_bytes // (1024 * 1024)} MB limit"
-                )
+                max_mb = settings.max_zip_bytes // (1024 * 1024)
+                raise HTTPException(status_code=400, detail=f"File exceeds {max_mb} MB limit")
             f.write(chunk)
 
     return zip_path
 
 
-def extract_and_discover(
-    zip_path: Path,
-    agent_type: str,
-    max_zip_bytes: int,
-    max_extracted_bytes: int,
-    max_file_count: int,
-) -> list[Path]:
+def extract_and_discover(zip_path: Path, agent_type: str) -> list[Path]:
     """Validate zip, extract contents, and discover session files.
 
     Extraction goes into a ``_extracted`` sibling directory next to the zip.
+    Reads size/count limits from application settings.
 
     Args:
         zip_path: Path to the uploaded zip file.
         agent_type: Agent CLI identifier for file discovery.
-        max_zip_bytes: Maximum allowed zip file size.
-        max_extracted_bytes: Maximum total uncompressed size.
-        max_file_count: Maximum number of files in the archive.
 
     Returns:
         List of discovered session file paths.
     """
+    settings = get_settings()
     validate_zip(
         zip_path=zip_path,
-        max_zip_bytes=max_zip_bytes,
-        max_extracted_bytes=max_extracted_bytes,
-        max_file_count=max_file_count,
+        max_zip_bytes=settings.max_zip_bytes,
+        max_extracted_bytes=settings.max_extracted_bytes,
+        max_file_count=settings.max_file_count,
     )
 
     extracted_dir = zip_path.parent / EXTRACTED_SUBDIR
@@ -244,19 +121,17 @@ def extract_and_discover(
     return discover_session_files(extracted_dir=extracted_dir, agent_type=agent_type)
 
 
-def cleanup_extraction(upload_dir: Path, upload_id: str) -> None:
-    """Remove the temporary extraction directory for an upload.
+def cleanup_extraction(extraction_dir: Path) -> None:
+    """Remove a temporary extraction directory.
 
     The zip file itself is kept as a permanent archive;
     only the ``_extracted/`` subdirectory is removed.
 
     Args:
-        upload_dir: Base upload storage directory (settings.upload_dir).
-        upload_id: Upload identifier whose extraction dir to clean up.
+        extraction_dir: Path to the extraction directory to remove.
     """
-    extracted_dir = upload_dir / upload_id / EXTRACTED_SUBDIR
-    if extracted_dir.exists():
-        shutil.rmtree(extracted_dir, ignore_errors=True)
+    if extraction_dir.exists():
+        shutil.rmtree(extraction_dir, ignore_errors=True)
 
 
 async def process_zip(
@@ -283,8 +158,9 @@ async def process_zip(
 
     filename = file.filename or "upload.zip"
     result = UploadResult(files_received=1)
-    upload_id = generate_upload_id()
+    upload_id = generate_timestamped_id()
     token_short = session_token[:8] if session_token else "none"
+    dest_dir = settings.upload_dir / upload_id
 
     logger.info(
         "process_zip START: file=%s agent=%s token=%s upload_id=%s upload_dir=%s",
@@ -296,24 +172,11 @@ async def process_zip(
     )
 
     try:
-        # 1. Stream zip to settings.upload_dir/{upload_id}/{upload_id}.zip
-        zip_path = await receive_zip(
-            file=file,
-            upload_dir=settings.upload_dir,
-            upload_id=upload_id,
-            max_bytes=settings.max_zip_bytes,
-            chunk_size=settings.stream_chunk_size,
-        )
+        zip_path = await receive_zip(file=file, dest_dir=dest_dir)
         logger.info("Received zip: %s (%d bytes)", zip_path, zip_path.stat().st_size)
 
-        # 2. Validate, extract, and discover session files
         session_files = await asyncio.to_thread(
-            extract_and_discover,
-            zip_path=zip_path,
-            agent_type=agent_type,
-            max_zip_bytes=settings.max_zip_bytes,
-            max_extracted_bytes=settings.max_extracted_bytes,
-            max_file_count=settings.max_file_count,
+            extract_and_discover, zip_path=zip_path, agent_type=agent_type
         )
         logger.info(
             "Discovered %d session files in %s: %s",
@@ -322,23 +185,21 @@ async def process_zip(
             [f.name for f in session_files[:10]],
         )
 
-        # 3. Parse files and store trajectories under {upload_dir}/{upload_id}/
-        #    The _upload_id tag lets the main store enforce visibility filtering.
+        # _upload_id tag lets the main store enforce visibility filtering
         tags: dict[str, str] = {"_upload_id": upload_id}
         if session_token:
             tags["_session_token"] = session_token
-        upload_store = DiskStore(root=settings.upload_dir / upload_id, default_tags=tags)
+        upload_store = DiskTrajectoryStore(root=dest_dir, default_tags=tags)
         upload_store.initialize()
 
-        parser = get_parser(agent_type=agent_type)
-        anonymizer = RuleAnonymizer(AnonymizeConfig(enabled=True))
-        session_details = await asyncio.to_thread(
-            _parse_and_store_files,
-            session_files=session_files,
-            parser=parser,
+        ctx = _ProcessingContext(
             store=upload_store,
+            parser=get_parser(agent_type=agent_type),
+            anonymizer=RuleAnonymizer(AnonymizeConfig(enabled=True)),
             result=result,
-            anonymizer=anonymizer,
+        )
+        session_details = await asyncio.to_thread(
+            _parse_and_store_files, session_files=session_files, ctx=ctx
         )
 
         logger.info(
@@ -349,22 +210,17 @@ async def process_zip(
             len(result.errors),
         )
 
-        # 4. Append metadata to the global metadata.jsonl
-        metadata = _build_upload_metadata(
-            upload_id=upload_id,
-            agent_type=agent_type,
-            filename=filename,
-            session_details=session_details,
-            result=result,
-            session_token=session_token,
-        )
-        # Append one upload record to the global metadata.jsonl file
-        # (offloaded to thread pool -- file lock can block under contention)
+        upload_info = {
+            "upload_id": upload_id,
+            "agent_type": agent_type,
+            "filename": filename,
+            "session_token": session_token,
+        }
+        metadata = _build_upload_metadata(upload_info, session_details, result)
         await asyncio.to_thread(
             locked_jsonl_append, path=settings.upload_dir / METADATA_FILENAME, data=metadata
         )
 
-        # 5. Register the upload store and invalidate downstream caches
         if session_token:
             register_upload_store(session_token, upload_store)
         new_session_ids = [d["session_id"] for d in session_details if "session_id" in d]
@@ -375,11 +231,8 @@ async def process_zip(
         logger.warning("Upload processing failed for %s: %s", filename, exc, exc_info=True)
         result.errors.append({"filename": filename, "error": str(exc)})
     finally:
-        # Clean up extraction dir; keep the zip as a permanent archive
-        # (offloaded to thread pool -- shutil.rmtree can block on large trees)
-        await asyncio.to_thread(
-            cleanup_extraction, upload_dir=settings.upload_dir, upload_id=upload_id
-        )
+        extraction_dir = dest_dir / EXTRACTED_SUBDIR
+        await asyncio.to_thread(cleanup_extraction, extraction_dir=extraction_dir)
 
     logger.info(
         "process_zip END: upload_id=%s result=parsed=%d stored=%d skipped=%d errors=%d",
@@ -392,26 +245,12 @@ async def process_zip(
     return result
 
 
-def _parse_and_store_files(
-    session_files: list[Path],
-    parser: BaseParser,
-    store: DiskStore,
-    result: UploadResult,
-    anonymizer: RuleAnonymizer,
-) -> list[dict]:
+def _parse_and_store_files(session_files: list[Path], ctx: _ProcessingContext) -> list[dict]:
     """Parse discovered session files, anonymize, and persist via the disk store.
-
-    Iterates over each discovered file, parses it into trajectories,
-    anonymizes them to redact sensitive data, and saves them. Skips files
-    that produce no trajectories. Accumulates per-session details for
-    the upload metadata manifest.
 
     Args:
         session_files: List of session file paths from discovery.
-        parser: Parser instance for the agent type.
-        store: DiskStore for trajectory persistence.
-        result: UploadResult to update with counts.
-        anonymizer: RuleAnonymizer for redacting sensitive data.
+        ctx: Processing dependencies (parser, store, anonymizer, result).
 
     Returns:
         List of per-session detail dicts for the upload metadata.
@@ -420,152 +259,82 @@ def _parse_and_store_files(
 
     for file_path in session_files:
         try:
-            trajectories = parser.parse_file(file_path=file_path)
+            trajectories = ctx.parser.parse_file(file_path=file_path)
         except Exception as exc:
             logger.warning("Failed to parse %s: %s", file_path.name, exc)
-            result.errors.append({"filename": file_path.name, "error": str(exc)})
+            ctx.result.errors.append({"filename": file_path.name, "error": str(exc)})
             continue
 
         if not trajectories:
-            result.skipped += 1
+            ctx.result.skipped += 1
             continue
 
-        # Separate main trajectories (no parent ref) from sub-agents
         mains = [t for t in trajectories if not t.parent_trajectory_ref]
         if not mains:
-            result.skipped += 1
+            ctx.result.skipped += 1
             continue
 
-        if len(mains) <= 1:
-            # Single-session file (main + optional sub-agents): store together
-            session_details.extend(
-                _store_single_session(trajectories, mains[0], file_path, store, anonymizer, result)
-            )
-        else:
-            # Multi-conversation file (e.g. claude.ai export): store each independently
-            session_details.extend(
-                _store_multi_sessions(mains, file_path, store, anonymizer, result)
-            )
+        # Single session: one batch (main + sub-agents stored together).
+        # Multi-conversation file (e.g. claude.ai export): one batch per main.
+        batches = [trajectories] if len(mains) <= 1 else [[m] for m in mains]
+        session_details.extend(_store_batches(batches, file_path, ctx))
 
     return session_details
 
 
-def _store_single_session(
-    trajectories: list,
-    main: object,
-    file_path: Path,
-    store: DiskStore,
-    anonymizer: RuleAnonymizer,
-    result: UploadResult,
-) -> list[dict]:
-    """Anonymize and store a single-session batch (main + sub-agents).
+def _store_batches(batches: list[list], file_path: Path, ctx: _ProcessingContext) -> list[dict]:
+    """Anonymize and store one or more trajectory batches from a single file.
+
+    Each batch is saved as an independent unit — a failure in one batch
+    does not prevent subsequent batches from being stored.
 
     Args:
-        trajectories: All trajectories from the file (main + sub-agents).
-        main: The main trajectory (no parent_trajectory_ref).
-        file_path: Source file for error reporting.
-        store: DiskStore for persistence.
-        anonymizer: RuleAnonymizer for redacting sensitive data.
-        result: UploadResult to accumulate counts.
+        batches: List of trajectory groups to store independently.
+        file_path: Source file for error reporting and logging.
+        ctx: Processing dependencies (store, anonymizer, result).
 
     Returns:
-        List of session detail dicts.
-    """
-    trajectories = _anonymize_trajectories(trajectories, anonymizer, result)
-    try:
-        store.save(trajectories=trajectories)
-    except Exception as exc:
-        logger.warning("Failed to store %s: %s", file_path.name, exc)
-        result.errors.append({"filename": file_path.name, "error": str(exc)})
-        return []
-
-    step_count = sum(len(t.steps) for t in trajectories)
-    result.sessions_parsed += 1
-    result.steps_stored += step_count
-    logger.info(
-        "Stored %d trajectories from %s (upload %s)",
-        len(trajectories),
-        file_path.name,
-        store.root.name,
-    )
-
-    return [
-        {
-            "session_id": main.session_id,
-            "trajectory_count": len(trajectories),
-            "step_count": step_count,
-            "source_file": file_path.name,
-        }
-    ]
-
-
-def _store_multi_sessions(
-    mains: list, file_path: Path, store: DiskStore, anonymizer: RuleAnonymizer, result: UploadResult
-) -> list[dict]:
-    """Anonymize and store each main trajectory independently.
-
-    Used for multi-conversation files (e.g. claude.ai export) where
-    parse_file returns many independent trajectories.
-
-    Args:
-        mains: List of independent main trajectories.
-        file_path: Source file for error reporting.
-        store: DiskStore for persistence.
-        anonymizer: RuleAnonymizer for redacting sensitive data.
-        result: UploadResult to accumulate counts.
-
-    Returns:
-        List of session detail dicts.
+        List of session detail dicts for successfully stored batches.
     """
     details: list[dict] = []
-    for traj in mains:
-        anonymized = _anonymize_trajectories([traj], anonymizer, result)
+    for batch in batches:
+        anonymized = _anonymize_trajectories(batch, ctx)
         if not anonymized:
             continue
-        anon_traj = anonymized[0]
         try:
-            store.save(trajectories=[anon_traj])
+            ctx.store.save(trajectories=anonymized)
         except Exception as exc:
-            logger.warning("Failed to store session %s: %s", anon_traj.session_id, exc)
-            result.errors.append({"filename": file_path.name, "error": str(exc)})
+            logger.warning("Failed to store %s: %s", file_path.name, exc)
+            ctx.result.errors.append({"filename": file_path.name, "error": str(exc)})
             continue
 
-        step_count = len(anon_traj.steps)
-        result.sessions_parsed += 1
-        result.steps_stored += step_count
-        details.append(
-            {
-                "session_id": anon_traj.session_id,
-                "trajectory_count": 1,
-                "step_count": step_count,
-                "source_file": file_path.name,
-            }
-        )
+        main = next(t for t in anonymized if not t.parent_trajectory_ref)
+        ctx.result.sessions_parsed += 1
+        ctx.result.steps_stored += sum(len(t.steps) for t in anonymized)
+        details.append(_build_session_detail(main.session_id, anonymized, file_path.name))
 
-    logger.info(
-        "Stored %d sessions from multi-conversation file %s (upload %s)",
-        len(details),
-        file_path.name,
-        store.root.name,
-    )
+    if details:
+        logger.info(
+            "Stored %d session(s) from %s (upload %s)",
+            len(details),
+            file_path.name,
+            ctx.store.root.name,
+        )
     return details
 
 
-def _anonymize_trajectories(
-    trajectories: list, anonymizer: RuleAnonymizer, result: UploadResult
-) -> list:
+def _anonymize_trajectories(trajectories: list, ctx: _ProcessingContext) -> list:
     """Anonymize a batch of trajectories and tag each with redaction metadata.
 
     Args:
         trajectories: Parsed trajectories from a single session file.
-        anonymizer: RuleAnonymizer instance for redacting sensitive data.
-        result: UploadResult to accumulate aggregate anonymization stats.
+        ctx: Processing context with anonymizer and result for stats.
 
     Returns:
         List of anonymized trajectories with ``extra._anonymized`` and
         ``extra._anonymize_stats`` metadata tags.
     """
-    anonymized_results = anonymizer.anonymize_batch(trajectories)
+    anonymized_results = ctx.anonymizer.anonymize_batch(trajectories)
     anonymized_trajectories = []
 
     for anon_traj, anon_result in anonymized_results:
@@ -575,40 +344,50 @@ def _anonymize_trajectories(
         anon_traj.extra["_anonymize_stats"] = anon_result.model_dump()
         anonymized_trajectories.append(anon_traj)
 
-        # Accumulate into aggregate upload result
-        result.secrets_redacted += anon_result.secrets_redacted
-        result.paths_anonymized += anon_result.paths_anonymized
-        result.pii_redacted += anon_result.pii_redacted
+        ctx.result.secrets_redacted += anon_result.secrets_redacted
+        ctx.result.paths_anonymized += anon_result.paths_anonymized
+        ctx.result.pii_redacted += anon_result.pii_redacted
 
     return anonymized_trajectories
 
 
+def _build_session_detail(session_id: str, trajectories: list, source_file: str) -> dict:
+    """Build a per-session detail dict for the upload metadata manifest.
+
+    Args:
+        session_id: Unique session identifier.
+        trajectories: Stored trajectories (used for count computation).
+        source_file: Original filename for provenance.
+
+    Returns:
+        Dict with session_id, trajectory_count, step_count, source_file.
+    """
+    return {
+        "session_id": session_id,
+        "trajectory_count": len(trajectories),
+        "step_count": sum(len(t.steps) for t in trajectories),
+        "source_file": source_file,
+    }
+
+
 def _build_upload_metadata(
-    upload_id: str,
-    agent_type: str,
-    filename: str,
-    session_details: list[dict],
-    result: UploadResult,
-    session_token: str | None = None,
+    upload_info: dict, session_details: list[dict], result: UploadResult
 ) -> dict:
     """Build the upload manifest metadata dict.
 
     Args:
-        upload_id: Unique upload identifier.
-        agent_type: Agent CLI identifier.
-        filename: Original uploaded filename.
+        upload_info: Identity fields (upload_id, agent_type, filename, session_token).
         session_details: Per-session detail dicts.
         result: UploadResult with aggregate counts.
-        session_token: Browser tab token that owns this upload.
 
     Returns:
         Metadata dict for appending to metadata.jsonl.
     """
     meta: dict = {
-        "upload_id": upload_id,
-        "timestamp": datetime.now(UTC).isoformat(),
-        "agent_type": agent_type,
-        "original_filename": filename,
+        "upload_id": upload_info["upload_id"],
+        "timestamp": utc_now_iso(),
+        "agent_type": upload_info["agent_type"],
+        "original_filename": upload_info["filename"],
         "sessions": session_details,
         "totals": {
             "sessions_parsed": result.sessions_parsed,
@@ -620,6 +399,7 @@ def _build_upload_metadata(
             "pii_redacted": result.pii_redacted,
         },
     }
+    session_token = upload_info.get("session_token")
     if session_token:
         meta["session_token"] = session_token
     return meta

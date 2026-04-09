@@ -10,10 +10,11 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# How long get_cached() reuses its in-memory list before rescanning disk
 CACHE_TTL_SECONDS = 300
 
 
-class SkillStore(ABC):
+class BaseSkillStore(ABC):
     """Abstract base for all skill stores.
 
     Both the central VibeLens store and agent-native stores inherit from this
@@ -71,7 +72,7 @@ class SkillStore(ABC):
         return self.skills_dir / name
 
     def import_skill_from(
-        self, source_store: "SkillStore", name: str, overwrite: bool = False
+        self, source_store: "BaseSkillStore", name: str, overwrite: bool = False
     ) -> SkillInfo | None:
         """Copy one skill directory from another store into this store."""
         source_dir = source_store.skill_path(name)
@@ -95,7 +96,7 @@ class SkillStore(ABC):
         return self.get_skill(name)
 
     def import_all_from(
-        self, source_store: "SkillStore", overwrite: bool = False
+        self, source_store: "BaseSkillStore", overwrite: bool = False
     ) -> list[SkillInfo]:
         """Copy every skill from another store into this store."""
         imported: list[SkillInfo] = []

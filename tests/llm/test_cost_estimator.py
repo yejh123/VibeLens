@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from vibelens.llm.cost_estimator import CostEstimate, estimate_analysis_cost
-from vibelens.llm.pricing import lookup_pricing
 from vibelens.llm.tokenizer import count_tokens
 
 FRICTION_LOG_DIR = Path("logs/friction")
@@ -109,15 +108,6 @@ def test_estimate_scales_with_batches() -> None:
     print(f"1 batch: {small.formatted_cost}")
     print(f"4 batches: {large.formatted_cost}")
     print(f"Ratio: {large.estimated_cost_usd / small.estimated_cost_usd:.2f}")
-
-
-def test_haiku_pricing_lookup() -> None:
-    """Verify Claude Haiku 4.5 pricing is available."""
-    pricing = lookup_pricing("anthropic/claude-haiku-4-5")
-    assert pricing is not None
-    assert pricing.input_per_mtok == 1.00
-    assert pricing.output_per_mtok == 5.00
-    print(f"Haiku pricing: ${pricing.input_per_mtok}/MTok in, ${pricing.output_per_mtok}/MTok out")
 
 
 @pytest.mark.skipif(

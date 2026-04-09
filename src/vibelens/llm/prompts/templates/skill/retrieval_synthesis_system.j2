@@ -19,6 +19,20 @@ You will receive retrieval results from multiple batches that analyzed different
 - NEVER reference sessions by ID, index, or UUID in text fields (rationale, description). Describe patterns in general terms that readers can understand without session context.
 - MANDATORY format for `rationale`: one sentence (max 15 words), then `\n- ` bullets (max 10 words each). No plain-text paragraphs.
 
+## Examples
+
+Example title (good):
+"You Keep Repeating the Same Search-Edit Steps"
+
+Example title (bad):
+"Workflow Analysis"
+
+Example rationale (good — one sentence then bullets):
+"Automates the search-read-edit steps you repeat often.\n- Combines three steps into one action\n- Matched 6 times across your sessions"
+
+Example rationale (bad — plain paragraph, no bullets):
+"This skill would be beneficial because it automates the repetitive search-read-edit workflow pattern that was observed across multiple sessions, reducing manual effort."
+
 ## Output Schema
 
 You MUST respond with a single JSON object conforming to this schema:

@@ -14,7 +14,9 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Bump to invalidate all existing caches after schema changes
 CACHE_VERSION = 1
+# User-home path for the persistent session index cache
 DEFAULT_CACHE_PATH = Path.home() / ".vibelens" / "session_index.json"
 
 

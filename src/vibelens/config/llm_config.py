@@ -18,10 +18,15 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Env var pointing to a JSON file with full LLM config overrides
 LLM_CONFIG_ENV_VAR = "VIBELENS_LLM_CONFIG"
+# Prefix for individual LLM env vars (e.g. VIBELENS_LLM_BACKEND)
 LLM_ENV_PREFIX = "VIBELENS_LLM_"
+# User-home path for persisted settings (survives restarts)
 DEFAULT_SETTINGS_PATH = Path.home() / ".vibelens" / "settings.json"
+# Pre-v0.9 YAML config location, auto-migrated on first load
 LEGACY_YAML_PATH = Path.home() / ".vibelens" / "llm.yaml"
+# Project-local legacy YAML, also auto-migrated
 LEGACY_PROJECT_YAML_PATH = Path("config/llm.yaml")
 
 PROVIDER_BASE_URLS: dict[str, str] = {
@@ -49,10 +54,12 @@ _ENV_FIELD_MAP: dict[str, str] = {
     "VIBELENS_LLM_MAX_TOKENS": "max_tokens",
 }
 
+# Number of trailing characters shown when masking an API key for display
 API_KEY_MASK_SUFFIX_LEN = 4
+# Characters replacing the hidden portion of an API key
 API_KEY_MASK = "***"
 
-
+# Old backend names that map to current litellm backend
 LEGACY_BACKEND_ALIASES: dict[str, str] = {
     "anthropic-api": "litellm",
     "openai-api": "litellm",

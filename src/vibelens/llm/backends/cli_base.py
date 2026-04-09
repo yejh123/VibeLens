@@ -26,8 +26,9 @@ from vibelens.utils.timestamps import monotonic_ms
 
 logger = get_logger(__name__)
 
+# Seconds to wait after SIGTERM before escalating to SIGKILL
 SIGTERM_GRACE_SECONDS = 5
-
+# Appended to user prompts to enforce JSON output when the CLI has no native schema flag
 SCHEMA_INSTRUCTION_TEMPLATE = (
     "\n\n---\nYou MUST respond with a single JSON object conforming to the following schema. "
     "Do NOT wrap the JSON in markdown code fences or add any text before/after it.\n\n"

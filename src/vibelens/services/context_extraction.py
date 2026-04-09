@@ -20,8 +20,8 @@ from vibelens.models.enums import StepSource
 from vibelens.models.trajectories import Trajectory
 from vibelens.models.trajectories.step import Step
 from vibelens.services.context_params import PRESET_DETAIL, ContextParams
+from vibelens.utils.content import content_to_text, is_error_content, truncate
 from vibelens.utils.log import get_logger
-from vibelens.utils.text import extract_text, is_error_content, truncate
 
 logger = get_logger(__name__)
 
@@ -103,6 +103,7 @@ def extract_session_context(
             main.next_trajectory_ref.session_id if main.next_trajectory_ref else None
         ),
         timestamp=main.timestamp,
+        session_index=session_index,
         step_index2id=tracker.index_to_real_id,
     )
 
@@ -227,7 +228,7 @@ def _build_compaction_boundaries(
     for agent in compaction_agents:
         for step in agent.steps:
             if step.source == StepSource.AGENT:
-                summary = extract_text(step.message)
+                summary = content_to_text(step.message)
                 if summary.strip():
                     boundaries.append((agent.timestamp, summary.strip()))
                 break
@@ -250,7 +251,7 @@ def _format_step(step: Step, tracker: _IndexTracker, params: ContextParams) -> s
     lines: list[str] = []
 
     if step.source == StepSource.USER:
-        message = extract_text(step.message)
+        message = content_to_text(step.message)
         if message.strip():
             idx = tracker.assign(step.step_id)
             truncated = _truncate_user_prompt(message.strip(), params)
@@ -259,7 +260,7 @@ def _format_step(step: Step, tracker: _IndexTracker, params: ContextParams) -> s
     elif step.source == StepSource.AGENT:
         # Agent's text message (reasoning, explanations, decisions)
         idx = tracker.assign(step.step_id)
-        message = extract_text(step.message)
+        message = content_to_text(step.message)
         truncated = _truncate_agent_message(message.strip(), params)
         agent_lines = [f"[step_id={idx}] AGENT: {truncated}"]
 
@@ -270,7 +271,7 @@ def _format_step(step: Step, tracker: _IndexTracker, params: ContextParams) -> s
         # Scan observations for errors and optionally non-error output
         if step.observation:
             for result in step.observation.results:
-                content = extract_text(result.content)
+                content = content_to_text(result.content)
                 if is_error_content(content):
                     error_text = truncate(content, params.error_truncate_chars)
                     agent_lines.append(f"  ERROR: {error_text}")

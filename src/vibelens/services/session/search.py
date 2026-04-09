@@ -24,8 +24,11 @@ from vibelens.utils import get_logger
 
 logger = get_logger(__name__)
 
+# Threads for parallel session loading during Tier 2 index build
 MAX_PARALLEL_WORKERS = 8
+# Max chars for tool argument values stored in the search index
 ARG_VALUE_MAX_LENGTH = 500
+# Max chars for observation text stored in the search index
 OBSERVATION_MAX_LENGTH = 200
 
 

@@ -16,13 +16,15 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile
 
 from vibelens.deps import get_settings
-from vibelens.services.upload.processor import generate_upload_id
-from vibelens.utils.json_helpers import locked_jsonl_append
+from vibelens.utils.identifiers import generate_timestamped_id
+from vibelens.utils.json import locked_jsonl_append
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Append-only log of received donations in the donation directory
 INDEX_FILENAME = "index.jsonl"
+# Metadata file inside each donated ZIP describing its contents
 MANIFEST_FILENAME = "manifest.json"
 
 
@@ -47,7 +49,7 @@ async def receive_donation(file: UploadFile) -> dict:
     donation_dir.mkdir(parents=True, exist_ok=True)
 
     # Stream to a temp path first, then rename after reading manifest
-    temp_id = generate_upload_id()
+    temp_id = generate_timestamped_id()
     temp_path = donation_dir / f"_tmp_{temp_id}.zip"
 
     total_written = await _stream_to_disk(file, temp_path, settings.max_zip_bytes)
@@ -56,7 +58,7 @@ async def receive_donation(file: UploadFile) -> dict:
     manifest = await asyncio.to_thread(_read_manifest, temp_path)
 
     # Use donation_id from manifest if present (new format), else generate one
-    donation_id = manifest.get("donation_id") or generate_upload_id()
+    donation_id = manifest.get("donation_id") or generate_timestamped_id()
     zip_filename = f"{donation_id}.zip"
     zip_path = donation_dir / zip_filename
 

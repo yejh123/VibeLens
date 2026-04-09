@@ -10,6 +10,7 @@ vibelens.services.dashboard.pricing.
 from vibelens.llm.normalizer import normalize_model_name
 from vibelens.models.llm.pricing import ModelPricing
 
+# Divisor to convert token counts to the "per million" unit used in pricing
 TOKENS_PER_MTOK = 1_000_000
 
 # Prices are USD per million tokens.

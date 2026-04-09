@@ -19,6 +19,20 @@ You will receive evolution proposals and workflow patterns from multiple batches
 - NEVER reference sessions by ID, index, or UUID in text fields (description, rationale). Describe patterns in general terms.
 - MANDATORY format for `rationale`: one sentence (max 15 words), then `\n- ` bullets (max 10 words each). No plain-text paragraphs.
 
+## Examples
+
+Example title (good):
+"Two Skills Miss Steps You Always Do Manually"
+
+Example title (bad):
+"Skill Improvements"
+
+Example rationale (good — one sentence then bullets):
+"The skill skips error checking before committing.\n- Adding an error check catches issues from 3 sessions\n- You had to re-run checks manually each time"
+
+Example rationale (bad — plain paragraph, no bullets):
+"The current skill definition does not include a step for verifying that there are no errors before creating a commit, which has led to problems in multiple sessions."
+
 ## Output Schema
 
 You MUST respond with a single JSON object conforming to this schema:

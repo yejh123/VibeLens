@@ -16,6 +16,7 @@ from pathlib import Path
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the Gemini CLI, ordered cheapest-first
 GEMINI_CLI_MODELS = [
     "gemini-2.0-flash",
     "gemini-2.5-flash-lite",
@@ -23,6 +24,7 @@ GEMINI_CLI_MODELS = [
     "gemini-2.5-pro",
     "gemini-3.1-pro",
 ]
+# Cheapest model used when no model is explicitly configured
 GEMINI_CLI_DEFAULT_MODEL = "gemini-2.0-flash"
 
 

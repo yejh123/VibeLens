@@ -3,7 +3,7 @@
 Aggregates results across per-user upload stores and the example store,
 implementing store-level isolation so each user only sees their own uploads.
 
-In self-use mode, delegates to the single LocalStore via get_store().
+In self-use mode, delegates to the single LocalStore via get_trajectory_store().
 In demo mode, iterates the user's registered upload stores (from the
 upload registry in deps.py) plus the shared example store.
 """
@@ -11,7 +11,7 @@ upload registry in deps.py) plus the shared example store.
 from vibelens.deps import (
     get_all_upload_stores,
     get_example_store,
-    get_store,
+    get_trajectory_store,
     get_upload_stores,
     is_demo_mode,
 )
@@ -34,7 +34,7 @@ def list_all_metadata(session_token: str | None = None) -> list[dict]:
         Combined metadata list from the user's active stores.
     """
     if not is_demo_mode():
-        metadata = list(get_store().list_metadata())
+        metadata = list(get_trajectory_store().list_metadata())
         seen_ids = {m.get("session_id") for m in metadata if m.get("session_id")}
         # Include example sessions alongside local sessions
         for m in get_example_store().list_metadata():
@@ -86,7 +86,7 @@ def load_from_stores(session_id: str, session_token: str | None = None) -> list 
         List of Trajectory objects, or None if not found in any store.
     """
     if not is_demo_mode():
-        result = get_store().load(session_id)
+        result = get_trajectory_store().load(session_id)
         if result is not None:
             return result
         return get_example_store().load(session_id)
@@ -115,7 +115,7 @@ def load_from_all_stores(session_id: str) -> list | None:
         List of Trajectory objects, or None if not found.
     """
     if not is_demo_mode():
-        result = get_store().load(session_id)
+        result = get_trajectory_store().load(session_id)
         if result is not None:
             return result
         return get_example_store().load(session_id)
@@ -139,7 +139,7 @@ def get_metadata_from_stores(session_id: str, session_token: str | None = None) 
         Metadata dict, or None if not found in any accessible store.
     """
     if not is_demo_mode():
-        meta = get_store().get_metadata(session_id)
+        meta = get_trajectory_store().get_metadata(session_id)
         if meta is not None:
             return meta
         return get_example_store().get_metadata(session_id)

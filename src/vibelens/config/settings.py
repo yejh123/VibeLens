@@ -11,6 +11,7 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Prefix for all VibeLens environment variables (e.g. VIBELENS_HOST)
 ENV_PREFIX = "VIBELENS_"
 
 

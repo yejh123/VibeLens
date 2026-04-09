@@ -8,6 +8,7 @@ batch-level results when multiple batches are used.
 from vibelens.models.llm.prompts import AnalysisPrompt, load_template
 from vibelens.models.skill import SkillRetrievalOutput
 
+# Per-batch retrieval: matches workflow patterns to featured skill candidates
 SKILL_RETRIEVAL_PROMPT = AnalysisPrompt(
     task_id="skill_retrieval",
     system_template=load_template("skill/retrieval_system.j2"),
@@ -15,7 +16,7 @@ SKILL_RETRIEVAL_PROMPT = AnalysisPrompt(
     output_model=SkillRetrievalOutput,
     exclude_fields={"SkillRecommendation": frozenset({"description"})},
 )
-
+# Post-batch synthesis: merges and deduplicates retrieval results across batches
 SKILL_RETRIEVAL_SYNTHESIS_PROMPT = AnalysisPrompt(
     task_id="skill_retrieval_synthesis",
     system_template=load_template("skill/retrieval_synthesis_system.j2"),

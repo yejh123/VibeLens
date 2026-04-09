@@ -43,27 +43,6 @@ def _is_finite(value: int | float) -> bool:
     return not (math.isinf(value) or math.isnan(value))
 
 
-def parse_ms_timestamp(value: int | str | None) -> datetime | None:
-    """Convert a millisecond-epoch timestamp to a UTC datetime.
-
-    Args:
-        value: Millisecond epoch as int or numeric string, or None.
-
-    Returns:
-        UTC-aware datetime, or None if parsing fails or out of range.
-    """
-    if value is None:
-        return None
-    try:
-        ms = int(value)
-        if not _is_finite(ms) or ms < 0:
-            return None
-        dt = datetime.fromtimestamp(ms / 1000, tz=UTC)
-        return _validate_range(dt)
-    except (ValueError, TypeError, OSError, OverflowError):
-        return None
-
-
 def parse_iso_timestamp(value: str | None) -> datetime | None:
     """Parse an ISO-8601 timestamp string to a UTC datetime.
 
@@ -143,27 +122,6 @@ def parse_metadata_timestamp(meta: dict) -> datetime | None:
     return None
 
 
-def safe_int(value: int | float | str | None, default: int = 0) -> int:
-    """Safely convert a value to int, handling None, NaN, Inf, and strings.
-
-    Args:
-        value: Value to convert.
-        default: Fallback when conversion fails.
-
-    Returns:
-        Integer value, or default on failure.
-    """
-    if value is None:
-        return default
-    try:
-        numeric = float(value)
-        if not _is_finite(numeric):
-            return default
-        return int(numeric)
-    except (ValueError, TypeError):
-        return default
-
-
 def monotonic_ms() -> int:
     """Return current monotonic time in milliseconds.
 
@@ -176,15 +134,13 @@ def monotonic_ms() -> int:
     return int(time.monotonic() * 1000)
 
 
-def format_isoformat(dt: datetime | None) -> str | None:
-    """Format a datetime to ISO-8601 string.
+def utc_now_iso() -> str:
+    """Return current UTC time as an ISO-8601 string.
 
-    Args:
-        dt: Datetime to format, or None.
+    Replaces the common ``datetime.now(UTC).isoformat()`` pattern
+    with a single call.
 
     Returns:
-        ISO-8601 string, or None if input is None.
+        ISO-8601 timestamp string with UTC timezone.
     """
-    if dt is None:
-        return None
-    return dt.isoformat()
+    return datetime.now(UTC).isoformat()

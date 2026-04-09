@@ -11,8 +11,8 @@ from fastapi import APIRouter, HTTPException
 
 from vibelens.deps import (
     get_central_skill_store,
+    get_claude_skill_store,
     get_codex_skill_store,
-    get_skill_store,
 )
 from vibelens.models.skill import VALID_SKILL_NAME
 from vibelens.schemas.skills import (
@@ -22,16 +22,17 @@ from vibelens.schemas.skills import (
     SkillWriteRequest,
 )
 from vibelens.services.analysis_shared import CACHE_TTL_SECONDS
+from vibelens.services.skill.download import download_skill_directory
 from vibelens.storage.skill.agent import AGENT_SKILL_REGISTRY
 from vibelens.storage.skill.disk import DiskSkillStore
-from vibelens.utils.github import download_skill_from_github
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
+# JSON manifest of featured skills shipped with the package
 FEATURED_SKILLS_PATH = Path(__file__).resolve().parents[3] / "featured-skills.json"
-
+# Default number of skills returned per page in listing endpoints
 DEFAULT_PAGE_SIZE = 50
 
 
@@ -43,7 +44,7 @@ def _make_agent_getter(source_type, skills_dir):
 
 
 AGENT_STORE_REGISTRY: dict[str, callable] = {
-    "claude_code": get_skill_store,
+    "claude_code": get_claude_skill_store,
     "codex": get_codex_skill_store,
 }
 
@@ -57,7 +58,7 @@ for _src_type, _skills_dir in AGENT_SKILL_REGISTRY.items():
 def _resolve_source_store(source: str):
     """Resolve supported source store ids."""
     if source == "claude":
-        return get_skill_store()
+        return get_claude_skill_store()
     if source == "codex":
         return get_codex_skill_store()
     raise HTTPException(status_code=404, detail=f"Unsupported skill source: {source}")
@@ -156,7 +157,7 @@ def install_featured_skill(req: FeaturedSkillInstallRequest) -> dict:
     # Download complete skill directory from GitHub (SKILL.md + auxiliary files)
     source_url = matched.get("source_url", "")
     skill_dir = central.skill_path(req.slug)
-    downloaded = download_skill_from_github(source_url, skill_dir) if source_url else False
+    downloaded = download_skill_directory(source_url, skill_dir) if source_url else False
 
     if not downloaded:
         # Fallback: build a minimal SKILL.md from catalog metadata

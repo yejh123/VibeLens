@@ -7,13 +7,17 @@ of trajectory data at three depth levels for different context budgets.
 from enum import StrEnum
 
 from vibelens.models.trajectories import Trajectory
-from vibelens.utils.text import extract_text, is_error_content, summarize_args, truncate
+from vibelens.utils.content import content_to_text, is_error_content, summarize_args, truncate
 
+# Character limits per message at each digest depth
 MAX_MESSAGE_CHARS_BRIEF = 80
 MAX_MESSAGE_CHARS_STANDARD = 300
 MAX_MESSAGE_CHARS_DETAILED = 2000
+# Character limit for tool output included in digests
 MAX_TOOL_OUTPUT_CHARS = 500
+# Sessions with fewer steps than this use detailed depth
 STEP_THRESHOLD_DETAILED = 10
+# Sessions with fewer steps than this use standard depth (above = brief)
 STEP_THRESHOLD_STANDARD = 200
 
 
@@ -107,7 +111,7 @@ def _format_step(index: int, step, depth: DigestDepth) -> str:
 
 def _format_step_brief(index: int, step) -> str:
     """One-line summary per step."""
-    message = extract_text(step.message)
+    message = content_to_text(step.message)
     truncated = truncate(message, MAX_MESSAGE_CHARS_BRIEF)
     tool_names = [tc.function_name for tc in step.tool_calls]
     tool_part = f" tools=[{','.join(tool_names)}]" if tool_names else ""
@@ -119,7 +123,7 @@ def _format_step_brief(index: int, step) -> str:
 def _format_step_standard(index: int, step) -> str:
     """Step with truncated message and tool call summaries."""
     lines: list[str] = []
-    message = extract_text(step.message)
+    message = content_to_text(step.message)
     truncated = truncate(message, MAX_MESSAGE_CHARS_STANDARD)
     lines.append(f"[{index}] {step.source.value}: {truncated}")
 
@@ -133,7 +137,7 @@ def _format_step_standard(index: int, step) -> str:
 
     if step.observation:
         for result in step.observation.results:
-            content = extract_text(result.content)
+            content = content_to_text(result.content)
             if is_error_content(content):
                 # Always include error output in full for friction detection
                 lines.append(f"  <- ERROR: {truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
@@ -146,7 +150,7 @@ def _format_step_standard(index: int, step) -> str:
 def _format_step_detailed(index: int, step) -> str:
     """Full step content with truncated tool outputs."""
     lines: list[str] = []
-    message = extract_text(step.message)
+    message = content_to_text(step.message)
     truncated = truncate(message, MAX_MESSAGE_CHARS_DETAILED)
     lines.append(f"[{index}] {step.source.value}:")
     if truncated:
@@ -160,7 +164,7 @@ def _format_step_detailed(index: int, step) -> str:
 
     if step.observation:
         for result in step.observation.results:
-            content = extract_text(result.content)
+            content = content_to_text(result.content)
             lines.append(f"  OUTPUT: {truncate(content, MAX_TOOL_OUTPUT_CHARS)}")
 
     return "\n".join(lines)
@@ -170,4 +174,4 @@ def _has_error_observation(step) -> bool:
     """Check whether a step has any error observations."""
     if not step.observation:
         return False
-    return any(is_error_content(extract_text(r.content)) for r in step.observation.results)
+    return any(is_error_content(content_to_text(r.content)) for r in step.observation.results)

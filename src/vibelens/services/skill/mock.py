@@ -65,6 +65,7 @@ def build_mock_skill_result(session_ids: list[str], mode: SkillMode) -> SkillAna
     )
 
 
+# Cap session loading in mock mode to avoid slow I/O
 MAX_MOCK_SESSIONS = 5
 
 

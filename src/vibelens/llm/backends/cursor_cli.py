@@ -17,12 +17,14 @@ References:
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the Cursor CLI, ordered cheapest-first
 CURSOR_CLI_MODELS = [
     "claude-sonnet-4-6",
     "claude-opus-4-6",
     "gpt-5.4",
     "gemini-2.5-pro",
 ]
+# Cheapest model used when no model is explicitly configured
 CURSOR_CLI_DEFAULT_MODEL = "claude-sonnet-4-6"
 
 

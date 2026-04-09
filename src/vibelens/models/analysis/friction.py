@@ -123,3 +123,6 @@ class FrictionAnalysisResult(BaseModel):
     warnings: list[str] = Field(
         default_factory=list, description="Non-fatal issues encountered during analysis."
     )
+    is_example: bool = Field(
+        default=False, description="Whether this is a bundled example analysis."
+    )

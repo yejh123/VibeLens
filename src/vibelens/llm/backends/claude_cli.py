@@ -12,6 +12,7 @@ Safety flags prevent agentic behavior during scripted inference:
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the Claude Code CLI, ordered cheapest-first
 CLAUDE_CLI_MODELS = [
     "claude-haiku-4-5",
     "claude-3-5-haiku",
@@ -20,6 +21,7 @@ CLAUDE_CLI_MODELS = [
     "claude-opus-4-6",
     "claude-opus-4-1",
 ]
+# Cheapest model used when no model is explicitly configured
 CLAUDE_CLI_DEFAULT_MODEL = "claude-haiku-4-5"
 
 

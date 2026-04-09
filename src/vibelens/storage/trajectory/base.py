@@ -21,7 +21,7 @@ from vibelens.utils.log import get_logger
 logger = get_logger(__name__)
 
 
-class TrajectoryStore(ABC):
+class BaseTrajectoryStore(ABC):
     """Base class for trajectory storage backends.
 
     Both LocalStore (self mode) and DiskStore (demo mode) inherit
@@ -101,9 +101,7 @@ class TrajectoryStore(ABC):
         self._enrich_refs_from_index(session_id, trajectories)
         return self._sort_trajectories(trajectories)
 
-    def _enrich_refs_from_index(
-        self, session_id: str, trajectories: list[Trajectory]
-    ) -> None:
+    def _enrich_refs_from_index(self, session_id: str, trajectories: list[Trajectory]) -> None:
         """Carry over continuation refs from the index to loaded trajectories.
 
         The index builder enriches skeletons with prev_trajectory_ref and

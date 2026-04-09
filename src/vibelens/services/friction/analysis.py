@@ -51,10 +51,15 @@ from vibelens.utils.log import clear_analysis_id, get_logger, set_analysis_id
 
 logger = get_logger(__name__)
 
+# Max output tokens for a single friction analysis batch call
 FRICTION_OUTPUT_TOKENS = 8192
+# Timeout per friction batch LLM call (seconds)
 FRICTION_TIMEOUT_SECONDS = 300
+# Synthesis needs more tokens because it merges multiple batch outputs
 SYNTHESIS_OUTPUT_TOKENS = 20000
+# Timeout for the synthesis LLM call (seconds)
 SYNTHESIS_TIMEOUT_SECONDS = 120
+# Directory for detailed request/response analysis logs
 FRICTION_LOG_DIR = Path("logs/friction")
 
 _cache: TTLCache = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)

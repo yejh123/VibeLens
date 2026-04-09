@@ -13,6 +13,7 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# All ATIF schema versions this codebase can parse
 ATIF_VERSION = Literal[
     "ATIF-v1.0",
     "ATIF-v1.1",
@@ -22,6 +23,7 @@ ATIF_VERSION = Literal[
     "ATIF-v1.5",
     "ATIF-v1.6",
 ]
+# Version stamped on newly created trajectories
 DEFAULT_ATIF_VERSION = "ATIF-v1.6"
 
 

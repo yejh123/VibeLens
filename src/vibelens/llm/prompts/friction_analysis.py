@@ -8,13 +8,14 @@ Two-phase pipeline:
 from vibelens.models.analysis.friction import FrictionAnalysisOutput
 from vibelens.models.llm.prompts import AnalysisPrompt, load_template
 
+# Per-batch friction detection: identifies friction types and mitigations
 FRICTION_ANALYSIS_PROMPT = AnalysisPrompt(
     task_id="friction_analysis",
     system_template=load_template("friction/analysis_system.j2"),
     user_template=load_template("friction/analysis_user.j2"),
     output_model=FrictionAnalysisOutput,
 )
-
+# Post-batch synthesis: merges and deduplicates batch results into one report
 FRICTION_SYNTHESIS_PROMPT = AnalysisPrompt(
     task_id="friction_synthesis",
     system_template=load_template("friction/synthesis_system.j2"),

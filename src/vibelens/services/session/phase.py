@@ -17,6 +17,7 @@ from vibelens.models.enums import SessionPhase
 from vibelens.models.trajectories import Step
 from vibelens.services.session.tool_categories import TOOL_CATEGORY_MAP
 
+# Number of consecutive steps examined to classify a session phase
 PHASE_WINDOW_SIZE = 5
 
 # 35% threshold — slightly lower than before (was 40%) to catch

@@ -10,6 +10,7 @@ import uvicorn
 from vibelens import __version__
 from vibelens.config import load_settings
 
+# Wait for the server to bind before opening the browser
 BROWSER_OPEN_DELAY_SECONDS = 1.5
 
 app = typer.Typer(name="vibelens", help="Agent Trajectory analysis and visualization platform.")

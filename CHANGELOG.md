@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.9.30] - 2026-04-09
+
+### Added
+- **Skill importer**: New `services/skill/importer.py` auto-imports agent skills from Claude Code, Codex, and third-party agent skill directories at startup.
+- **Skill download service**: New `services/skill/download.py` for fetching featured skills from the catalog.
+- **Upload zip commands**: Extracted per-agent zip commands to `services/upload/commands.py` for cleaner upload processor.
+- **Utility modules**: Added `utils/content.py` (text extraction helpers), `utils/identifiers.py` (timestamped ID generation), `utils/json.py` (JSONL locking, reading).
+- **Trajectory storage package**: New `storage/trajectory/` package replacing `storage/conversation/` with clearer naming (`BaseTrajectoryStore`, `DiskTrajectoryStore`, `LocalTrajectoryStore`).
+- **Store tests**: Added `tests/storage/test_disk_store.py` and `tests/storage/test_local_store.py` with full ABC compliance tests.
+- **Session route tests**: Added `tests/api/test_session_routes.py`.
+
+### Fixed
+- **Analysis session index alignment**: LLM sometimes used batch indices (e.g. `"12"`) instead of session UUIDs in StepRef outputs, causing all step references to be silently dropped. Added `session_index` field to `SessionContext`, index-to-UUID fallback in `SessionContextBatch.resolve_step_ref`, and per-batch 0-based reindexing in the session batcher.
+- **Example analyses invisible in result view**: `is_example` flag was on Meta schemas but missing from `FrictionAnalysisResult` and `SkillAnalysisResult` models. Pydantic silently stripped the flag when loading full results, so the "Example" badge never appeared on result detail views. Added `is_example` to both result models.
+- **Extraction index gaps on skipped sessions**: `extract_all_contexts` used `enumerate()` causing index gaps when sessions were skipped. Now uses `len(contexts)` for sequential 0-based indices.
+
+### Changed
+- **Storage rename**: `storage/conversation/` renamed to `storage/trajectory/`. `TrajectoryStore` to `BaseTrajectoryStore`, `DiskStore` to `DiskTrajectoryStore`, `LocalStore` to `LocalTrajectoryStore`. All imports updated across the codebase.
+- **Skill store unification**: Removed `storage/skill/codex.py` (`CodexSkillStore`). Codex skills now use `DiskSkillStore` with `SkillSourceType.CODEX`, matching the Claude Code skill store pattern.
+- **Dependency renames**: `get_store()` to `get_trajectory_store()`, `get_skill_store()` to `get_claude_skill_store()`.
+- **Utils consolidation**: `utils/text.py` merged into `utils/content.py` (`extract_text` renamed to `content_to_text`). `utils/json_helpers.py` merged into `utils/json.py`. Removed `utils/paths.py`, `utils/github.py`, `utils/json_extract.py`.
+- **Upload processor simplified**: Extracted zip commands, replaced `uuid4()` with `generate_timestamped_id()`, reduced module from ~460 to ~250 lines.
+- **Analysis loading UI**: Stop button moved above informational text in both friction and skill analysis waiting screens. Text reordered: "Usually takes 2-5 minutes" before "Running in background".
+- **Background startup**: Renamed `_lightweight_startup` to `_run_background_startup`, now runs `import_agent_skills()` and `seed_example_analyses()`.
+
+### Removed
+- **Deleted modules**: `storage/conversation/` (replaced by `storage/trajectory/`), `storage/skill/codex.py`, `utils/github.py`, `utils/json_extract.py`, `utils/json_helpers.py`, `utils/paths.py`, `utils/text.py`.
+- **Deleted tests**: Removed outdated tests for deleted modules (`tests/api/test_e2e.py`, `tests/config/`, `tests/ingest/anonymize/`, `tests/live/`, `tests/services/friction/`, `tests/services/session/`, `tests/utils/`).
+
 ## [0.9.29] - 2026-04-08
 
 ### Added

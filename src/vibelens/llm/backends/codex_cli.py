@@ -23,6 +23,7 @@ import json
 from vibelens.llm.backends.cli_base import CliBackend
 from vibelens.models.llm.inference import BackendType, InferenceRequest
 
+# Models supported by the Codex CLI, ordered cheapest-first
 CODEX_CLI_MODELS = [
     "gpt-4.1-nano",
     "gpt-5.4-nano",
@@ -35,6 +36,7 @@ CODEX_CLI_MODELS = [
     "o3-pro",
     "gpt-5.4-pro",
 ]
+# Cheapest model used when no model is explicitly configured
 CODEX_CLI_DEFAULT_MODEL = "gpt-5.4-mini"
 
 

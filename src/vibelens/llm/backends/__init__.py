@@ -27,7 +27,9 @@ _CLI_BACKEND_REGISTRY: dict[BackendType, tuple[str, str]] = {
     BackendType.AMP_CLI: ("vibelens.llm.backends.amp_cli", "AmpCliBackend"),
 }
 
+# All CLI backends that run as subprocesses
 CLI_BACKENDS = frozenset(_CLI_BACKEND_REGISTRY.keys())
+# Complete set of valid backend identifiers (CLI + API + special)
 KNOWN_BACKENDS = CLI_BACKENDS | {BackendType.LITELLM, BackendType.DISABLED, BackendType.MOCK}
 
 
@@ -81,6 +83,7 @@ def _create_litellm_backend(model: str, config: LLMConfig) -> InferenceBackend:
     return LiteLLMBackend(config=config, model_override=override)
 
 
+# Cheapest model used when no model is explicitly configured for litellm
 LITELLM_DEFAULT_MODEL = "anthropic/claude-haiku-4-5"
 
 

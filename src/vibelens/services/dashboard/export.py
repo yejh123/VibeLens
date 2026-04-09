@@ -13,8 +13,9 @@ from vibelens.services.dashboard.stats import (
     compute_dashboard_stats,
 )
 
+# Prefix for exported CSV/JSON filenames (date is appended at download time)
 EXPORT_FILENAME_PREFIX = "vibelens-dashboard"
-
+# Column headers for the dashboard CSV export
 CSV_COLUMNS = [
     "session_id",
     "project_path",

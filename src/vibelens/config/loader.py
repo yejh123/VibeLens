@@ -10,9 +10,11 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Prefix for all VibeLens environment variables
 ENV_PREFIX = "VIBELENS_"
+# Env var pointing to the YAML config file path
 CONFIG_ENV_VAR = "VIBELENS_CONFIG"
-
+# Config file names auto-discovered in the working directory
 DEFAULT_CONFIG_NAMES = ["vibelens.yaml", "vibelens.yml"]
 
 # Maps nested YAML sections/keys → flat Settings field names.

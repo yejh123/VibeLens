@@ -59,3 +59,6 @@ class SkillAnalysisResult(BaseModel):
     duration_seconds: float | None = Field(
         default=None, description="Wall-clock analysis duration in seconds."
     )
+    is_example: bool = Field(
+        default=False, description="Whether this is a bundled example analysis."
+    )

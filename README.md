@@ -5,7 +5,8 @@
 <h1 align="center">VibeLens</h1>
 
 <p align="center">
-  <strong>See what your AI coding agents are actually doing.</strong>
+  <strong>See what your AI coding agents are actually doing.</strong><br>
+  Replay. Analyze. Evolve.
 </p>
 
 <p align="center">
@@ -18,6 +19,7 @@
 <p align="center">
   <a href="https://vibelens.chats-lab.org/">Live Demo</a> &middot;
   <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#supported-agents">Supported Agents</a> &middot;
   <a href="https://pypi.org/project/vibelens/">PyPI</a> &middot;
   <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -25,75 +27,84 @@
 ---
 
 <p align="center">
-  <img src="figures/comic-blurb.jpg" alt="VibeLens Comic">
+  <img src="figures/comic-blurb.jpg" alt="VibeLens Comic — Understand your agent. Teach it. Master it.">
 </p>
 
-<p align="center"><em>Analyze and understand your agent. Evolve it.</em></p>
+<p align="center"><em>Understand your agent. Teach it. Master it.</em></p>
+
+---
 
 Your AI coding agents run hundreds of tool calls, burn thousands of tokens, and you have no idea what happened. VibeLens changes that.
-
-- **Session visualization.** Step-by-step timeline with every tool call, thinking block, and sub-agent spawn.
-- **Dashboard analytics.** Cost breakdowns by model, peak-hour histograms, and per-project drill-downs.
-- **Productivity tips.** Flags retries, circular debugging, and abandoned approaches -- with suggested fixes.
-- **Skill personalization.** Recommend, create, and evolve reusable skills from your session history.
-- **Session sharing.** Share your interactions with your teammates with a link.
-
-Works with **Claude Code**, **Codex CLI**, **Gemini CLI**, and **OpenClaw** out of the box.
 
 ```bash
 pip install vibelens && vibelens serve
 ```
 
-### Session Viewer & Dashboard
-
-<table>
-  <tr>
-    <td width="50%">
-      <kbd><img src="figures/01-conversation.png" alt="Session Viewer" width="100%" /></kbd>
-      <p align="center"><b>Session Viewer</b><br>Step-by-step timeline with messages, tool calls, and sub-agent spawns.</p>
-    </td>
-    <td width="50%">
-      <kbd><img src="figures/02-dashboard.png" alt="Analytics Dashboard" width="100%" /></kbd>
-      <p align="center"><b>Analytics Dashboard</b><br>Aggregate stats, cost estimation, and usage trends over time.</p>
-    </td>
-  </tr>
-</table>
-
-### Productivity Tips & Skill Personalization
-
-<table>
-  <tr>
-    <td width="50%">
-      <kbd><img src="figures/03-productivity-tips.png" alt="Productivity Tips" width="100%" /></kbd>
-      <p align="center"><b>Productivity Tips</b><br>Detect friction patterns and get concrete improvement suggestions.</p>
-    </td>
-    <td width="50%">
-      <kbd><img src="figures/04-skill-retrieval.png" alt="Skill Retrieval" width="100%" /></kbd>
-      <p align="center"><b>Skill Retrieval</b><br>Match workflow patterns to pre-built skills from the catalog.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <kbd><img src="figures/05-skill-creation.png" alt="Skill Creation" width="100%" /></kbd>
-      <p align="center"><b>Skill Creation</b><br>Generate new SKILL.md files from your session history.</p>
-    </td>
-    <td width="50%">
-      <kbd><img src="figures/06-skill-evolution.png" alt="Skill Evolution" width="100%" /></kbd>
-      <p align="center"><b>Skill Evolution</b><br>Evolve installed skills with targeted edits based on real usage.</p>
-    </td>
-  </tr>
-</table>
+One install. Reads local logs. Works with **Claude Code**, **Codex CLI**, **Gemini CLI**, and **OpenClaw** out of the box.
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-agent parsing** | Claude Code, Codex CLI, Gemini CLI, OpenClaw with auto-detection |
-| **Session Visualization** | Tool calls, sub-agent spawns, elapsed time, image content |
-| **Dashboard Analytics** | Cost breakdowns by model, peak-hour histograms, and per-project drill-downs. |
-| **Productivity tips** | Friction detection, cross-session patterns, actionable mitigations |
-| **Skill personalization** | Retrieve, create, and evolve reusable agent skills |
-| **Session sharing** | Shareable URLs with read-only view |
+| **Session visualization** | Step-by-step timeline with tool calls, thinking blocks, sub-agent spawns, and flow diagrams |
+| **Dashboard analytics** | Usage heatmaps, cost breakdowns by model, peak-hour histograms, per-project drill-downs |
+| **Productivity tips** | Spots retry loops, circular debugging, abandoned approaches across sessions |
+| **Personalization** | Retrieve, customize, and evolve reusable skills from your real sessions |
+| **Session sharing** | One-click shareable links for team review |
+| **Multi-agent support** | Claude Code, Codex CLI, Gemini CLI, OpenClaw with auto-detection |
+
+## Supported Agents
+
+| Agent | Format | Data Location |
+|-------|--------|---------------|
+| **Claude Code** | JSONL | `~/.claude/projects/` |
+| **Codex CLI** | JSONL | `~/.codex/sessions/` |
+| **Gemini CLI** | JSON | `~/.gemini/tmp/` |
+| **OpenClaw** | JSONL | `~/.openclaw/agents/` |
+
+VibeLens auto-detects the agent format. Just point it at your session directory and it works.
+
+## Screenshots
+
+### Session Visualization & Dashboard Analytics
+
+<table>
+  <tr>
+    <td width="50%">
+      <kbd><img src="figures/01-conversation.png" alt="Session Visualization" width="100%" /></kbd>
+      <p align="center"><b>Session Visualization</b><br>Step-by-step timeline with messages, tool calls, thinking blocks, and sub-agent spawns.</p>
+    </td>
+    <td width="50%">
+      <kbd><img src="figures/02-dashboard.png" alt="Dashboard Analytics" width="100%" /></kbd>
+      <p align="center"><b>Dashboard Analytics</b><br>Usage heatmaps, cost breakdowns by model, and per-project drill-downs.</p>
+    </td>
+  </tr>
+</table>
+
+### Productivity Tips & Personalization
+
+<table>
+  <tr>
+    <td width="50%">
+      <kbd><img src="figures/03-productivity-tips.png" alt="Productivity Tips" width="100%" /></kbd>
+      <p align="center"><b>Productivity Tips</b><br>Detect friction patterns and get concrete suggestions to improve your workflow.</p>
+    </td>
+    <td width="50%">
+      <kbd><img src="figures/04-skill-retrieval.png" alt="Skill Recommendation" width="100%" /></kbd>
+      <p align="center"><b>Skill Recommendation</b><br>Match workflow patterns to pre-built skills from the catalog.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <kbd><img src="figures/05-skill-creation.png" alt="Skill Customization" width="100%" /></kbd>
+      <p align="center"><b>Skill Customization</b><br>Generate new SKILL.md files tailored to your session patterns.</p>
+    </td>
+    <td width="50%">
+      <kbd><img src="figures/06-skill-evolution.png" alt="Skill Evolution" width="100%" /></kbd>
+      <p align="center"><b>Skill Evolution</b><br>Evolve installed skills with targeted edits based on your real sessions.</p>
+    </td>
+  </tr>
+</table>
 
 ## Quick Start
 
@@ -133,31 +144,11 @@ vibelens serve --config config/self-use.yaml
 vibelens serve --host 0.0.0.0 --port 8080
 ```
 
-## Supported Agents
-
-| Agent | Format | Data Location |
-|-------|--------|---------------|
-| **Claude Code** | JSONL | `~/.claude/projects/` |
-| **Codex CLI** | JSONL | `~/.codex/sessions/` |
-| **Gemini CLI** | JSON | `~/.gemini/tmp/` |
-| **OpenClaw** | JSONL | `~/.openclaw/agents/` |
-
 ## Data Donation
 
 VibeLens supports donating your agent session data to advance research on coding agent behavior. Donated sessions are collected by [CHATS-Lab](https://github.com/CHATS-lab) (Conversation, Human-AI Technology, and Safety Lab) at Northeastern University.
 
 To donate, upload your data, select the sessions you want to share, and click the **Donate** button.
-
-## Development
-
-```bash
-# Lint and test
-uv run ruff check src/ tests/
-uv run pytest tests/ -v -s
-
-# Frontend dev server (hot reload)
-cd frontend && npm install && npm run dev
-```
 
 ## Contributing
 

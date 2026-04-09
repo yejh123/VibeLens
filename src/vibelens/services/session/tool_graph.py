@@ -13,6 +13,8 @@ from vibelens.services.session.tool_categories import TOOL_CATEGORY_MAP
 
 _FILE_PATH_KEYS = {"file_path", "path", "filename", "notebook_path", "directory"}
 
+# Max step gap for inferring causal edges between tool calls.
+# Larger distances allow looser chains; smaller ones reduce false positives.
 MAX_READ_WRITE_DISTANCE = 20
 MAX_SEARCH_READ_DISTANCE = 12
 MAX_WRITE_TEST_DISTANCE = 5

@@ -8,7 +8,9 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Timeout for `git rev-parse --show-toplevel` repo root detection
 GIT_RESOLVE_TIMEOUT_SECONDS = 10
+# Timeout for `git bundle create` (large repos can be slow)
 BUNDLE_TIMEOUT_SECONDS = 300
 
 

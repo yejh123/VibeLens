@@ -1,8 +1,6 @@
 """Dependency injection singletons for VibeLens."""
 
-import json
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from vibelens.config import (
@@ -15,15 +13,16 @@ from vibelens.config import (
 from vibelens.config.llm_config import DEFAULT_SETTINGS_PATH, discover_settings_path
 from vibelens.llm.backend import InferenceBackend
 from vibelens.models.enums import AppMode
-from vibelens.storage.conversation.base import TrajectoryStore
-from vibelens.storage.conversation.disk import DiskStore
-from vibelens.storage.conversation.local import LocalStore
+from vibelens.storage.trajectory.base import BaseTrajectoryStore
+from vibelens.storage.trajectory.disk import DiskTrajectoryStore
+from vibelens.storage.trajectory.local import LocalTrajectoryStore
+from vibelens.utils.json import read_jsonl
 from vibelens.utils.log import get_logger
 
 _MISSING = object()
 _NOT_CHECKED = object()
 _registry: dict[str, Any] = {}
-_upload_registry: dict[str, list[DiskStore]] = {}
+_upload_registry: dict[str, list[DiskTrajectoryStore]] = {}
 
 logger = get_logger(__name__)
 
@@ -72,7 +71,7 @@ def get_friction_store():
     return _get_or_create("friction_store", lambda: FrictionStore(get_settings().friction_dir))
 
 
-def get_skill_store():
+def get_claude_skill_store():
     """Return cached Claude Code skill store singleton."""
     from vibelens.models.skill import SkillSourceType
     from vibelens.storage.skill.disk import DiskSkillStore
@@ -84,11 +83,15 @@ def get_skill_store():
 
 
 def get_codex_skill_store():
-    """Return cached CodexSkillStore singleton."""
-    from vibelens.storage.skill.codex import CodexSkillStore
+    """Return cached Codex CLI skill store singleton."""
+    from vibelens.models.skill import SkillSourceType
+    from vibelens.storage.skill.disk import DiskSkillStore
 
     return _get_or_create(
-        "codex_skill_store", lambda: CodexSkillStore(get_settings().codex_dir / "skills")
+        "codex_skill_store",
+        lambda: DiskSkillStore(
+            get_settings().codex_dir / "skills", SkillSourceType.CODEX
+        ),
     )
 
 
@@ -156,7 +159,7 @@ def set_inference_backend(backend: InferenceBackend | None) -> None:
     _registry["inference_backend"] = backend
 
 
-def get_upload_stores(session_token: str | None) -> list[DiskStore]:
+def get_upload_stores(session_token: str | None) -> list[DiskTrajectoryStore]:
     """Return upload stores for a given session_token.
 
     Args:
@@ -170,7 +173,7 @@ def get_upload_stores(session_token: str | None) -> list[DiskStore]:
     return _upload_registry.get(session_token, [])
 
 
-def get_all_upload_stores() -> list[DiskStore]:
+def get_all_upload_stores() -> list[DiskTrajectoryStore]:
     """Return all upload stores across all tokens.
 
     Used for token-agnostic lookups like shared session resolution,
@@ -179,13 +182,13 @@ def get_all_upload_stores() -> list[DiskStore]:
     Returns:
         Flat list of every registered upload DiskStore.
     """
-    stores: list[DiskStore] = []
+    stores: list[DiskTrajectoryStore] = []
     for token_stores in _upload_registry.values():
         stores.extend(token_stores)
     return stores
 
 
-def register_upload_store(session_token: str, store: DiskStore) -> None:
+def register_upload_store(session_token: str, store: DiskTrajectoryStore) -> None:
     """Register an upload store for a session_token.
 
     Args:
@@ -217,7 +220,7 @@ def reconstruct_upload_registry() -> None:
     _upload_registry.clear()
     registered = 0
 
-    for line in _iter_metadata_lines(metadata_path):
+    for line in read_jsonl(metadata_path):
         token = line.get("session_token")
         upload_id = line.get("upload_id")
         if not token or not upload_id:
@@ -228,7 +231,7 @@ def reconstruct_upload_registry() -> None:
             continue
 
         tags = {"_upload_id": upload_id, "_session_token": token}
-        store = DiskStore(root=store_root, default_tags=tags)
+        store = DiskTrajectoryStore(root=store_root, default_tags=tags)
         store.initialize()
         _upload_registry.setdefault(token, []).append(store)
         registered += 1
@@ -240,49 +243,28 @@ def reconstruct_upload_registry() -> None:
     )
 
 
-def _iter_metadata_lines(path: Path) -> list[dict]:
-    """Read a JSONL file and return parsed dicts, skipping invalid lines.
-
-    Args:
-        path: Path to the JSONL file.
-
-    Returns:
-        List of parsed JSON dicts.
-    """
-    results: list[dict] = []
-    try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    results.append(json.loads(stripped))
-                except json.JSONDecodeError:
-                    logger.warning("Skipping invalid JSON line in %s", path.name)
-    except OSError as exc:
-        logger.warning("Cannot read metadata file %s: %s", path, exc)
-    return results
-
-
-def get_store() -> TrajectoryStore:
+def get_trajectory_store() -> BaseTrajectoryStore:
     """Return cached TrajectoryStore singleton.
 
     In self-use mode returns LocalStore. In demo mode this is unused
     (store_resolver uses get_upload_stores + get_example_store instead).
     """
 
-    def _create_store() -> TrajectoryStore:
+    def _create_store() -> BaseTrajectoryStore:
         settings = get_settings()
-        return DiskStore(settings.upload_dir) if is_demo_mode() else LocalStore(settings=settings)
+        return (
+            DiskTrajectoryStore(settings.upload_dir)
+            if is_demo_mode()
+            else LocalTrajectoryStore(settings=settings)
+        )
 
     return _get_or_create("store", _create_store)
 
 
-def get_example_store() -> DiskStore:
+def get_example_store() -> DiskTrajectoryStore:
     """Return cached DiskStore for demo example sessions.
 
     Separate from the upload store so examples live in ``~/.vibelens/examples/``
     and uploads live in ``~/.vibelens/uploads/``.
     """
-    return _get_or_create("example_store", lambda: DiskStore(get_settings().examples_dir))
+    return _get_or_create("example_store", lambda: DiskTrajectoryStore(get_settings().examples_dir))

@@ -6,6 +6,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, Template
 from pydantic import BaseModel, ConfigDict, Field
 
+# Root directory for Jinja2 system/user prompt templates
 TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "llm" / "prompts" / "templates"
 
 _jinja_env = Environment(

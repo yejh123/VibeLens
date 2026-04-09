@@ -28,8 +28,11 @@ from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Placeholder for sessions that lack a project path
 NO_PROJECT = "__unknown__"
+# Regex anchor for splitting oversized contexts at step boundaries
 STEP_BOUNDARY_PATTERN = re.compile(r"\n\n(?=\[step_id=)")
+# Extra tokens reserved for separator text between context parts
 SEPARATOR_TOKEN_ALLOWANCE = 5
 
 
@@ -189,6 +192,7 @@ def _split_session_at_steps(
     for i, part_text in enumerate(parts, 1):
         part_ctx = SessionContext(
             session_id=f"{ctx.session_id}_part{i}",
+            session_index=ctx.session_index,
             project_path=ctx.project_path,
             context_text=part_text,
             trajectory_group=ctx.trajectory_group,
@@ -342,6 +346,9 @@ def _assemble_batches(chains: list[_Chain], budget: int) -> list[SessionContextB
             batch_tokens += chain.tokens
             batch_projects.add(chain.project)
             unplaced.remove(chain)
+
+        for idx, ctx in enumerate(batch_contexts):
+            ctx.reindex(idx)
 
         batch_id = f"batch-{len(batches) + 1:03d}"
         batches.append(

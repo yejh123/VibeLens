@@ -1,6 +1,6 @@
 """Session retrieval and export business logic."""
 
-from vibelens.deps import get_example_store, get_store, get_upload_stores, is_demo_mode
+from vibelens.deps import get_example_store, get_trajectory_store, get_upload_stores, is_demo_mode
 from vibelens.models.trajectories import Trajectory
 from vibelens.services.session.store_resolver import (
     get_metadata_from_stores,
@@ -32,7 +32,7 @@ def list_sessions(
         List of trajectory summary dicts (no steps).
     """
     if refresh and not is_demo_mode():
-        get_store().invalidate_index()
+        get_trajectory_store().invalidate_index()
     summaries = list_all_metadata(session_token)
     logger.info(
         "list_sessions: metadata=%d token=%s",
@@ -75,7 +75,7 @@ def list_projects(session_token: str | None = None) -> list[str]:
         Sorted list of unique project path strings.
     """
     if not is_demo_mode():
-        return sorted(get_store().list_projects())
+        return sorted(get_trajectory_store().list_projects())
 
     projects: set[str] = set()
     user_stores = get_upload_stores(session_token)

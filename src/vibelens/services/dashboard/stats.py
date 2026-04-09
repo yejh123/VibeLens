@@ -24,7 +24,9 @@ from vibelens.utils.timestamps import parse_metadata_timestamp
 
 logger = get_logger(__name__)
 
+# Placeholder when a session has no model metadata
 UNKNOWN_MODEL = "unknown"
+# Placeholder for sessions without a project path
 NO_PROJECT = "(no project)"
 
 

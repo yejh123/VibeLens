@@ -2,7 +2,9 @@
 
 from pydantic import BaseModel, Field
 
+# Replacement text inserted where sensitive data was removed
 REDACTED_PLACEHOLDER = "[REDACTED]"
+# Usernames shorter than this are too common to reliably detect
 MIN_BARE_USERNAME_LENGTH = 4
 
 

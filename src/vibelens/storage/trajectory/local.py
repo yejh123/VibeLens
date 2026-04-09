@@ -22,7 +22,7 @@ from vibelens.ingest.parsers import LOCAL_PARSER_CLASSES
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.models.enums import AgentType
 from vibelens.models.trajectories import FinalMetrics, Trajectory
-from vibelens.storage.conversation.base import TrajectoryStore
+from vibelens.storage.trajectory.base import BaseTrajectoryStore
 from vibelens.utils import get_logger
 
 logger = get_logger(__name__)
@@ -47,7 +47,7 @@ def _extract_session_id(filepath: Path, agent_type: AgentType) -> str:
     return f"{agent_type.value}:{stem}"
 
 
-class LocalStore(TrajectoryStore):
+class LocalTrajectoryStore(BaseTrajectoryStore):
     """Read sessions from all local agent data directories.
 
     Uses LOCAL_PARSER_CLASSES to instantiate parsers, scans each parser's

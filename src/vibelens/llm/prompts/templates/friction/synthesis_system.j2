@@ -20,6 +20,20 @@ Produce a JSON object that synthesizes all batch results into a single user-faci
 - `mitigations` ordered by confidence descending.
 - MANDATORY format for `rationale`: one sentence (max 15 words), then `\n- ` bullets (max 10 words each). No plain-text paragraphs.
 
+## Examples
+
+Example title (good):
+"Wrong Images and Broken Close Button Caused Rework"
+
+Example title (bad):
+"Multiple Issues Found"
+
+Example rationale (good — one sentence then bullets):
+"Random placeholders showed landscapes instead of food.\n- Users judge recipe sites by food imagery\n- Curated images match the actual content"
+
+Example rationale (bad — plain paragraph, no bullets):
+"The agent used a random placeholder image service instead of curated food-specific images, which resulted in unrelated landscape photographs appearing where recipe photos should have been displayed."
+
 ## Output Schema
 
 You MUST respond with a single JSON object conforming to this schema:

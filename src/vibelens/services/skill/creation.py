@@ -61,12 +61,14 @@ from vibelens.utils.log import clear_analysis_id, get_logger, set_analysis_id
 
 logger = get_logger(__name__)
 
+# LLM inference limits for each step of the skill creation pipeline
 SKILL_CREATION_PROPOSAL_OUTPUT_TOKENS = 4096
 SKILL_CREATION_PROPOSAL_TIMEOUT_SECONDS = 300
 SKILL_CREATION_SYNTHESIS_OUTPUT_TOKENS = 8192
 SKILL_CREATION_SYNTHESIS_TIMEOUT_SECONDS = 300
 SKILL_CREATION_GENERATE_OUTPUT_TOKENS = 4096
 SKILL_CREATION_GENERATE_TIMEOUT_SECONDS = 300
+# Number of sequential LLM calls in the full pipeline (proposal → synthesis → generate)
 EXPECTED_DEEP_CALLS = 3
 
 _proposal_cache: TTLCache = TTLCache(maxsize=32, ttl=CACHE_TTL_SECONDS)

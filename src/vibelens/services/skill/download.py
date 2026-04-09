@@ -1,8 +1,8 @@
-"""GitHub skill downloading utilities.
+"""Download skill directories from GitHub repositories.
 
-Downloads complete skill directories (SKILL.md + auxiliary files) from
-GitHub repositories, supporting recursive directory traversal via the
-GitHub Contents API.
+Fetches complete skill directories (SKILL.md + auxiliary files) from GitHub
+using the Contents API, with recursive directory traversal to preserve the
+full skill structure locally.
 """
 
 import logging
@@ -13,15 +13,22 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# GitHub REST API v3 base URL for repository content queries
 GITHUB_API_BASE = "https://api.github.com"
+
+# Base URL for raw file downloads (bypasses API rate limits)
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com"
+
+# Matches GitHub tree URLs like https://github.com/{owner}/{repo}/tree/{ref}/{path}
 GITHUB_TREE_PATTERN = re.compile(
     r"https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/tree/(?P<ref>[^/]+)/(?P<path>.+)"
 )
+
+# Timeout for all GitHub HTTP requests (seconds)
 REQUEST_TIMEOUT_SECONDS = 30
 
 
-def download_skill_from_github(source_url: str, target_dir: Path) -> bool:
+def download_skill_directory(source_url: str, target_dir: Path) -> bool:
     """Download a complete skill directory from a GitHub tree URL.
 
     Fetches all files recursively from the GitHub Contents API and writes
@@ -47,7 +54,7 @@ def download_skill_from_github(source_url: str, target_dir: Path) -> bool:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        downloaded = _download_directory(owner, repo, ref, path, target_dir)
+        downloaded = _fetch_directory_recursive(owner, repo, ref, path, target_dir)
         logger.info(
             "Downloaded %d files from %s/%s/%s to %s", downloaded, owner, repo, path, target_dir
         )
@@ -57,8 +64,10 @@ def download_skill_from_github(source_url: str, target_dir: Path) -> bool:
         return False
 
 
-def _download_directory(owner: str, repo: str, ref: str, path: str, local_dir: Path) -> int:
-    """Recursively download all files from a GitHub directory.
+def _fetch_directory_recursive(
+    owner: str, repo: str, ref: str, path: str, local_dir: Path
+) -> int:
+    """Recursively fetch all files from a GitHub directory via the Contents API.
 
     Args:
         owner: Repository owner.
@@ -90,17 +99,17 @@ def _download_directory(owner: str, repo: str, ref: str, path: str, local_dir: P
             raw_url = entry.get("download_url", "")
             if not raw_url:
                 raw_url = f"{GITHUB_RAW_BASE}/{owner}/{repo}/{ref}/{entry['path']}"
-            downloaded += _download_file(raw_url, local_dir / entry_name)
+            downloaded += _fetch_file(raw_url, local_dir / entry_name)
 
         elif entry_type == "dir":
             sub_dir = local_dir / entry_name
             sub_dir.mkdir(parents=True, exist_ok=True)
-            downloaded += _download_directory(owner, repo, ref, entry["path"], sub_dir)
+            downloaded += _fetch_directory_recursive(owner, repo, ref, entry["path"], sub_dir)
 
     return downloaded
 
 
-def _download_file(url: str, local_path: Path) -> int:
+def _fetch_file(url: str, local_path: Path) -> int:
     """Download a single file from a URL.
 
     Args:

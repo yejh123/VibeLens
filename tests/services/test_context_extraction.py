@@ -374,9 +374,7 @@ def test_session_context_batch_bool_and_len():
 
     traj = _make_trajectory("sess-a", [_make_step("s1", "user", "hello")])
     ctx = extract_session_context([traj])
-    non_empty = SessionContextBatch(
-        contexts=[ctx], session_ids=["sess-a"], skipped_session_ids=[]
-    )
+    non_empty = SessionContextBatch(contexts=[ctx], session_ids=["sess-a"], skipped_session_ids=[])
     assert non_empty
     assert len(non_empty) == 1
 

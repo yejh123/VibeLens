@@ -21,6 +21,7 @@ SUBAGENTS_DIR_NAME = "subagents"
 # Directories to skip during recursive discovery
 _SKIP_DIR_NAMES = {SUBAGENTS_DIR_NAME, "parsed"}
 
+# File extensions that session parsers can handle
 PARSEABLE_EXTENSIONS = {".json", ".jsonl"}
 
 _PARSERS_BY_TYPE: dict[AgentType, type[BaseParser]] = {

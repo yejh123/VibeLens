@@ -382,10 +382,6 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
                 <TutorialBanner tutorial={MODE_DESCRIPTIONS[currentMode].tutorial} accentColor="teal" />
                 {activeJobId && (
                   <div className="flex flex-col items-center gap-3 mt-1">
-                    <div className="text-center space-y-1">
-                      <p className="text-sm text-zinc-400">Running in background — you can switch tabs</p>
-                      <p className="text-sm text-zinc-400">Usually takes 2-5 minutes</p>
-                    </div>
                     <button
                       onClick={handleStopAnalysis}
                       className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs text-rose-300 hover:text-white bg-rose-900/30 hover:bg-rose-800/50 border border-rose-700/50 rounded-md transition"
@@ -393,6 +389,10 @@ export function SkillsPanel({ checkedIds, activeJobId, onJobIdChange }: SkillsPa
                       <Square className="w-3 h-3" />
                       Stop
                     </button>
+                    <div className="text-center space-y-1">
+                      <p className="text-sm text-zinc-400">Usually takes 2-5 minutes</p>
+                      <p className="text-sm text-zinc-400">Running in background — you can switch tabs</p>
+                    </div>
                   </div>
                 )}
               </div>

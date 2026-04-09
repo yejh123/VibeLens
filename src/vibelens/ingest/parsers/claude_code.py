@@ -83,6 +83,7 @@ _AGENT_ID_PATTERN = re.compile(r"agentId:\s*([a-f0-9]+)")
 _PERSISTED_PATH_PATTERN = re.compile(r"Full output saved to: (.+?)(?:\n|$)")
 
 
+# Reject paths longer than this to avoid pathological file reads
 MAX_PATH_LENGTH = 1024
 
 

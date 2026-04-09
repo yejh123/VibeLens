@@ -22,10 +22,15 @@ from pathlib import Path
 
 _analysis_id_var: ContextVar[str | None] = ContextVar("analysis_id", default=None)
 
+# Format string for all log handlers (timestamp | module:line | level | message)
 LOG_FORMAT = "%(asctime)s | %(name)s:%(lineno)d | %(levelname)s | %(message)s"
+# Date portion of the log format
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+# Project-root logs/ directory for all log files
 DEFAULT_LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
+# Rotate log files after reaching 10 MB
 LOG_MAX_BYTES = 10 * 1024 * 1024
+# Keep 3 rotated backup files per log
 LOG_BACKUP_COUNT = 3
 
 # Maps logger name prefix → log filename. Order matters: first match wins.

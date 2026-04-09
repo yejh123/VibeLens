@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from vibelens.models.skill.source import SkillSource, SkillSourceType
 
+# Enforces kebab-case naming (e.g. "test-fix-loop", "commit-with-review")
 VALID_SKILL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 

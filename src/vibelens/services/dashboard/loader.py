@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 # After each batch, the thread sleeps briefly to release the GIL
 # so the event loop can serve other requests (friction history, LLM status).
 WARM_BATCH_SIZE = 20
+# Sleep between batches to release the GIL for other requests
 WARM_YIELD_SECONDS = 0.01
 
 _dashboard_cache: TTLCache = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
@@ -64,24 +65,7 @@ def load_filtered_trajectories(
     """
     metadata = list_all_metadata(session_token)
     filtered = filter_metadata(metadata, project_path, date_from, date_to, agent_name)
-
-    trajectories = []
-    for meta in filtered:
-        session_id = meta.get("session_id", "")
-        if not session_id:
-            continue
-        try:
-            group = load_from_stores(session_id, session_token)
-            if group:
-                traj = group[0]
-                # Enrich project_path from skeleton metadata when full
-                # parse fails to extract it (cwd not in first N entries)
-                if not traj.project_path:
-                    traj.project_path = meta.get("project_path")
-                trajectories.append(traj)
-        except Exception:
-            logger.warning("Failed to load session %s, skipping", session_id)
-
+    trajectories = _load_and_enrich_trajectories(filtered, session_token)
     return trajectories, filtered
 
 
@@ -212,23 +196,27 @@ def warm_cache() -> None:
     _dashboard_cache[cache_key_dash] = stats
 
     # Tool usage requires full trajectories — load in batches to yield GIL
-    trajectories = _load_trajectories_yielding(filtered)
+    trajectories = _load_and_enrich_trajectories(
+        filtered, session_token=None, batch_size=WARM_BATCH_SIZE
+    )
     usage = compute_tool_usage(trajectories)
     _tool_usage_cache[cache_key_tools] = usage
 
     logger.info("Dashboard cache warmed")
 
 
-def _load_trajectories_yielding(metadata: list[dict]) -> list[Trajectory]:
-    """Load trajectories in batches, sleeping between batches to release the GIL.
+def _load_and_enrich_trajectories(
+    metadata: list[dict], session_token: str | None, batch_size: int = 0
+) -> list[Trajectory]:
+    """Load trajectories from metadata, enriching project_path from skeleton data.
 
-    When called from a background thread, the brief sleep between batches
-    allows the async event loop to serve other requests. Without this,
-    continuous JSON parsing of hundreds of sessions monopolizes the GIL
-    and blocks lightweight endpoints like /friction/history and /llm/status.
+    When ``batch_size > 0``, sleeps briefly between batches to release the
+    GIL so the async event loop can serve other requests concurrently.
 
     Args:
         metadata: Filtered metadata list with session_ids to load.
+        session_token: Browser tab token for upload scoping.
+        batch_size: If > 0, yield GIL every N sessions. 0 means no yielding.
 
     Returns:
         List of loaded Trajectory objects.
@@ -240,17 +228,18 @@ def _load_trajectories_yielding(metadata: list[dict]) -> list[Trajectory]:
         if not session_id:
             continue
         try:
-            group = load_from_stores(session_id)
+            group = load_from_stores(session_id, session_token)
             if group:
                 traj = group[0]
+                # Enrich project_path from skeleton metadata when full
+                # parse fails to extract it (cwd not in first N entries)
                 if not traj.project_path:
                     traj.project_path = meta.get("project_path")
                 trajectories.append(traj)
         except Exception:
-            logger.warning("Failed to load session %s during cache warming", session_id)
+            logger.warning("Failed to load session %s, skipping", session_id)
 
-        # Release the GIL between batches so the event loop can run
-        if (i + 1) % WARM_BATCH_SIZE == 0:
+        if batch_size > 0 and (i + 1) % batch_size == 0:
             logger.info("Cache warming progress: %d/%d sessions loaded", i + 1, len(metadata))
             time.sleep(WARM_YIELD_SECONDS)
 

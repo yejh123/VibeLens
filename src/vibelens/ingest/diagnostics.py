@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+# Cap warnings per parse run to avoid flooding logs with repetitive issues
 MAX_WARNINGS = 20
 
 

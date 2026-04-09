@@ -21,21 +21,30 @@ from pathlib import Path
 import httpx
 
 from vibelens import __version__
-from vibelens.deps import get_settings, get_store
+from vibelens.deps import (
+    get_example_store,
+    get_settings,
+    get_trajectory_store,
+    get_upload_stores,
+    is_demo_mode,
+)
 from vibelens.ingest.parsers.base import BaseParser
 from vibelens.models.trajectories.trajectory import Trajectory
 from vibelens.schemas.session import DonateResult
 from vibelens.services.session.store_resolver import load_from_stores
-from vibelens.services.upload.processor import generate_upload_id
-from vibelens.storage.conversation.base import TrajectoryStore
-from vibelens.storage.conversation.local import LocalStore
+from vibelens.storage.trajectory.base import BaseTrajectoryStore
+from vibelens.storage.trajectory.local import LocalTrajectoryStore
 from vibelens.utils.git import compute_repo_hash, create_git_bundle, resolve_git_root
+from vibelens.utils.identifiers import generate_timestamped_id
 from vibelens.utils.log import get_logger
 
 logger = get_logger(__name__)
 
+# Server endpoint path where donation ZIPs are POSTed
 DONATION_RECEIVE_PATH = "/api/donation/receive"
+# Metadata file written inside the outgoing donation ZIP
 MANIFEST_FILENAME = "manifest.json"
+# Timeout for the HTTP upload to the donation server
 HTTP_TIMEOUT_SECONDS = 120
 
 
@@ -60,7 +69,7 @@ async def send_donation(session_ids: list[str], session_token: str | None = None
     if not sessions_data.valid_sessions:
         return DonateResult(total=len(session_ids), donated=0, errors=sessions_data.errors)
 
-    donation_id = generate_upload_id()
+    donation_id = generate_timestamped_id()
     bundle_dir = Path(tempfile.mkdtemp(prefix="vibelens_bundles_"))
     try:
         repo_bundles, repo_hash_map = await asyncio.to_thread(
@@ -133,7 +142,7 @@ class _RepoBundle:
     session_ids: list[str] = field(default_factory=list)
 
 
-def _active_stores(session_token: str | None = None) -> list[TrajectoryStore]:
+def _active_stores(session_token: str | None = None) -> list[BaseTrajectoryStore]:
     """Return all active trajectory stores visible to the given token.
 
     In demo mode, includes per-user upload stores so that newly uploaded
@@ -145,9 +154,7 @@ def _active_stores(session_token: str | None = None) -> list[TrajectoryStore]:
     Returns:
         Ordered list of stores to search.
     """
-    from vibelens.deps import get_example_store, get_upload_stores, is_demo_mode
-
-    stores: list[TrajectoryStore] = [get_store()]
+    stores: list[BaseTrajectoryStore] = [get_trajectory_store()]
     if is_demo_mode():
         stores.extend(get_upload_stores(session_token))
         stores.append(get_example_store())
@@ -155,8 +162,8 @@ def _active_stores(session_token: str | None = None) -> list[TrajectoryStore]:
 
 
 def _find_session_in_stores(
-    stores: list[TrajectoryStore], session_id: str
-) -> tuple[TrajectoryStore, tuple] | None:
+    stores: list[BaseTrajectoryStore], session_id: str
+) -> tuple[BaseTrajectoryStore, tuple] | None:
     """Find a session across multiple stores.
 
     Args:
@@ -174,7 +181,7 @@ def _find_session_in_stores(
 
 
 def _collect_sessions(
-    stores: list[TrajectoryStore],
+    stores: list[BaseTrajectoryStore],
     session_ids: list[str],
     session_token: str | None = None,
 ) -> _SessionCollectionResult:
@@ -192,9 +199,7 @@ def _collect_sessions(
 
     for session_id in session_ids:
         try:
-            _collect_single_session(
-                stores, session_id, session_token, result
-            )
+            _collect_single_session(stores, session_id, session_token, result)
         except Exception as exc:
             logger.warning(
                 "Donation: unexpected error collecting session %s: %s",
@@ -202,15 +207,13 @@ def _collect_sessions(
                 exc,
                 exc_info=True,
             )
-            result.errors.append(
-                {"session_id": session_id, "error": f"Collection error: {exc}"}
-            )
+            result.errors.append({"session_id": session_id, "error": f"Collection error: {exc}"})
 
     return result
 
 
 def _collect_single_session(
-    stores: list[TrajectoryStore],
+    stores: list[BaseTrajectoryStore],
     session_id: str,
     session_token: str | None,
     result: _SessionCollectionResult,
@@ -291,7 +294,7 @@ def _collect_single_session(
 
 
 def _resolve_raw_files(
-    store: TrajectoryStore,
+    store: BaseTrajectoryStore,
     filepath: Path,
     parser: BaseParser,
     source_upload_id: str | None = None,
@@ -325,7 +328,7 @@ def _resolve_raw_files(
 
     # LocalStore has agent data dirs for computing relative paths
     data_dir = None
-    if isinstance(store, LocalStore):
+    if isinstance(store, LocalTrajectoryStore):
         data_dir = store.get_data_dir(parser) or parser.LOCAL_DATA_DIR
 
     raw_files: list[tuple[Path, str]] = []

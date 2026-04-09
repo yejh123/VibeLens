@@ -9,6 +9,7 @@ singleton to avoid repeated initialization overhead.
 
 import tiktoken
 
+# tiktoken encoding shared by Claude, GPT-4, and most modern LLMs
 ENCODING_NAME = "cl100k_base"
 
 _encoder: tiktoken.Encoding | None = None

@@ -1,16 +1,69 @@
-"""Shared text helpers for digest and analysis modules.
+"""Content extraction and text helpers for digest and analysis modules.
 
 Pure functions for extracting, truncating, and summarizing text content
 from trajectory message and observation fields.
 """
 
+import json
+
+# Default cap for summarize_args total output length
 DEFAULT_MAX_TOTAL_CHARS = 200
+# Default cap for a single argument value in summarize_args
 DEFAULT_MAX_VALUE_CHARS = 60
+# Lowercased substrings that indicate error content in observations
 ERROR_SIGNALS = ("error:", "traceback", "exception", "failed", "fatal")
 
 
-def extract_text(content) -> str:
-    """Extract plain text from a message or observation content field.
+def coerce_to_string(value: str | list | dict | int | float | bool | None) -> str:
+    """Coerce any content value to a plain string.
+
+    Handles the polymorphic content fields found across agent formats:
+    string pass-through, list of ``{text: ...}`` blocks concatenated,
+    dict JSON-serialised, and primitives stringified.
+
+    Args:
+        value: Content in any observed shape.
+
+    Returns:
+        Plain string representation.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return _extract_text_from_blocks(value)
+    if isinstance(value, dict):
+        return json.dumps(value)
+    return str(value)
+
+
+def _extract_text_from_blocks(blocks: list) -> str:
+    """Concatenate text from a list of content blocks.
+
+    Handles dicts with ``text`` keys, bare strings, and silently skips
+    non-text items.
+
+    Args:
+        blocks: List of content block dicts or strings.
+
+    Returns:
+        Concatenated text separated by newlines.
+    """
+    parts: list[str] = []
+    for block in blocks:
+        if isinstance(block, str):
+            if block:
+                parts.append(block)
+        elif isinstance(block, dict):
+            text = block.get("text", "")
+            if text and isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def content_to_text(content) -> str:
+    """Convert a polymorphic message/observation content field to plain text.
 
     Handles str, list[ContentPart], None, and other types.
 
